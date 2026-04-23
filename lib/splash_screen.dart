@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'animations.dart';
-import 'welcome_screen.dart'; // role picker is inside welcome_screen
+import 'welcome_screen.dart';
+import 'onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -86,12 +88,20 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
-  void _navigate() {
+  void _navigate() async {
     if (!mounted) return;
+    final prefs = await SharedPreferences.getInstance();
+    final onboardingDone = prefs.getBool('onboarding_done') ?? false;
+    if (!mounted) return;
+
+    final destination = onboardingDone
+        ? const WelcomeScreen()
+        : const OnboardingScreen();
+
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const WelcomeScreen(),
+        pageBuilder: (_, __, ___) => destination,
         transitionDuration: const Duration(milliseconds: 700),
         transitionsBuilder: (_, animation, __, child) => FadeTransition(
             opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),

@@ -31,7 +31,7 @@ class OfflineScreen extends StatelessWidget {
               ElevatedButton.icon(
                 onPressed: () async {
                   final connectivity = await Connectivity().checkConnectivity();
-                  if (connectivity != ConnectivityResult.none) {
+                  if (!connectivity.contains(ConnectivityResult.none)) {
                     Navigator.pushReplacement(context,
                         MaterialPageRoute(builder: (_) => SplashScreen()));
                   }

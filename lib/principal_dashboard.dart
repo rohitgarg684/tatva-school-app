@@ -1,7 +1,8 @@
 import 'dart:math' show min, max;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'login_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'welcome_screen.dart';
 import 'messaging_screen.dart';
 import 'animations.dart';
 
@@ -293,11 +294,14 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                 SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(builder: (_) => LoginScreen()),
-                          (r) => false);
+                    onPressed: () async {
+                      await FirebaseAuth.instance.signOut();
+                      if (context.mounted) {
+                        Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(builder: (_) => WelcomeScreen()),
+                            (r) => false);
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                         backgroundColor: danger,

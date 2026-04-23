@@ -93,7 +93,7 @@ class _LoginScreenState extends State<LoginScreen>
       UserCredential cred =
           await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: emailController.text.trim(),
-        password: passwordController.text.trim(),
+        password: passwordController.text,
       );
 
       if (!cred.user!.emailVerified) {
@@ -147,7 +147,7 @@ class _LoginScreenState extends State<LoginScreen>
       });
       HapticFeedback.vibrate();
     }
-    setState(() => isLoading = false);
+    if (mounted) setState(() => isLoading = false);
   }
 
   Future<void> _forgotPassword() async {

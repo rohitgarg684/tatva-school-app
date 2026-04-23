@@ -10,16 +10,35 @@ class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  String get _uid => _auth.currentUser!.uid;
+  String get _uid {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('FirestoreService called with no authenticated user.');
+    }
+    return user.uid;
+  }
 
   // ─── CLASS CODE GENERATOR ──────────────────────────────────────────────────
-  String generateClassCode(String subject, String className) {
+  Future<String> generateClassCode(String subject, String className) async {
     final subjectPart = subject
         .replaceAll(' ', '')
         .toUpperCase()
         .substring(0, min(4, subject.replaceAll(' ', '').length));
-    final rand = Random().nextInt(900) + 100;
-    return '$subjectPart$rand';
+
+    const maxAttempts = 10;
+    for (int attempt = 0; attempt < maxAttempts; attempt++) {
+      final rand = Random().nextInt(9000) + 1000;
+      final code = '$subjectPart$rand';
+      final existing = await _db
+          .collection('classes')
+          .where('classCode', isEqualTo: code)
+          .limit(1)
+          .get();
+      if (existing.docs.isEmpty) return code;
+    }
+    // Fallback with timestamp to guarantee uniqueness
+    final ts = DateTime.now().millisecondsSinceEpoch % 100000;
+    return '$subjectPart$ts';
   }
 
   // ─── CREATE CLASS (Teacher) ────────────────────────────────────────────────
@@ -30,7 +49,7 @@ class FirestoreService {
     try {
       final userDoc = await _db.collection('users').doc(_uid).get();
       final userData = userDoc.data()!;
-      final classCode = generateClassCode(subject, name);
+      final classCode = await generateClassCode(subject, name);
 
       final classRef = await _db.collection('classes').add({
         'name': name,

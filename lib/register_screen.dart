@@ -3,10 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'login_screen.dart';
-import 'teacher_dashboard.dart';
-import 'parent_dashboard.dart';
-import 'student_dashboard.dart';
-import 'principal_dashboard.dart';
 import 'firestore_service.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -81,6 +77,7 @@ class _RegisterScreenState extends State<RegisterScreen>
             parent: _slideController, curve: Curves.easeOutCubic));
 
     Future.delayed(Duration(milliseconds: 100), () {
+      if (!mounted) return;
       _fadeController.forward();
       _slideController.forward();
     });
@@ -114,7 +111,7 @@ class _RegisterScreenState extends State<RegisterScreen>
   Future<void> _register() async {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
+    final password = _passwordController.text;
     final classCode = _classCodeController.text.trim().toUpperCase();
     final childName = _childNameController.text.trim();
 
@@ -150,7 +147,10 @@ class _RegisterScreenState extends State<RegisterScreen>
       );
       final uid = cred.user!.uid;
 
-      // 2. Save user to Firestore
+      // 2. Send email verification
+      await cred.user!.sendEmailVerification();
+
+      // 3. Save user to Firestore
       await FirebaseFirestore.instance.collection('users').doc(uid).set({
         'name': name,
         'email': email,
@@ -161,7 +161,7 @@ class _RegisterScreenState extends State<RegisterScreen>
         if (_selectedRole == 'Parent') 'children': [],
       });
 
-      // 3. Join class (Student or Parent)
+      // 4. Join class (Student or Parent)
       if (_selectedRole == 'Student' || _selectedRole == 'Parent') {
         final fs = FirestoreService();
         final error = await fs.joinClassByCode(
@@ -188,25 +188,21 @@ class _RegisterScreenState extends State<RegisterScreen>
         }
       }
 
-      // 4. Navigate to correct dashboard
+      // 5. Sign out and redirect to login — user must verify email first
+      await FirebaseAuth.instance.signOut();
       if (mounted) {
-        Widget dashboard;
-        switch (_selectedRole) {
-          case 'Teacher':
-            dashboard = TeacherDashboard();
-            break;
-          case 'Parent':
-            dashboard = ParentDashboard();
-            break;
-          case 'Principal':
-            dashboard = PrincipalDashboard();
-            break;
-          default:
-            dashboard = StudentDashboard();
-        }
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              'Account created! Please check your email to verify, then sign in.',
+              style: TextStyle(fontFamily: 'Raleway')),
+          backgroundColor: success,
+          duration: Duration(seconds: 5),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => dashboard),
+          MaterialPageRoute(builder: (_) => LoginScreen()),
           (route) => false,
         );
       }
