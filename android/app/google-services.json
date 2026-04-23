@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "160391868467",
+    "project_id": "tatva-academy",
+    "storage_bucket": "tatva-academy.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:160391868467:android:8bfcb01f04577aff9e3346",
+        "android_client_info": {
+          "package_name": "com.example.tatva"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDrRcfxUoa-SIRoahIUlXtEbLX0pzNBKD8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:160391868467:android:e6aa8ec5745d58b59e3346",
+        "android_client_info": {
+          "package_name": "com.tatvaacademy.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDrRcfxUoa-SIRoahIUlXtEbLX0pzNBKD8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
