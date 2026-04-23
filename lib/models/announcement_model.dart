@@ -1,0 +1,53 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+class AnnouncementModel {
+  final String id;
+  final String title;
+  final String body;
+  final String audience;
+  final List<String> classIds;
+  final String createdBy;
+  final String createdByName;
+  final String createdByRole;
+  final DateTime? createdAt;
+
+  const AnnouncementModel({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.audience,
+    this.classIds = const [],
+    required this.createdBy,
+    required this.createdByName,
+    required this.createdByRole,
+    this.createdAt,
+  });
+
+  factory AnnouncementModel.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+    return AnnouncementModel(
+      id: doc.id,
+      title: data['title'] as String? ?? '',
+      body: data['body'] as String? ?? '',
+      audience: data['audience'] as String? ?? '',
+      classIds: List<String>.from(data['classIds'] ?? []),
+      createdBy: data['createdBy'] as String? ?? '',
+      createdByName: data['createdByName'] as String? ?? '',
+      createdByRole: data['createdByRole'] as String? ?? '',
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'title': title,
+      'body': body,
+      'audience': audience,
+      'classIds': classIds,
+      'createdBy': createdBy,
+      'createdByName': createdByName,
+      'createdByRole': createdByRole,
+      'createdAt': FieldValue.serverTimestamp(),
+    };
+  }
+}

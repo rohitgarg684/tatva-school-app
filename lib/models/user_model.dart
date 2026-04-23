@@ -1,0 +1,71 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'user_role.dart';
+
+class UserModel {
+  final String uid;
+  final String name;
+  final String email;
+  final UserRole role;
+  final List<String> classIds;
+  final List<Map<String, dynamic>> children;
+  final String? fcmToken;
+  final DateTime? createdAt;
+
+  const UserModel({
+    required this.uid,
+    required this.name,
+    required this.email,
+    required this.role,
+    this.classIds = const [],
+    this.children = const [],
+    this.fcmToken,
+    this.createdAt,
+  });
+
+  factory UserModel.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+    return UserModel(
+      uid: doc.id,
+      name: data['name'] as String? ?? '',
+      email: data['email'] as String? ?? '',
+      role: UserRole.fromString(data['role'] as String? ?? 'Student'),
+      classIds: List<String>.from(data['classIds'] ?? []),
+      children: List<Map<String, dynamic>>.from(data['children'] ?? []),
+      fcmToken: data['fcmToken'] as String?,
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'email': email,
+      'role': role.label,
+      'uid': uid,
+      'classIds': classIds,
+      'children': children,
+      if (fcmToken != null) 'fcmToken': fcmToken,
+      'createdAt': FieldValue.serverTimestamp(),
+    };
+  }
+
+  UserModel copyWith({
+    String? name,
+    String? email,
+    UserRole? role,
+    List<String>? classIds,
+    List<Map<String, dynamic>>? children,
+    String? fcmToken,
+  }) {
+    return UserModel(
+      uid: uid,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      role: role ?? this.role,
+      classIds: classIds ?? this.classIds,
+      children: children ?? this.children,
+      fcmToken: fcmToken ?? this.fcmToken,
+      createdAt: createdAt,
+    );
+  }
+}
