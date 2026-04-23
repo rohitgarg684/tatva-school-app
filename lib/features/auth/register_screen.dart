@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'login_screen.dart';
 import '../../services/auth_service.dart';
+import '../../services/class_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -162,8 +164,8 @@ class _RegisterScreenState extends State<RegisterScreen>
 
       // 4. Join class (Student or Parent)
       if (_selectedRole == 'Student' || _selectedRole == 'Parent') {
-        final fs = FirestoreService();
-        final error = await fs.joinClassByCode(
+        final cs = ClassService();
+        final error = await cs.joinClassByCode(
           classCode: classCode,
           role: _selectedRole,
           childName: _selectedRole == 'Parent' ? childName : null,
