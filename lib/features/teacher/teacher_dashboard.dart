@@ -4,8 +4,11 @@ import '../messaging/messaging_screen.dart';
 import '../../shared/animations/animations.dart';
 import '../auth/welcome_screen.dart';
 import '../../shared/theme/colors.dart';
+import '../../shared/widgets/add_student_sheet.dart';
 import '../../shared/widgets/logout_sheet.dart';
+import '../../shared/widgets/pick_student_sheet.dart';
 import '../../core/router/app_router.dart';
+import '../../services/class_service.dart';
 
 class TeacherDashboard extends StatefulWidget {
   const TeacherDashboard({super.key});
@@ -357,6 +360,312 @@ class _TeacherDashboardState extends State<TeacherDashboard>
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ));
+
+  void _showAddStudentOptions(String classId, List existingStudentUids) {
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: TatvaColors.bgCard,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 36, height: 3,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: info.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.person_add_outlined,
+                    color: info, size: 18),
+              ),
+              const SizedBox(width: 10),
+              const Text('Add Student to Class',
+                  style: TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: textDark)),
+            ]),
+            const SizedBox(height: 20),
+            _addStudentOption(
+              icon: Icons.person_search_outlined,
+              color: info,
+              title: 'Pick Existing Student',
+              subtitle: 'Choose from students already enrolled in school',
+              onTap: () {
+                Navigator.pop(context);
+                PickStudentSheet.show(context,
+                    classId: classId,
+                    excludeStudentIds: existingStudentUids.cast<String>(),
+                    onStudentAdded: () => _snack('Student added to class'));
+              },
+            ),
+            const SizedBox(height: 10),
+            _addStudentOption(
+              icon: Icons.person_add_alt_1_outlined,
+              color: primary,
+              title: 'Create New Student',
+              subtitle: 'Enroll a new student and add to this class',
+              onTap: () {
+                Navigator.pop(context);
+                AddStudentSheet.show(context,
+                    classId: classId,
+                    onStudentAdded: () => _snack('Student created and added'));
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCreateClass() {
+    final nameCtrl = TextEditingController();
+    final subjectCtrl = TextEditingController();
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Padding(
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: StatefulBuilder(
+          builder: (ctx, setModalState) {
+            bool isCreating = false;
+            return Container(
+              decoration: const BoxDecoration(
+                color: TatvaColors.bgCard,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36, height: 3,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(2)),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10)),
+                      child: const Icon(Icons.class_outlined,
+                          color: primary, size: 18),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text('Create New Class',
+                        style: TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: textDark)),
+                  ]),
+                  const SizedBox(height: 4),
+                  const Text('A unique class code will be generated',
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 13,
+                          color: textLight)),
+                  const SizedBox(height: 20),
+                  const Text('Class Name',
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: textDark)),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: nameCtrl,
+                    style: const TextStyle(
+                        fontFamily: 'Raleway', fontSize: 14, color: textDark),
+                    decoration: InputDecoration(
+                      hintText: 'e.g. Grade 8 — Section A',
+                      hintStyle: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 13,
+                          color: Colors.grey.shade400),
+                      filled: true,
+                      fillColor: bg,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade200)),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                              color: primary.withOpacity(0.5), width: 1.5)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Subject',
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: textDark)),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: subjectCtrl,
+                    style: const TextStyle(
+                        fontFamily: 'Raleway', fontSize: 14, color: textDark),
+                    decoration: InputDecoration(
+                      hintText: 'e.g. Mathematics',
+                      hintStyle: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 13,
+                          color: Colors.grey.shade400),
+                      filled: true,
+                      fillColor: bg,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade200)),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                              color: primary.withOpacity(0.5), width: 1.5)),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  BouncyTap(
+                    onTap: isCreating
+                        ? null
+                        : () async {
+                            if (nameCtrl.text.trim().isEmpty ||
+                                subjectCtrl.text.trim().isEmpty) {
+                              return;
+                            }
+                            setModalState(() => isCreating = true);
+                            final result = await ClassService().createClass(
+                              name: nameCtrl.text.trim(),
+                              subject: subjectCtrl.text.trim(),
+                            );
+                            if (!ctx.mounted) return;
+                            Navigator.pop(ctx);
+                            if (result != null) {
+                              _snack('Class "${result.name}" created! Code: ${result.classCode}');
+                            } else {
+                              _snack('Failed to create class. Try again.');
+                            }
+                          },
+                    child: Container(
+                      width: double.infinity,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: primary,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                              color: primary.withOpacity(0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4)),
+                        ],
+                      ),
+                      child: Center(
+                        child: isCreating
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                    color: Colors.white, strokeWidth: 2))
+                            : const Text('Create Class',
+                                style: TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _addStudentOption({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.04),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withOpacity(0.15)),
+        ),
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10)),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: textDark)),
+                Text(subtitle,
+                    style: const TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 12,
+                        color: textLight)),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: color, size: 22),
+        ]),
+      ),
+    );
+  }
 
   // ─── BUILD ─────────────────────────────────────────────────────────────────
   @override
@@ -727,7 +1036,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
         FadeSlideIn(
             delayMs: 80,
             child: GestureDetector(
-              onTap: () => _snack('Create Class — available in the live app!'),
+              onTap: _showCreateClass,
               child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -809,7 +1118,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
               ]),
             ),
             Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                 child: Row(children: [
                   Icon(Icons.people_outline, color: textLight, size: 16),
                   const SizedBox(width: 4),
@@ -827,7 +1136,31 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                           fontFamily: 'Raleway',
                           fontSize: 12,
                           color: textLight)),
-                  const Spacer(),
+                ])),
+            Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                child: Row(children: [
+                  GestureDetector(
+                      onTap: () => _showAddStudentOptions(c['classId'], c['studentUids'] as List),
+                      child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                              color: info.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(8),
+                              border:
+                                  Border.all(color: info.withOpacity(0.2))),
+                          child: Row(children: [
+                            Icon(Icons.person_add_outlined, color: info, size: 14),
+                            const SizedBox(width: 4),
+                            const Text('Add Student',
+                                style: TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 12,
+                                    color: info,
+                                    fontWeight: FontWeight.w600))
+                          ]))),
+                  const SizedBox(width: 8),
                   GestureDetector(
                       onTap: () => _switchTab(2),
                       child: Container(

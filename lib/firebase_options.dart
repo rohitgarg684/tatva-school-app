@@ -27,7 +27,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.macOS:
         return macos;
       case TargetPlatform.windows:
-        return windows;
+        return web;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -41,46 +41,37 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDFhq2wNv-Et68HX_sIJdzxeuzAcE5oHqc',
-    appId: '1:160391868467:web:acf76a8773a933859e3346',
-    messagingSenderId: '160391868467',
-    projectId: 'tatva-academy',
-    authDomain: 'tatva-academy.firebaseapp.com',
-    storageBucket: 'tatva-academy.firebasestorage.app',
+    apiKey: 'AIzaSyBz-CWy_oSvxS6ZpiB-NKxokaKwnV9cYjc',
+    appId: '1:859841471446:web:53ea03aa5a1d7d74a63a77',
+    messagingSenderId: '859841471446',
+    projectId: 'tatva-school-app',
+    authDomain: 'tatva-school-app.firebaseapp.com',
+    storageBucket: 'tatva-school-app.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDrRcfxUoa-SIRoahIUlXtEbLX0pzNBKD8',
-    appId: '1:160391868467:android:8bfcb01f04577aff9e3346',
-    messagingSenderId: '160391868467',
-    projectId: 'tatva-academy',
-    storageBucket: 'tatva-academy.firebasestorage.app',
+    apiKey: 'AIzaSyA-yTLF3sb-et_GjlAS6XCy7OVLvAs8YRY',
+    appId: '1:859841471446:android:6feb3a04db6c74b9a63a77',
+    messagingSenderId: '859841471446',
+    projectId: 'tatva-school-app',
+    storageBucket: 'tatva-school-app.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBZFAPTpg0tUQHgwfB_-EerPi7Y9BpaFxk',
-    appId: '1:160391868467:ios:a80d8afdf8d885269e3346',
-    messagingSenderId: '160391868467',
-    projectId: 'tatva-academy',
-    storageBucket: 'tatva-academy.firebasestorage.app',
-    iosBundleId: 'com.example.tatva',
+    apiKey: 'AIzaSyB_hoHgEUyu0e3XDOze5jFKKpajW-MCE_o',
+    appId: '1:859841471446:ios:83e51016c097dfbba63a77',
+    messagingSenderId: '859841471446',
+    projectId: 'tatva-school-app',
+    storageBucket: 'tatva-school-app.firebasestorage.app',
+    iosBundleId: 'com.tatva.school',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyBZFAPTpg0tUQHgwfB_-EerPi7Y9BpaFxk',
-    appId: '1:160391868467:ios:a80d8afdf8d885269e3346',
-    messagingSenderId: '160391868467',
-    projectId: 'tatva-academy',
-    storageBucket: 'tatva-academy.firebasestorage.app',
-    iosBundleId: 'com.example.tatva',
-  );
-
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyDFhq2wNv-Et68HX_sIJdzxeuzAcE5oHqc',
-    appId: '1:160391868467:web:c10f075f7e9dfe789e3346',
-    messagingSenderId: '160391868467',
-    projectId: 'tatva-academy',
-    authDomain: 'tatva-academy.firebaseapp.com',
-    storageBucket: 'tatva-academy.firebasestorage.app',
+    apiKey: 'AIzaSyB_hoHgEUyu0e3XDOze5jFKKpajW-MCE_o',
+    appId: '1:859841471446:ios:83e51016c097dfbba63a77',
+    messagingSenderId: '859841471446',
+    projectId: 'tatva-school-app',
+    storageBucket: 'tatva-school-app.firebasestorage.app',
+    iosBundleId: 'com.tatva.school',
   );
 }

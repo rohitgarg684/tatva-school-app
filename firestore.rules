@@ -1,0 +1,79 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isPrincipal() {
+      return isSignedIn() && userRole() == 'Principal';
+    }
+
+    function isTeacher() {
+      return isSignedIn() && userRole() == 'Teacher';
+    }
+
+    function isTeacherOrPrincipal() {
+      return isSignedIn() && userRole() in ['Teacher', 'Principal'];
+    }
+
+    // ── Users ────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isPrincipal();
+      allow delete: if isPrincipal();
+    }
+
+    // ── Students (record-only, no auth) ─────────────────────────────
+    match /students/{studentId} {
+      allow read: if isSignedIn();
+      allow create: if isTeacherOrPrincipal();
+      allow update: if isTeacherOrPrincipal();
+      allow delete: if isPrincipal();
+    }
+
+    // ── Classes ──────────────────────────────────────────────────────
+    match /classes/{classId} {
+      allow read: if isSignedIn();
+      allow create: if isTeacherOrPrincipal();
+      allow update: if isSignedIn();
+      allow delete: if isPrincipal();
+    }
+
+    // ── Grades ───────────────────────────────────────────────────────
+    match /grades/{gradeId} {
+      allow read: if isSignedIn();
+      allow create: if isTeacherOrPrincipal();
+      allow update: if isTeacherOrPrincipal();
+      allow delete: if isPrincipal();
+    }
+
+    // ── Announcements ────────────────────────────────────────────────
+    match /announcements/{announcementId} {
+      allow read: if isSignedIn();
+      allow create: if isTeacherOrPrincipal();
+      allow update: if isTeacherOrPrincipal();
+      allow delete: if isPrincipal();
+    }
+
+    // ── Votes ────────────────────────────────────────────────────────
+    match /votes/{voteId} {
+      allow read: if isSignedIn();
+      allow create: if isPrincipal();
+      allow update: if isSignedIn();
+      allow delete: if isPrincipal();
+    }
+  }
+}

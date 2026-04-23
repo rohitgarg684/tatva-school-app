@@ -1,1 +1,42 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"tatva-academy","appId":"1:160391868467:android:8bfcb01f04577aff9e3346","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"tatva-academy","configurations":{"android":"1:160391868467:android:8bfcb01f04577aff9e3346","ios":"1:160391868467:ios:a80d8afdf8d885269e3346","macos":"1:160391868467:ios:a80d8afdf8d885269e3346","web":"1:160391868467:web:acf76a8773a933859e3346","windows":"1:160391868467:web:c10f075f7e9dfe789e3346"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "tatva-school-app",
+          "appId": "1:859841471446:android:6feb3a04db6c74b9a63a77",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "tatva-school-app",
+          "configurations": {
+            "android": "1:859841471446:android:6feb3a04db6c74b9a63a77",
+            "ios": "1:859841471446:ios:83e51016c097dfbba63a77",
+            "macos": "1:859841471446:ios:83e51016c097dfbba63a77",
+            "web": "1:859841471446:web:53ea03aa5a1d7d74a63a77"
+          }
+        }
+      }
+    }
+  }
+}

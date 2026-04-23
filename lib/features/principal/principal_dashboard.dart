@@ -1,8 +1,11 @@
 import 'dart:math' show min, max;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../models/student_model.dart';
 import '../../repositories/auth_repository.dart';
+import '../../services/class_service.dart';
 import '../../shared/theme/colors.dart';
+import '../../shared/widgets/add_student_sheet.dart';
 import '../../shared/widgets/logout_sheet.dart';
 import '../../shared/animations/animations.dart';
 import '../../core/router/app_router.dart';
@@ -34,6 +37,12 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
   static const Color success = TatvaColors.success;
   static const Color info = TatvaColors.info;
   static const Color purple = TatvaColors.purple;
+
+  final ClassService _classService = ClassService();
+  List<StudentModel> _students = [];
+  List<StudentModel> _filteredStudents = [];
+  final _studentSearchCtrl = TextEditingController();
+  bool _studentsLoading = false;
 
   late AnimationController _shimmerController;
   late AnimationController _greetingController;
@@ -202,6 +211,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
     _shimmerController.dispose();
     _greetingController.dispose();
     _tabController.dispose();
+    _studentSearchCtrl.dispose();
     super.dispose();
   }
 
@@ -216,6 +226,33 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
     });
     _greetingController.forward();
     _tabController.forward();
+  }
+
+  Future<void> _loadStudents() async {
+    setState(() => _studentsLoading = true);
+    final all = await _classService.getAllStudentRecords();
+    if (!mounted) return;
+    setState(() {
+      _students = all;
+      _filterStudents(_studentSearchCtrl.text);
+      _studentsLoading = false;
+    });
+  }
+
+  void _filterStudents(String query) {
+    final lower = query.trim().toLowerCase();
+    setState(() {
+      if (lower.isEmpty) {
+        _filteredStudents = _students;
+      } else {
+        _filteredStudents = _students
+            .where((s) =>
+                s.name.toLowerCase().contains(lower) ||
+                s.rollNumber.toLowerCase().contains(lower) ||
+                s.displayGradeSection.toLowerCase().contains(lower))
+            .toList();
+      }
+    });
   }
 
   String get _greeting {
@@ -694,7 +731,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
             _buildOverviewTab(),
             _buildGradeTrendsTab(),
             _buildTeacherWorkloadTab(),
-            _buildAttendanceTab(),
+            _buildStudentsTab(),
             _buildCommunicateTab(),
             _buildProfileTab(),
           ],
@@ -721,9 +758,9 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
         'label': 'Teachers'
       },
       {
-        'icon': Icons.calendar_today_outlined,
-        'activeIcon': Icons.calendar_today_rounded,
-        'label': 'Attendance'
+        'icon': Icons.school_outlined,
+        'activeIcon': Icons.school_rounded,
+        'label': 'Students'
       },
       {
         'icon': Icons.campaign_outlined,
@@ -1312,242 +1349,250 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
     );
   }
 
-  // ─── ATTENDANCE TAB ───────────────────────────────────────────────────────────
-  Widget _buildAttendanceTab() {
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(height: 8),
-          FadeSlideIn(
-              child: Text('Attendance Trends',
-                  style: TextStyle(
-                      fontFamily: 'Raleway',
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: textDark,
-                      letterSpacing: -0.8))),
-          FadeSlideIn(
-              delayMs: 60,
-              child: Text('School-wide attendance tracking',
-                  style: TextStyle(
-                      fontFamily: 'Raleway', fontSize: 13, color: textLight))),
-          SizedBox(height: 20),
-          FadeSlideIn(
-            delayMs: 100,
-            child: WaveCard(
-              gradientColors: [
-                Color(0xFF1565C0),
-                Color(0xFF1E88E5),
-                Color(0xFF42A5F5)
-              ],
-              boxShadow: [
-                BoxShadow(
-                    color: info.withOpacity(0.3),
-                    blurRadius: 24,
-                    offset: Offset(0, 10))
-              ],
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Column(
+  // ─── STUDENTS TAB ────────────────────────────────────────────────────────────
+  Widget _buildStudentsTab() {
+    if (_students.isEmpty && !_studentsLoading) {
+      _loadStudents();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(20, 24, 20, 0),
+          child: FadeSlideIn(
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Current Month Average',
+                      Text('Student Directory',
+                          style: TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: textDark,
+                              letterSpacing: -0.8)),
+                      SizedBox(height: 4),
+                      Text(
+                          _studentsLoading
+                              ? 'Loading...'
+                              : '${_students.length} students enrolled',
                           style: TextStyle(
                               fontFamily: 'Raleway',
                               fontSize: 13,
-                              color: Colors.white.withOpacity(0.7))),
-                      SizedBox(height: 4),
-                      Row(children: [
-                        SlotNumber(
-                            value: 90,
-                            suffix: '%',
-                            style: TextStyle(
-                                fontFamily: 'Raleway',
-                                fontSize: 36,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white)),
-                        SizedBox(width: 12),
-                        Container(
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(20)),
-                          child: Text('234 / 260 present',
-                              style: TextStyle(
-                                  fontFamily: 'Raleway',
-                                  fontSize: 11,
-                                  color: Colors.white)),
-                        ),
-                      ]),
-                      SizedBox(height: 20),
-                      _buildLineChart(
-                          attendanceTrend
-                              .map((a) => {
-                                    'month': a['month'],
-                                    'avg': (a['rate'] as int).toDouble()
-                                  })
-                              .toList(),
-                          'avg',
-                          Colors.white),
-                      SizedBox(height: 8),
-                      Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: attendanceTrend
-                              .map((d) => Text(d['month'],
-                                  style: TextStyle(
-                                      fontFamily: 'Raleway',
-                                      fontSize: 11,
-                                      color: Colors.white.withOpacity(0.6))))
-                              .toList()),
-                    ]),
-              ),
-            ),
-          ),
-          SizedBox(height: 28),
-          FadeSlideIn(
-              delayMs: 150,
-              child: Text('Monthly Breakdown',
-                  style: TextStyle(
-                      fontFamily: 'Raleway',
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: textDark,
-                      letterSpacing: -0.3))),
-          SizedBox(height: 16),
-          Row(
-            children: List.generate(attendanceTrend.length, (index) {
-              final a = attendanceTrend[index];
-              Color barColor = a['rate'] >= 90
-                  ? success
-                  : a['rate'] >= 80
-                      ? accent
-                      : danger;
-              return Expanded(
-                child: StaggeredItem(
-                  index: index,
+                              color: textLight)),
+                    ],
+                  ),
+                ),
+                BouncyTap(
+                  onTap: () => AddStudentSheet.show(context,
+                      onStudentAdded: _loadStudents),
                   child: Container(
-                    margin: EdgeInsets.symmetric(horizontal: 4),
-                    padding: EdgeInsets.all(12),
+                    padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                        color: bgCard,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.grey.shade100)),
-                    child: Column(children: [
-                      Text('${a['rate']}%',
+                      color: primary,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                            color: primary.withOpacity(0.3),
+                            blurRadius: 10,
+                            offset: Offset(0, 3)),
+                      ],
+                    ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.person_add_rounded,
+                          color: Colors.white, size: 16),
+                      SizedBox(width: 6),
+                      Text('Add Student',
                           style: TextStyle(
                               fontFamily: 'Raleway',
-                              fontSize: 16,
+                              fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: barColor)),
-                      SizedBox(height: 6),
-                      AnimatedProgressBar(
-                          value: a['rate'] / 100,
-                          color: barColor,
-                          height: 5,
-                          delayMs: 400 + index * 80),
-                      SizedBox(height: 6),
-                      Text(a['month'],
-                          style: TextStyle(
-                              fontFamily: 'Raleway',
-                              fontSize: 11,
-                              color: textLight,
-                              fontWeight: FontWeight.w600)),
+                              color: Colors.white)),
                     ]),
                   ),
                 ),
-              );
-            }),
+              ],
+            ),
           ),
-          SizedBox(height: 28),
-          FadeSlideIn(
-              delayMs: 180,
-              child: Text('At-Risk Students',
-                  style: TextStyle(
-                      fontFamily: 'Raleway',
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: textDark,
-                      letterSpacing: -0.3))),
-          SizedBox(height: 12),
-          ...List.generate(3, (index) {
-            final students = [
-              {
-                'name': 'Vikram Patel',
-                'class': 'Grade 8 - A',
-                'rate': '72%',
-                'avatar': 'V'
-              },
-              {
-                'name': 'Sneha Joshi',
-                'class': 'Grade 7 - B',
-                'rate': '75%',
-                'avatar': 'S'
-              },
-              {
-                'name': 'Aryan Kumar',
-                'class': 'Grade 9 - A',
-                'rate': '78%',
-                'avatar': 'A'
-              },
-            ];
-            final s = students[index];
-            return StaggeredItem(
-              index: index,
-              child: Container(
-                margin: EdgeInsets.only(bottom: 10),
-                padding: EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                    color: bgCard,
+        ),
+        SizedBox(height: 16),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20),
+          child: FadeSlideIn(
+            delayMs: 60,
+            child: TextField(
+              controller: _studentSearchCtrl,
+              onChanged: _filterStudents,
+              style: TextStyle(
+                  fontFamily: 'Raleway', fontSize: 14, color: textDark),
+              decoration: InputDecoration(
+                hintText: 'Search by name, roll number or grade...',
+                hintStyle: TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 13,
+                    color: Colors.grey.shade400),
+                prefixIcon:
+                    Icon(Icons.search, color: textLight, size: 20),
+                filled: true,
+                fillColor: bgCard,
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: danger.withOpacity(0.15))),
-                child: Row(children: [
-                  CircleAvatar(
-                      radius: 18,
-                      backgroundColor: danger.withOpacity(0.1),
-                      child: Text(s['avatar']!,
+                    borderSide: BorderSide.none),
+                enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: Colors.grey.shade200)),
+                focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                        color: primary.withOpacity(0.5), width: 1.5)),
+              ),
+            ),
+          ),
+        ),
+        SizedBox(height: 16),
+        Expanded(
+          child: _studentsLoading
+              ? Center(
+                  child: CircularProgressIndicator(color: primary))
+              : _filteredStudents.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(40),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.school_outlined,
+                                color: textLight, size: 48),
+                            SizedBox(height: 12),
+                            Text(
+                              _studentSearchCtrl.text.isNotEmpty
+                                  ? 'No students match your search'
+                                  : 'No students enrolled yet',
+                              style: TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 15,
+                                  color: textLight),
+                            ),
+                            SizedBox(height: 6),
+                            Text('Tap "Add Student" to enroll one',
+                                style: TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 12,
+                                    color: textLight)),
+                          ],
+                        ),
+                      ),
+                    )
+                  : RefreshIndicator(
+                      color: primary,
+                      onRefresh: _loadStudents,
+                      child: ListView.builder(
+                        padding: EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: _filteredStudents.length,
+                        itemBuilder: (_, index) =>
+                            _studentCard(_filteredStudents[index], index),
+                      ),
+                    ),
+        ),
+      ],
+    );
+  }
+
+  Widget _studentCard(StudentModel student, int index) {
+    final colors = [primary, info, accent, purple, success, danger];
+    final cardColor = colors[index % colors.length];
+
+    return StaggeredItem(
+      index: index,
+      child: Container(
+        margin: EdgeInsets.only(bottom: 10),
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: bgCard,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade100),
+        ),
+        child: Row(children: [
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: cardColor.withOpacity(0.12),
+            child: Text(
+              student.name.isNotEmpty ? student.name[0].toUpperCase() : '?',
+              style: TextStyle(
+                  fontFamily: 'Raleway',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: cardColor),
+            ),
+          ),
+          SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(student.name,
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: textDark,
+                        letterSpacing: -0.2)),
+                SizedBox(height: 2),
+                Row(children: [
+                  if (student.rollNumber.isNotEmpty) ...[
+                    Container(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: cardColor.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(student.rollNumber,
                           style: TextStyle(
                               fontFamily: 'Raleway',
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: danger))),
-                  SizedBox(width: 12),
-                  Expanded(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                        Text(s['name']!,
-                            style: TextStyle(
-                                fontFamily: 'Raleway',
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: textDark)),
-                        Text(s['class']!,
-                            style: TextStyle(
-                                fontFamily: 'Raleway',
-                                fontSize: 11,
-                                color: textLight)),
-                      ])),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                        color: danger.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8)),
-                    child: Text(s['rate']!,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: cardColor)),
+                    ),
+                    SizedBox(width: 8),
+                  ],
+                  if (student.displayGradeSection.isNotEmpty)
+                    Text(student.displayGradeSection,
                         style: TextStyle(
                             fontFamily: 'Raleway',
                             fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: danger)),
-                  ),
+                            color: textLight)),
                 ]),
+                if (student.parentName.isNotEmpty) ...[
+                  SizedBox(height: 2),
+                  Text('Parent: ${student.parentName}',
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 11,
+                          color: textLight)),
+                ],
+              ],
+            ),
+          ),
+          if (student.classIds.isNotEmpty)
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: info.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8),
               ),
-            );
-          }),
-          SizedBox(height: 24),
-        ],
+              child: Text('${student.classIds.length} class${student.classIds.length > 1 ? 'es' : ''}',
+                  style: TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: info)),
+            ),
+        ]),
       ),
     );
   }
