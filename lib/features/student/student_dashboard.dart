@@ -799,9 +799,9 @@ class _StudentDashboardState extends State<StudentDashboard>
             children: events.asMap().entries.map((entry) {
               final idx = entry.key;
               final event = entry.value;
-              final icon = _activityIcon(event.type);
-              final timeAgo = event.timestamp != null
-                  ? _formatTimeAgo(event.timestamp!)
+              final icon = _activityIcon(event.type.name);
+              final timeAgo = event.createdAt != null
+                  ? _formatTimeAgo(event.createdAt!)
                   : '';
               return Column(children: [
                 if (idx > 0)
