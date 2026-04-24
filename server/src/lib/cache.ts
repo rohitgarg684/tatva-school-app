@@ -29,7 +29,5 @@ export function cacheDeletePrefix(prefix: string): void {
   }
 }
 
-const SHARED_TTL = 60_000;
-const USER_TTL = 30_000;
-
-export { SHARED_TTL, USER_TTL };
+export const SHARED_TTL = 60_000;
+export const USER_TTL = 30_000;

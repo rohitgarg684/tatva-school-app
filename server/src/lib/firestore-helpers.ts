@@ -48,13 +48,6 @@ export async function queryDocs(
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
-export function timestampToIso(val: any): string | null {
-  if (!val) return null;
-  if (val.toDate) return val.toDate().toISOString();
-  if (val instanceof Date) return val.toISOString();
-  return String(val);
-}
-
 export function serializeDocs(docs: any[]): any[] {
   return docs.map(serializeDoc);
 }

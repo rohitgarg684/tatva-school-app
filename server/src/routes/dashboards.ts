@@ -1,4 +1,5 @@
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { Router } from "express";
+import { requireAuth } from "../middleware/auth";
 import {
   db,
   getDoc,
@@ -6,21 +7,16 @@ import {
   queryDocs,
   serializeDocs,
   serializeDoc,
-} from "./firestore-helpers";
+} from "../lib/firestore-helpers";
 import {
   cacheGet,
   cacheSet,
-  cacheDelete,
   SHARED_TTL,
   USER_TTL,
-} from "./cache";
+} from "../lib/cache";
 
-function requireAuth(request: any): string {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "Must be signed in.");
-  }
-  return request.auth.uid;
-}
+const router = Router();
+router.use(requireAuth);
 
 async function fetchShared(key: string, fetcher: () => Promise<any>) {
   const cached = cacheGet<any>(key);
@@ -60,22 +56,18 @@ function computeSubjectAverages(grades: any[]): Record<string, number> {
   return result;
 }
 
-// ─── Student Dashboard ─────────────────────────────────────────────────────
+// ─── Student Dashboard ──────────────────────────────────────────────────────
 
-export const getStudentDashboard = onCall(
-  { region: "us-central1", memory: "256MiB" },
-  async (request) => {
-    const callerUid = requireAuth(request);
-    const uid = (request.data?.uid as string) || callerUid;
+router.get("/student/:uid", async (req, res) => {
+  try {
+    const uid = req.params.uid || req.uid!;
 
     const cacheKey = `student_dash_${uid}`;
     const cached = cacheGet<any>(cacheKey);
-    if (cached) return cached;
+    if (cached) return res.json(cached);
 
     const user = await getDoc("users", uid);
-    if (!user) {
-      throw new HttpsError("not-found", "User not found.");
-    }
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     const classIds: string[] = user.classIds || [];
 
@@ -159,26 +151,25 @@ export const getStudentDashboard = onCall(
     };
 
     cacheSet(cacheKey, result, USER_TTL);
-    return result;
+    res.json(result);
+  } catch (err: any) {
+    console.error("getStudentDashboard error:", err);
+    res.status(500).json({ error: err.message || "Internal server error" });
   }
-);
+});
 
 // ─── Teacher Dashboard ──────────────────────────────────────────────────────
 
-export const getTeacherDashboard = onCall(
-  { region: "us-central1", memory: "256MiB" },
-  async (request) => {
-    const callerUid = requireAuth(request);
-    const uid = (request.data?.uid as string) || callerUid;
+router.get("/teacher/:uid", async (req, res) => {
+  try {
+    const uid = req.params.uid || req.uid!;
 
     const cacheKey = `teacher_dash_${uid}`;
     const cached = cacheGet<any>(cacheKey);
-    if (cached) return cached;
+    if (cached) return res.json(cached);
 
     const user = await getDoc("users", uid);
-    if (!user) {
-      throw new HttpsError("not-found", "User not found.");
-    }
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     const classIds: string[] = user.classIds || [];
     const classes =
@@ -262,32 +253,30 @@ export const getTeacherDashboard = onCall(
     };
 
     cacheSet(cacheKey, result, USER_TTL);
-    return result;
+    res.json(result);
+  } catch (err: any) {
+    console.error("getTeacherDashboard error:", err);
+    res.status(500).json({ error: err.message || "Internal server error" });
   }
-);
+});
 
 // ─── Parent Dashboard ───────────────────────────────────────────────────────
 
-export const getParentDashboard = onCall(
-  { region: "us-central1", memory: "256MiB" },
-  async (request) => {
-    const callerUid = requireAuth(request);
-    const uid = (request.data?.uid as string) || callerUid;
+router.get("/parent/:uid", async (req, res) => {
+  try {
+    const uid = req.params.uid || req.uid!;
 
     const cacheKey = `parent_dash_${uid}`;
     const cached = cacheGet<any>(cacheKey);
-    if (cached) return cached;
+    if (cached) return res.json(cached);
 
     const user = await getDoc("users", uid);
-    if (!user) {
-      throw new HttpsError("not-found", "User not found.");
-    }
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     const children: any[] = user.children || [];
     const classIdSet = new Set<string>();
     const childrenData: any[] = [];
 
-    // Resolve child UIDs by querying users where role==Student and name matches
     const studentSnap = children.length > 0
       ? await db
           .collection("users")
@@ -299,7 +288,6 @@ export const getParentDashboard = onCall(
       ? studentSnap.docs.map((d) => ({ id: d.id, ...d.data() }))
       : [];
 
-    // Gather all class IDs to batch-fetch
     const classIds = children
       .map((c: any) => c.classId)
       .filter((id: string) => id);
@@ -308,7 +296,6 @@ export const getParentDashboard = onCall(
       : [];
     const classMap = new Map(childClasses.map((c: any) => [c.id, c]));
 
-    // For each child, resolve UID then batch-fetch per-child data
     for (const childInfo of children) {
       if (childInfo.classId) classIdSet.add(childInfo.classId);
 
@@ -414,26 +401,25 @@ export const getParentDashboard = onCall(
     };
 
     cacheSet(cacheKey, result, USER_TTL);
-    return result;
+    res.json(result);
+  } catch (err: any) {
+    console.error("getParentDashboard error:", err);
+    res.status(500).json({ error: err.message || "Internal server error" });
   }
-);
+});
 
 // ─── Principal Dashboard ────────────────────────────────────────────────────
 
-export const getPrincipalDashboard = onCall(
-  { region: "us-central1", memory: "512MiB" },
-  async (request) => {
-    const callerUid = requireAuth(request);
-    const uid = (request.data?.uid as string) || callerUid;
+router.get("/principal/:uid", async (req, res) => {
+  try {
+    const uid = req.params.uid || req.uid!;
 
     const cacheKey = `principal_dash_${uid}`;
     const cached = cacheGet<any>(cacheKey);
-    if (cached) return cached;
+    if (cached) return res.json(cached);
 
     const user = await getDoc("users", uid);
-    if (!user) {
-      throw new HttpsError("not-found", "User not found.");
-    }
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     const [
       teacherSnap,
@@ -488,6 +474,11 @@ export const getPrincipalDashboard = onCall(
     };
 
     cacheSet(cacheKey, result, USER_TTL);
-    return result;
+    res.json(result);
+  } catch (err: any) {
+    console.error("getPrincipalDashboard error:", err);
+    res.status(500).json({ error: err.message || "Internal server error" });
   }
-);
+});
+
+export default router;

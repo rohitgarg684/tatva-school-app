@@ -1,36 +1,28 @@
 import 'dart:typed_data';
-import 'package:firebase_storage/firebase_storage.dart';
 import '../models/story_post.dart';
 import '../models/activity_event.dart';
 import '../repositories/story_repository.dart';
 import 'activity_service.dart';
+import 'api_service.dart';
 
 class StoryService {
   final StoryRepository _repo;
   final ActivityService _activitySvc;
-  final FirebaseStorage _storage;
+  final ApiService _api;
 
   StoryService({
     StoryRepository? repo,
     ActivityService? activitySvc,
-    FirebaseStorage? storage,
+    ApiService? api,
   })  : _repo = repo ?? StoryRepository(),
         _activitySvc = activitySvc ?? ActivityService(),
-        _storage = storage ?? FirebaseStorage.instance;
+        _api = api ?? ApiService();
 
-  /// Uploads image bytes to Firebase Storage, returns download URL.
   Future<String?> uploadImage(
-      Uint8List bytes, String classId, String fileName) async {
-    try {
-      final ref = _storage.ref('stories/$classId/$fileName');
-      await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
-      return await ref.getDownloadURL();
-    } catch (_) {
-      return null;
-    }
+      Uint8List bytes, String classId, String fileName) {
+    return _api.uploadStoryImage(bytes, classId, fileName);
   }
 
-  /// Creates a story post (text-only or with media URLs already uploaded).
   Future<bool> createPost(StoryPost post) async {
     final id = await _repo.add(post);
     if (id == null) return false;
@@ -42,7 +34,9 @@ class StoryService {
       actorRole: post.authorRole,
       classId: post.classId,
       title: 'New story post in ${post.className}',
-      body: post.text.length > 80 ? '${post.text.substring(0, 80)}...' : post.text,
+      body: post.text.length > 80
+          ? '${post.text.substring(0, 80)}...'
+          : post.text,
     ));
 
     return true;
