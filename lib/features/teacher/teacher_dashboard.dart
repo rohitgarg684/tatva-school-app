@@ -137,7 +137,9 @@ class _TeacherDashboardState extends State<TeacherDashboard>
       _todayAttendance = data.todayAttendance;
       _classStory = data.classStory;
       _activityFeed = data.activityFeed;
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('TeacherDashboard._loadData error: $e');
+    }
     if (!mounted) return;
     setState(() => isLoading = false);
     _greetingController.forward();

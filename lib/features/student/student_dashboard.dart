@@ -138,7 +138,9 @@ class _StudentDashboardState extends State<StudentDashboard>
       for (final hw in _homework) {
         if (hw.isSubmittedBy(_uid)) _completedIds.add(hw.id);
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('StudentDashboard._loadData error: $e');
+    }
     if (!mounted) return;
     setState(() => isLoading = false);
     _greetingController.forward();

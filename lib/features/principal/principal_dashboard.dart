@@ -135,7 +135,9 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
       _announcementModels = data.announcements;
       _voteModels = data.activeVotes;
       _activityFeed = data.activityFeed;
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('PrincipalDashboard._loadUser error: $e');
+    }
     if (!mounted) return;
     setState(() => isLoading = false);
     _greetingController.forward();

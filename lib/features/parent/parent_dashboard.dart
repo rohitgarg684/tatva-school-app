@@ -123,7 +123,9 @@ class _ParentDashboardState extends State<ParentDashboard>
       if (_selectedChildIndex >= _childrenData.length) {
         _selectedChildIndex = 0;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('ParentDashboard._loadData error: $e');
+    }
     if (!mounted) return;
     setState(() => isLoading = false);
     _greetingController.forward();
