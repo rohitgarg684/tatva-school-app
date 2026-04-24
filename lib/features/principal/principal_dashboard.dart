@@ -7,6 +7,7 @@ import '../../models/student_model.dart';
 import '../../models/user_model.dart';
 import '../../models/vote_model.dart';
 import '../../repositories/auth_repository.dart';
+import '../../services/api_service.dart';
 import '../../services/dashboard_service.dart';
 import '../../services/announcement_service.dart';
 import '../../services/vote_service.dart';
@@ -61,6 +62,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
   late Animation<double> _greetingScale;
   late Animation<double> _tabFade;
 
+  final _api = ApiService();
   final _dashSvc = DashboardService();
   final _announceSvc = AnnouncementService();
   final _voteSvc = VoteService();
@@ -340,17 +342,18 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                 BouncyTap(
                   onTap: () async {
                     if (questionController.text.trim().isEmpty) return;
-                    await _voteSvc.create(VoteModel(
+                    final newVote = VoteModel(
                       id: '',
                       question: questionController.text.trim(),
                       type: selectedType.toLowerCase().replaceAll(' ', '_'),
                       createdBy: _uid,
                       createdByName: _user?.name ?? '',
                       createdByRole: 'Principal',
-                    ));
+                    );
+                    await _voteSvc.create(newVote);
                     if (!context.mounted) return;
                     Navigator.pop(context);
-                    _loadUser();
+                    setState(() => _voteModels.insert(0, newVote));
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text('Vote sent to all parents!',
                           style: TextStyle(fontFamily: 'Raleway')),
@@ -545,7 +548,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                 BouncyTap(
                   onTap: () async {
                     if (titleController.text.trim().isEmpty) return;
-                    await _announceSvc.post(AnnouncementModel(
+                    final newAnn = AnnouncementModel(
                       id: '',
                       title: titleController.text.trim(),
                       body: bodyController.text.trim(),
@@ -553,10 +556,11 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                       createdBy: _uid,
                       createdByName: _user?.name ?? '',
                       createdByRole: 'Principal',
-                    ));
+                    );
+                    await _announceSvc.post(newAnn);
                     if (!context.mounted) return;
                     Navigator.pop(context);
-                    _loadUser();
+                    setState(() => _announcementModels.insert(0, newAnn));
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text('Announcement sent to $selectedAudience!',
                           style: TextStyle(fontFamily: 'Raleway')),
@@ -1981,8 +1985,8 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                                   SizedBox(width: 10),
                                   GestureDetector(
                                     onTap: () async {
-                                      await _voteSvc.close(vote.id);
-                                      _loadUser();
+                                      await _api.closeVote(vote.id);
+                                      setState(() => _voteModels.removeWhere((v) => v.id == vote.id));
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(SnackBar(
                                               content: Text(

@@ -46,6 +46,26 @@ class GradeModel {
     );
   }
 
+  factory GradeModel.fromJson(Map<String, dynamic> data) {
+    return GradeModel(
+      id: data['id'] as String? ?? '',
+      studentUid: data['studentUid'] as String? ?? '',
+      studentName: data['studentName'] as String? ?? '',
+      classId: data['classId'] as String? ?? '',
+      subject: data['subject'] as String? ?? '',
+      assessmentName: data['assessmentName'] as String? ?? '',
+      score: (data['score'] as num?)?.toDouble() ?? 0,
+      total: (data['total'] as num?)?.toDouble() ?? 0,
+      teacherUid: data['teacherUid'] as String? ?? '',
+      createdAt: data['createdAt'] != null
+          ? DateTime.tryParse(data['createdAt'] as String)
+          : null,
+      updatedAt: data['updatedAt'] != null
+          ? DateTime.tryParse(data['updatedAt'] as String)
+          : null,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'studentUid': studentUid,

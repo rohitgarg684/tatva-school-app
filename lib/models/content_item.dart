@@ -106,6 +106,24 @@ class ContentItem {
     );
   }
 
+  factory ContentItem.fromJson(Map<String, dynamic> data) {
+    return ContentItem(
+      id: data['id'] as String? ?? '',
+      title: data['title'] as String? ?? '',
+      description: data['description'] as String? ?? '',
+      category: ContentCategory.fromString(data['category'] as String? ?? ''),
+      videoUrl: data['videoUrl'] as String? ?? '',
+      thumbnailUrl: data['thumbnailUrl'] as String? ?? '',
+      duration: data['duration'] as String? ?? '',
+      ageGroup: data['ageGroup'] as String? ?? 'All',
+      viewCount: (data['viewCount'] as num?)?.toInt() ?? 0,
+      completedBy: List<String>.from(data['completedBy'] ?? []),
+      createdAt: data['createdAt'] != null
+          ? DateTime.tryParse(data['createdAt'] as String)
+          : null,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'title': title,

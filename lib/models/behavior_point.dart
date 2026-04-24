@@ -43,6 +43,23 @@ class BehaviorPoint {
     );
   }
 
+  factory BehaviorPoint.fromJson(Map<String, dynamic> data) {
+    return BehaviorPoint(
+      id: data['id'] as String? ?? '',
+      studentUid: data['studentUid'] as String? ?? '',
+      studentName: data['studentName'] as String? ?? '',
+      classId: data['classId'] as String? ?? '',
+      categoryId: data['categoryId'] as String? ?? '',
+      points: (data['points'] as num?)?.toInt() ?? 0,
+      awardedBy: data['awardedBy'] as String? ?? '',
+      awardedByName: data['awardedByName'] as String? ?? '',
+      note: data['note'] as String? ?? '',
+      createdAt: data['createdAt'] != null
+          ? DateTime.tryParse(data['createdAt'] as String)
+          : null,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'studentUid': studentUid,

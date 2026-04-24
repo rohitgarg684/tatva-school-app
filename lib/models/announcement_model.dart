@@ -39,6 +39,22 @@ class AnnouncementModel {
     );
   }
 
+  factory AnnouncementModel.fromJson(Map<String, dynamic> data) {
+    return AnnouncementModel(
+      id: data['id'] as String? ?? '',
+      title: data['title'] as String? ?? '',
+      body: data['body'] as String? ?? '',
+      audience: Audience.fromString(data['audience'] as String? ?? ''),
+      classIds: List<String>.from(data['classIds'] ?? []),
+      createdBy: data['createdBy'] as String? ?? '',
+      createdByName: data['createdByName'] as String? ?? '',
+      createdByRole: data['createdByRole'] as String? ?? '',
+      createdAt: data['createdAt'] != null
+          ? DateTime.tryParse(data['createdAt'] as String)
+          : null,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'title': title,

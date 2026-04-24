@@ -67,6 +67,25 @@ class StoryPost {
     );
   }
 
+  factory StoryPost.fromJson(Map<String, dynamic> data) {
+    return StoryPost(
+      id: data['id'] as String? ?? '',
+      authorUid: data['authorUid'] as String? ?? '',
+      authorName: data['authorName'] as String? ?? '',
+      authorRole: data['authorRole'] as String? ?? '',
+      classId: data['classId'] as String? ?? '',
+      className: data['className'] as String? ?? '',
+      text: data['text'] as String? ?? '',
+      mediaUrls: List<String>.from(data['mediaUrls'] ?? []),
+      mediaType: StoryMediaType.fromString(data['mediaType'] as String? ?? ''),
+      likedBy: List<String>.from(data['likedBy'] ?? []),
+      commentCount: (data['commentCount'] as num?)?.toInt() ?? 0,
+      createdAt: data['createdAt'] != null
+          ? DateTime.tryParse(data['createdAt'] as String)
+          : null,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'authorUid': authorUid,

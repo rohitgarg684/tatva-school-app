@@ -23,9 +23,8 @@ import '../../models/attendance_record.dart';
 import '../../models/attendance_status.dart';
 import '../../models/story_post.dart';
 import '../../models/activity_event.dart';
-import '../../services/behavior_service.dart';
-import '../../services/attendance_service.dart';
 import '../../services/story_service.dart';
+import '../../services/api_service.dart';
 
 class TeacherDashboard extends StatefulWidget {
   const TeacherDashboard({super.key});
@@ -53,9 +52,8 @@ class _TeacherDashboardState extends State<TeacherDashboard>
 
   final _dashSvc = DashboardService();
   final _hwSvc = HomeworkService();
-  final _behaviorSvc = BehaviorService();
-  final _attendanceSvc = AttendanceService();
   final _storySvc = StoryService();
+  final _api = ApiService();
   String _uid = '';
 
   UserModel? _user;
@@ -1263,17 +1261,24 @@ class _TeacherDashboardState extends State<TeacherDashboard>
     return GestureDetector(
       onTap: () async {
         Navigator.pop(context);
-        await _behaviorSvc.awardPoint(
+        _api.awardBehaviorPoint(
+          studentUid: studentUid,
+          classId: classId,
+          categoryId: cat.id,
+          studentName: studentName,
+          points: isPositive ? 1 : -1,
+        );
+        setState(() => _classBehavior.add(BehaviorPoint(
           studentUid: studentUid,
           studentName: studentName,
           classId: classId,
           categoryId: cat.id,
-          isPositive: isPositive,
+          points: isPositive ? 1 : -1,
           awardedBy: _uid,
           awardedByName: _user?.name ?? '',
-        );
+          createdAt: DateTime.now(),
+        )));
         _snack('${isPositive ? '+1' : '-1'} ${cat.name} for $studentName');
-        _loadUser();
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1427,16 +1432,27 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                     preMarked[s.uid] ?? AttendanceStatus.present;
                 names[s.uid] = s.name;
               }
-              await _attendanceSvc.markClassAttendance(
-                classId: classId,
-                date: dateStr,
-                studentStatuses: finalStatuses,
-                studentNames: names,
-                markedBy: _uid,
-                markedByName: _user?.name ?? '',
-              );
+              final records = finalStatuses.entries.map((e) => {
+                'studentUid': e.key,
+                'studentName': names[e.key] ?? '',
+                'classId': classId,
+                'date': dateStr,
+                'status': e.value.label,
+              }).toList();
+              _api.markAttendanceBatch(records);
+              setState(() {
+                _todayAttendance = finalStatuses.entries.map((e) =>
+                  AttendanceRecord(
+                    studentUid: e.key,
+                    studentName: names[e.key] ?? '',
+                    classId: classId,
+                    date: dateStr,
+                    status: e.value,
+                    markedBy: _uid,
+                    createdAt: DateTime.now(),
+                  )).toList();
+              });
               _snack('Attendance saved for $displayDate');
-              _loadUser();
             },
             child: Container(
               width: double.infinity,
@@ -1939,7 +1955,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                     onTap: () async {
                       final title = titleCtrl.text.trim();
                       if (title.isEmpty) return;
-                      await _hwSvc.create(HomeworkModel(
+                      final hw = HomeworkModel(
                         id: '',
                         title: title,
                         description: descCtrl.text.trim().isEmpty
@@ -1951,11 +1967,12 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                         teacherUid: _uid,
                         teacherName: _user?.name ?? '',
                         dueDate: 'Dec 20, 2024',
-                      ));
+                      );
+                      await _hwSvc.create(hw);
                       if (!context.mounted) return;
                       Navigator.pop(context);
+                      setState(() => _homework.insert(0, hw));
                       _snack('Homework posted to $selectedClassName!');
-                      _loadUser();
                     },
                     child: Container(
                       width: double.infinity,
@@ -2099,8 +2116,26 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                           Row(children: [
                             GestureDetector(
                               onTap: () async {
-                                await _storySvc.toggleLike(post.id, _uid);
-                                _loadUser();
+                                _api.toggleStoryLike(post.id);
+                                final i = _classStory.indexWhere((s) => s.id == post.id);
+                                if (i == -1) return;
+                                final p = _classStory[i];
+                                final updatedLikes = List<String>.from(p.likedBy);
+                                p.isLikedBy(_uid) ? updatedLikes.remove(_uid) : updatedLikes.add(_uid);
+                                setState(() => _classStory[i] = StoryPost(
+                                  id: p.id,
+                                  authorUid: p.authorUid,
+                                  authorName: p.authorName,
+                                  authorRole: p.authorRole,
+                                  classId: p.classId,
+                                  className: p.className,
+                                  text: p.text,
+                                  mediaUrls: p.mediaUrls,
+                                  mediaType: p.mediaType,
+                                  likedBy: updatedLikes,
+                                  commentCount: p.commentCount,
+                                  createdAt: p.createdAt,
+                                ));
                               },
                               child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -2229,18 +2264,20 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                         _classes.isNotEmpty ? _classes.first.id : '';
                     final className =
                         _classes.isNotEmpty ? _classes.first.name : '';
-                    await _storySvc.createPost(StoryPost(
+                    final newPost = StoryPost(
                       authorUid: _uid,
                       authorName: _user?.name ?? '',
                       authorRole: 'Teacher',
                       classId: classId,
                       className: className,
                       text: text,
-                    ));
+                      createdAt: DateTime.now(),
+                    );
+                    _storySvc.createPost(newPost);
                     if (!context.mounted) return;
                     Navigator.pop(context);
+                    setState(() => _classStory.insert(0, newPost));
                     _snack('Story posted!');
-                    _loadUser();
                   },
                   child: Container(
                     width: double.infinity,

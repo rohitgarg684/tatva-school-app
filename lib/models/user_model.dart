@@ -41,6 +41,23 @@ class UserModel {
     );
   }
 
+  factory UserModel.fromJson(Map<String, dynamic> data) {
+    return UserModel(
+      uid: data['uid'] as String? ?? data['id'] as String? ?? '',
+      name: data['name'] as String? ?? '',
+      email: data['email'] as String? ?? '',
+      role: UserRole.fromString(data['role'] as String? ?? 'Student'),
+      classIds: List<String>.from(data['classIds'] ?? []),
+      children: (data['children'] as List<dynamic>? ?? [])
+          .map((c) => ChildInfo.fromMap(c as Map<String, dynamic>))
+          .toList(),
+      fcmToken: data['fcmToken'] as String?,
+      createdAt: data['createdAt'] != null
+          ? DateTime.tryParse(data['createdAt'] as String)
+          : null,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'name': name,

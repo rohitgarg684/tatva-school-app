@@ -41,6 +41,23 @@ class ClassModel {
     );
   }
 
+  factory ClassModel.fromJson(Map<String, dynamic> data) {
+    return ClassModel(
+      id: data['id'] as String? ?? '',
+      name: data['name'] as String? ?? '',
+      subject: data['subject'] as String? ?? '',
+      teacherUid: data['teacherUid'] as String? ?? '',
+      teacherName: data['teacherName'] as String? ?? '',
+      teacherEmail: data['teacherEmail'] as String? ?? '',
+      classCode: data['classCode'] as String? ?? '',
+      studentUids: List<String>.from(data['studentUids'] ?? []),
+      parentUids: List<String>.from(data['parentUids'] ?? []),
+      createdAt: data['createdAt'] != null
+          ? DateTime.tryParse(data['createdAt'] as String)
+          : null,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'name': name,

@@ -8,8 +8,7 @@ import '../auth/welcome_screen.dart';
 import '../../repositories/auth_repository.dart';
 import '../../services/dashboard_service.dart';
 import '../../services/homework_service.dart';
-import '../../services/story_service.dart';
-import '../../services/content_service.dart';
+import '../../services/api_service.dart';
 import '../../models/audience.dart';
 import '../../models/user_model.dart';
 import '../../models/grade_model.dart';
@@ -51,7 +50,7 @@ class _StudentDashboardState extends State<StudentDashboard>
 
   final _dashSvc = DashboardService();
   final _hwSvc = HomeworkService();
-  final _storySvc = StoryService();
+  final _api = ApiService();
   String _uid = '';
 
   UserModel? _user;
@@ -1790,9 +1789,16 @@ class _StudentDashboardState extends State<StudentDashboard>
                       ],
                       const SizedBox(height: 10),
                       GestureDetector(
-                        onTap: () async {
-                          await _storySvc.toggleLike(post.id, _uid);
-                          _loadUser();
+                        onTap: () {
+                          final liked = post.likedBy;
+                          setState(() {
+                            if (liked.contains(_uid)) {
+                              liked.remove(_uid);
+                            } else {
+                              liked.add(_uid);
+                            }
+                          });
+                          _api.toggleStoryLike(post.id);
                         },
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
                           Icon(
@@ -1891,9 +1897,11 @@ class _StudentDashboardState extends State<StudentDashboard>
                         borderRadius: BorderRadius.circular(14),
                         onTap: completed
                             ? null
-                            : () async {
-                                await ContentService().markCompleted(ci.id, _uid);
-                                _loadUser();
+                            : () {
+                                setState(() {
+                                  ci.completedBy.add(_uid);
+                                });
+                                _api.markContentCompleted(ci.id);
                               },
                         child: Container(
                           margin: const EdgeInsets.only(bottom: 10),

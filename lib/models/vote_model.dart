@@ -74,6 +74,23 @@ class VoteModel {
     );
   }
 
+  factory VoteModel.fromJson(Map<String, dynamic> data) {
+    return VoteModel(
+      id: data['id'] as String? ?? '',
+      question: data['question'] as String? ?? '',
+      type: data['type'] as String? ?? '',
+      createdBy: data['createdBy'] as String? ?? '',
+      createdByName: data['createdByName'] as String? ?? '',
+      createdByRole: data['createdByRole'] as String? ?? '',
+      votes: VoteCount.fromMap(data['votes'] as Map<String, dynamic>?),
+      voters: List<String>.from(data['voters'] ?? []),
+      active: data['active'] as bool? ?? true,
+      createdAt: data['createdAt'] != null
+          ? DateTime.tryParse(data['createdAt'] as String)
+          : null,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'question': question,

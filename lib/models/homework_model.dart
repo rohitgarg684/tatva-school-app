@@ -48,6 +48,24 @@ class HomeworkModel {
     );
   }
 
+  factory HomeworkModel.fromJson(Map<String, dynamic> data) {
+    return HomeworkModel(
+      id: data['id'] as String? ?? '',
+      title: data['title'] as String? ?? '',
+      description: data['description'] as String? ?? '',
+      subject: data['subject'] as String? ?? '',
+      classId: data['classId'] as String? ?? '',
+      className: data['className'] as String? ?? '',
+      teacherUid: data['teacherUid'] as String? ?? '',
+      teacherName: data['teacherName'] as String? ?? '',
+      dueDate: data['dueDate'] as String? ?? '',
+      submittedBy: List<String>.from(data['submittedBy'] ?? []),
+      createdAt: data['createdAt'] != null
+          ? DateTime.tryParse(data['createdAt'] as String)
+          : null,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'title': title,

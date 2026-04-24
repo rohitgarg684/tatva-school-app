@@ -86,6 +86,24 @@ class ActivityEvent {
     );
   }
 
+  factory ActivityEvent.fromJson(Map<String, dynamic> data) {
+    return ActivityEvent(
+      id: data['id'] as String? ?? '',
+      type: ActivityType.fromString(data['type'] as String? ?? ''),
+      actorUid: data['actorUid'] as String? ?? '',
+      actorName: data['actorName'] as String? ?? '',
+      actorRole: data['actorRole'] as String? ?? '',
+      targetUid: data['targetUid'] as String? ?? '',
+      classId: data['classId'] as String? ?? '',
+      title: data['title'] as String? ?? '',
+      body: data['body'] as String? ?? '',
+      metadata: Map<String, dynamic>.from(data['metadata'] ?? {}),
+      createdAt: data['createdAt'] != null
+          ? DateTime.tryParse(data['createdAt'] as String)
+          : null,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'type': type.name,

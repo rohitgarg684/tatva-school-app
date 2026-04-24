@@ -36,6 +36,21 @@ class AttendanceRecord {
     );
   }
 
+  factory AttendanceRecord.fromJson(Map<String, dynamic> data) {
+    return AttendanceRecord(
+      id: data['id'] as String? ?? '',
+      studentUid: data['studentUid'] as String? ?? '',
+      studentName: data['studentName'] as String? ?? '',
+      classId: data['classId'] as String? ?? '',
+      date: data['date'] as String? ?? '',
+      status: AttendanceStatus.fromString(data['status'] as String? ?? ''),
+      markedBy: data['markedBy'] as String? ?? '',
+      createdAt: data['createdAt'] != null
+          ? DateTime.tryParse(data['createdAt'] as String)
+          : null,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'studentUid': studentUid,

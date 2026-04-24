@@ -8,8 +8,7 @@ import '../../shared/widgets/logout_sheet.dart';
 import '../../core/router/app_router.dart';
 import '../../repositories/auth_repository.dart';
 import '../../services/dashboard_service.dart';
-import '../../services/vote_service.dart';
-import '../../services/story_service.dart';
+import '../../services/api_service.dart';
 import '../../services/attendance_service.dart';
 import '../../services/report_service.dart';
 import '../../models/user_model.dart';
@@ -52,8 +51,7 @@ class _ParentDashboardState extends State<ParentDashboard>
   static const Color purple = TatvaColors.purple;
 
   final _dashSvc = DashboardService();
-  final _voteSvc = VoteService();
-  final _storySvc = StoryService();
+  final _api = ApiService();
   String _uid = '';
 
   UserModel? _user;
@@ -157,9 +155,28 @@ class _ParentDashboardState extends State<ParentDashboard>
   void _castVote(int index, String option) async {
     if (_activeVotes[index].hasVoted(_uid)) return;
     final voteId = _activeVotes[index].id;
-    await _voteSvc.castVote(voteId: voteId, option: option, voterUid: _uid);
+    final old = _activeVotes[index];
+    final oldVotes = old.votes;
+    setState(() {
+      _activeVotes[index] = VoteModel(
+        id: old.id,
+        question: old.question,
+        type: old.type,
+        createdBy: old.createdBy,
+        createdByName: old.createdByName,
+        createdByRole: old.createdByRole,
+        votes: VoteCount(
+          school: oldVotes.school + (option == 'school' ? 1 : 0),
+          noSchool: oldVotes.noSchool + (option == 'no_school' ? 1 : 0),
+          undecided: oldVotes.undecided + (option == 'undecided' ? 1 : 0),
+        ),
+        voters: [...old.voters, _uid],
+        active: old.active,
+        createdAt: old.createdAt,
+      );
+    });
+    _api.castVote(voteId, option);
     if (!mounted) return;
-    await _loadData();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: const Text('Vote submitted!',
           style: TextStyle(fontFamily: 'Raleway')),
@@ -1819,9 +1836,35 @@ class _ParentDashboardState extends State<ParentDashboard>
                           const SizedBox(height: 10),
                           Row(children: [
                             GestureDetector(
-                              onTap: () async {
-                                await _storySvc.toggleLike(post.id, _uid);
-                                _loadData();
+                              onTap: () {
+                                final liked = post.isLikedBy(_uid);
+                                setState(() {
+                                  _storyPosts = [
+                                    for (final p in _storyPosts)
+                                      if (p.id == post.id)
+                                        StoryPost(
+                                          id: p.id,
+                                          authorUid: p.authorUid,
+                                          authorName: p.authorName,
+                                          authorRole: p.authorRole,
+                                          classId: p.classId,
+                                          className: p.className,
+                                          text: p.text,
+                                          mediaUrls: p.mediaUrls,
+                                          mediaType: p.mediaType,
+                                          likedBy: liked
+                                              ? p.likedBy
+                                                  .where((uid) => uid != _uid)
+                                                  .toList()
+                                              : [...p.likedBy, _uid],
+                                          commentCount: p.commentCount,
+                                          createdAt: p.createdAt,
+                                        )
+                                      else
+                                        p,
+                                  ];
+                                });
+                                _api.toggleStoryLike(post.id);
                               },
                               child: Row(
                                   mainAxisSize: MainAxisSize.min,
