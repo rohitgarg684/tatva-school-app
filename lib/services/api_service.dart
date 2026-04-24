@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
 class ApiService {
@@ -8,12 +9,14 @@ class ApiService {
   factory ApiService() => _instance;
   ApiService._();
 
+  static const _cloudRunUrl =
+      'https://tatva-api-859841471446.us-central1.run.app';
+
   String get _baseUrl {
-    final host = Uri.base.host;
-    if (host == 'localhost' || host == '127.0.0.1') {
-      return '${Uri.base.origin}/api';
+    if (kIsWeb) {
+      return '/api';
     }
-    return '/api';
+    return '$_cloudRunUrl/api';
   }
 
   Future<String> _getToken() async {
