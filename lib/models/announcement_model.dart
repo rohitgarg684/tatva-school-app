@@ -1,10 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'audience.dart';
 
 class AnnouncementModel {
   final String id;
   final String title;
   final String body;
-  final String audience;
+  final Audience audience;
   final List<String> classIds;
   final String createdBy;
   final String createdByName;
@@ -29,7 +30,7 @@ class AnnouncementModel {
       id: doc.id,
       title: data['title'] as String? ?? '',
       body: data['body'] as String? ?? '',
-      audience: data['audience'] as String? ?? '',
+      audience: Audience.fromString(data['audience'] as String? ?? ''),
       classIds: List<String>.from(data['classIds'] ?? []),
       createdBy: data['createdBy'] as String? ?? '',
       createdByName: data['createdByName'] as String? ?? '',
@@ -42,7 +43,7 @@ class AnnouncementModel {
     return {
       'title': title,
       'body': body,
-      'audience': audience,
+      'audience': audience.label,
       'classIds': classIds,
       'createdBy': createdBy,
       'createdByName': createdByName,

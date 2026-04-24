@@ -2,20 +2,20 @@ import '../models/user_model.dart';
 import '../models/user_role.dart';
 import '../repositories/auth_repository.dart';
 import '../repositories/user_repository.dart';
-import '../repositories/class_repository.dart';
+import 'class_service.dart';
 
 class AuthService {
   final AuthRepository _authRepo;
   final UserRepository _userRepo;
-  final ClassRepository _classRepo;
+  final ClassService _classSvc;
 
   AuthService({
     AuthRepository? authRepo,
     UserRepository? userRepo,
-    ClassRepository? classRepo,
+    ClassService? classSvc,
   })  : _authRepo = authRepo ?? AuthRepository(),
         _userRepo = userRepo ?? UserRepository(),
-        _classRepo = classRepo ?? ClassRepository();
+        _classSvc = classSvc ?? ClassService();
 
   Future<({UserModel user, UserRole role})?> signIn({
     required String email,
@@ -60,60 +60,20 @@ class AuthService {
     );
     await _userRepo.createUser(user);
 
+    // Delegate class-joining to ClassService (no duplication)
     String? classWarning;
     if ((role == UserRole.student || role == UserRole.parent) &&
         classCode != null &&
         classCode.isNotEmpty) {
-      classWarning =
-          await _joinClass(uid: uid, role: role, classCode: classCode, childName: childName);
+      classWarning = await _classSvc.joinClassByCode(
+        classCode: classCode,
+        role: role,
+        childName: childName,
+      );
     }
 
     await _authRepo.signOut();
     return classWarning;
-  }
-
-  Future<String?> _joinClass({
-    required String uid,
-    required UserRole role,
-    required String classCode,
-    String? childName,
-  }) async {
-    try {
-      final classModel = await _classRepo.findByCode(classCode);
-      if (classModel == null) return 'Class code not found.';
-
-      if (role == UserRole.student) {
-        await _classRepo.addStudentToClass(classModel.id, uid);
-        await _userRepo.updateUser(uid, {
-          'classIds': [classModel.id],
-          'classCode': classModel.classCode,
-          'className': classModel.name,
-          'subject': classModel.subject,
-          'teacherName': classModel.teacherName,
-          'teacherUid': classModel.teacherUid,
-        });
-      } else if (role == UserRole.parent) {
-        await _classRepo.addParentToClass(classModel.id, uid);
-        await _userRepo.updateUser(uid, {
-          'classIds': [classModel.id],
-          'children': [
-            {
-              'classId': classModel.id,
-              'classCode': classModel.classCode,
-              'childName': childName ?? '',
-              'className': classModel.name,
-              'subject': classModel.subject,
-              'teacherName': classModel.teacherName,
-              'teacherUid': classModel.teacherUid,
-              'teacherEmail': classModel.teacherEmail,
-            }
-          ],
-        });
-      }
-      return null;
-    } catch (_) {
-      return 'Could not join class. You can add one later.';
-    }
   }
 
   Future<void> signOut() => _authRepo.signOut();

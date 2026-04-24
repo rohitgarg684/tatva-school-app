@@ -9,12 +9,14 @@ import '../../shared/widgets/logout_sheet.dart';
 import '../../shared/widgets/pick_student_sheet.dart';
 import '../../core/router/app_router.dart';
 import '../../services/class_service.dart';
+import '../../services/dashboard_service.dart';
+import '../../services/homework_service.dart';
 import '../../repositories/auth_repository.dart';
-import '../../repositories/user_repository.dart';
-import '../../repositories/class_repository.dart';
-import '../../repositories/grade_repository.dart';
-import '../../repositories/announcement_repository.dart';
-import '../../repositories/homework_repository.dart';
+import '../../models/user_model.dart';
+import '../../models/class_model.dart';
+import '../../models/grade_model.dart';
+import '../../models/announcement_model.dart';
+import '../../models/homework_model.dart';
 
 class TeacherDashboard extends StatefulWidget {
   const TeacherDashboard({super.key});
@@ -40,14 +42,17 @@ class _TeacherDashboardState extends State<TeacherDashboard>
   static const Color info = TatvaColors.info;
   static const Color purple = TatvaColors.purple;
 
-  String userName = '';
-  String userEmail = '';
-  List<Map<String, dynamic>> _classes = [];
-  List<Map<String, dynamic>> _students = [];
-  List<Map<String, dynamic>> _grades = [];
-  List<Map<String, dynamic>> _announcements = [];
-  List<Map<String, dynamic>> _parents = [];
-  List<Map<String, dynamic>> _homework = [];
+  final _dashSvc = DashboardService();
+  final _hwSvc = HomeworkService();
+  String _uid = '';
+
+  UserModel? _user;
+  List<ClassModel> _classes = [];
+  List<UserModel> _students = [];
+  List<UserModel> _parents = [];
+  List<GradeModel> _grades = [];
+  List<AnnouncementModel> _announcements = [];
+  List<HomeworkModel> _homework = [];
 
   @override
   void initState() {
@@ -105,103 +110,19 @@ class _TeacherDashboardState extends State<TeacherDashboard>
   Future<void> _loadUser() async {
     setState(() => isLoading = true);
     try {
-      final uid = AuthRepository().currentUid ?? 'teacher_priya';
-
-      final user = await UserRepository().getUser(uid);
-      if (user != null) {
-        userName = user.name;
-        userEmail = user.email;
-      }
-
-      final classIds = user?.classIds ?? [];
-      if (classIds.isNotEmpty) {
-        final classModels = await ClassRepository().getClassesByIds(classIds);
-        _classes = classModels.map((c) => <String, dynamic>{
-          'classId': c.id,
-          'name': c.name,
-          'classCode': c.classCode,
-          'subject': c.subject,
-          'studentUids': c.studentUids,
-          'parentUids': c.parentUids,
-        }).toList();
-      }
-
-      if (_classes.isNotEmpty) {
-        final firstClassStudentUids =
-            List<String>.from(_classes.first['studentUids'] ?? []);
-        if (firstClassStudentUids.isNotEmpty) {
-          final studentModels =
-              await UserRepository().getUsersByIds(firstClassStudentUids);
-          _students = studentModels.map((s) => <String, dynamic>{
-            'uid': s.uid,
-            'name': s.name,
-            'email': s.email,
-          }).toList();
-        }
-      }
-
-      if (_classes.isNotEmpty) {
-        final gradeModels = await GradeRepository()
-            .fetchClassGrades(_classes.first['classId'] as String);
-        _grades = gradeModels.map((g) => <String, dynamic>{
-          'studentName': g.studentName,
-          'assessmentName': g.assessmentName,
-          'subject': g.subject,
-          'score': g.score,
-          'total': g.total,
-        }).toList();
-      }
-
-      final annModels = await AnnouncementRepository().fetchAll();
-      _announcements = annModels.map((a) => <String, dynamic>{
-        'title': a.title,
-        'body': a.body,
-        'audience': a.audience,
-        'createdByName': a.createdByName,
-      }).toList();
-
-      if (_classes.isNotEmpty) {
-        final firstClassParentUids =
-            List<String>.from(_classes.first['parentUids'] ?? []);
-        if (firstClassParentUids.isNotEmpty) {
-          final parentModels =
-              await UserRepository().getUsersByIds(firstClassParentUids);
-          _parents = parentModels.map((p) => <String, dynamic>{
-            'uid': p.uid,
-            'name': p.name,
-            'email': p.email,
-            'childName': p.children.isNotEmpty
-                ? (p.children.first['childName'] ?? '')
-                : '',
-          }).toList();
-        }
-      }
-
-      final hwModels = await HomeworkRepository().getByTeacher(uid);
-      _homework = hwModels.map((h) {
-        final classMatch = _classes.where((c) => c['classId'] == h.classId);
-        final totalStudents = classMatch.isNotEmpty
-            ? (classMatch.first['studentUids'] as List).length
-            : 0;
-        return <String, dynamic>{
-          'id': h.id,
-          'title': h.title,
-          'description': h.description,
-          'subject': h.subject,
-          'classId': h.classId,
-          'className': h.className,
-          'dueDate': h.dueDate,
-          'totalMarks': 0,
-          'submissions': h.submittedBy,
-          'totalStudents': totalStudents,
-          'status': 'active',
-        };
-      }).toList();
+      _uid = AuthRepository().currentUid ?? 'teacher_priya';
+      final data = await _dashSvc.loadTeacherDashboard(overrideUid: _uid);
+      _user = data.user;
+      _classes = data.classes;
+      _students = data.studentsInFirstClass;
+      _parents = data.parentsInFirstClass;
+      _grades = data.gradesInFirstClass;
+      _announcements = data.announcements;
+      _homework = data.homework;
     } catch (_) {}
     if (!mounted) return;
     setState(() => isLoading = false);
     _greetingController.forward();
-    _cardsController.forward();
     _tabController.forward();
   }
 
@@ -241,7 +162,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ));
 
-  void _showAddStudentOptions(String classId, List existingStudentUids) {
+  void _showAddStudentOptions(String classId, List<String> existingStudentUids) {
     HapticFeedback.lightImpact();
     showModalBottomSheet(
       context: context,
@@ -291,7 +212,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                 Navigator.pop(context);
                 PickStudentSheet.show(context,
                     classId: classId,
-                    excludeStudentIds: existingStudentUids.cast<String>(),
+                    excludeStudentIds: existingStudentUids,
                     onStudentAdded: () => _snack('Student added to class'));
               },
             ),
@@ -718,8 +639,8 @@ class _TeacherDashboardState extends State<TeacherDashboard>
   // ─── HOME TAB ──────────────────────────────────────────────────────────────
   Widget _buildHomeTab() {
     final totalStudents =
-        _classes.fold(0, (sum, c) => sum + (c['studentUids'] as List).length);
-    final activeHw = _homework.where((h) => h['status'] == 'active').length;
+        _classes.fold(0, (sum, c) => sum + c.studentUids.length);
+    final activeHw = _homework.length;
     return RefreshIndicator(
       color: primary,
       onRefresh: _loadUser,
@@ -844,7 +765,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                             ]),
                             const SizedBox(height: 6),
                             TypewriterText(
-                                text: userName,
+                                text: _user?.name ?? '',
                                 delayMs: 400,
                                 style: const TextStyle(
                                     fontFamily: 'Raleway',
@@ -862,7 +783,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                           ])),
                       HeroAvatar(
                           heroTag: 'teacher_avatar',
-                          initial: userName[0],
+                          initial: _user?.initial ?? '?',
                           radius: 26,
                           bgColor: Colors.white.withOpacity(0.15),
                           textColor: Colors.white,
@@ -943,9 +864,9 @@ class _TeacherDashboardState extends State<TeacherDashboard>
     );
   }
 
-  Widget _classCard(Map<String, dynamic> c, int index) {
-    final studentCount = (c['studentUids'] as List).length;
-    final parentCount = (c['parentUids'] as List).length;
+  Widget _classCard(ClassModel c, int index) {
+    final studentCount = c.studentUids.length;
+    final parentCount = c.parentUids.length;
     return StaggeredItem(
         index: index,
         child: Container(
@@ -969,13 +890,13 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                      Text(c['name'],
+                      Text(c.name,
                           style: const TextStyle(
                               fontFamily: 'Raleway',
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: textDark)),
-                      Text(c['subject'],
+                      Text(c.subject,
                           style: const TextStyle(
                               fontFamily: 'Raleway',
                               fontSize: 12,
@@ -988,7 +909,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                         color: accent.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: accent.withOpacity(0.3))),
-                    child: Text(c['classCode'],
+                    child: Text(c.classCode,
                         style: const TextStyle(
                             fontFamily: 'Raleway',
                             fontSize: 14,
@@ -1021,7 +942,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
                 child: Row(children: [
                   GestureDetector(
-                      onTap: () => _showAddStudentOptions(c['classId'], c['studentUids'] as List),
+                      onTap: () => _showAddStudentOptions(c.id, c.studentUids),
                       child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 6),
@@ -1105,7 +1026,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
               ])),
           ..._grades.asMap().entries.map((e) {
             final g = e.value;
-            final pct = (g['score'] as double) / (g['total'] as double);
+            final pct = g.total > 0 ? g.score / g.total : 0.0;
             final c = pct >= 0.9
                 ? success
                 : pct >= 0.7
@@ -1124,7 +1045,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                     CircleAvatar(
                         radius: 18,
                         backgroundColor: primary.withOpacity(0.1),
-                        child: Text((g['studentName'] as String)[0],
+                        child: Text(g.studentName.isNotEmpty ? g.studentName[0] : '?',
                             style: const TextStyle(
                                 fontFamily: 'Raleway',
                                 fontSize: 13,
@@ -1135,13 +1056,13 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                         child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                          Text(g['studentName'],
+                          Text(g.studentName,
                               style: const TextStyle(
                                   fontFamily: 'Raleway',
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                   color: textDark)),
-                          Text(g['assessmentName'],
+                          Text(g.assessmentName,
                               style: const TextStyle(
                                   fontFamily: 'Raleway',
                                   fontSize: 11,
@@ -1157,7 +1078,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                                 color: c.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(8)),
                             child: Text(
-                                '${(g['score'] as double).toInt()}/${(g['total'] as double).toInt()}',
+                                '${g.score.toInt()}/${g.total.toInt()}',
                                 style: TextStyle(
                                     fontFamily: 'Raleway',
                                     fontSize: 13,
@@ -1171,8 +1092,8 @@ class _TeacherDashboardState extends State<TeacherDashboard>
 
   // ─── HOMEWORK TAB ──────────────────────────────────────────────────────────
   Widget _buildHomeworkTab() {
-    final active = _homework.where((h) => h['status'] == 'active').toList();
-    final done = _homework.where((h) => h['status'] == 'completed').toList();
+    final active = _homework;
+    final done = <HomeworkModel>[];
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1244,11 +1165,11 @@ class _TeacherDashboardState extends State<TeacherDashboard>
     );
   }
 
-  Widget _hwCard(Map<String, dynamic> hw, int idx) {
-    final subs = (hw['submissions'] as List).length;
-    final total = hw['totalStudents'] as int;
+  Widget _hwCard(HomeworkModel hw, int idx) {
+    final subs = hw.submissionCount;
+    final total = 0;
     final pct = total > 0 ? subs / total : 0.0;
-    final isDone = hw['status'] == 'completed';
+    final isDone = false;
     final color = isDone ? success : accent;
     return StaggeredItem(
       index: idx,
@@ -1285,13 +1206,13 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                    Text(hw['title'],
+                    Text(hw.title,
                         style: const TextStyle(
                             fontFamily: 'Raleway',
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: textDark)),
-                    Text(hw['className'],
+                    Text(hw.className,
                         style: const TextStyle(
                             fontFamily: 'Raleway',
                             fontSize: 11,
@@ -1304,7 +1225,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                       color: color.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: color.withOpacity(0.25))),
-                  child: Text('${hw['totalMarks']} marks',
+                  child: Text('0 marks',
                       style: TextStyle(
                           fontFamily: 'Raleway',
                           fontSize: 11,
@@ -1316,7 +1237,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(hw['description'],
+              Text(hw.description,
                   style: const TextStyle(
                       fontFamily: 'Raleway',
                       fontSize: 12,
@@ -1326,7 +1247,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
               Row(children: [
                 Icon(Icons.calendar_today_outlined, size: 12, color: textLight),
                 const SizedBox(width: 4),
-                Text('Due ${hw['dueDate']}',
+                Text('Due ${hw.dueDate}',
                     style: const TextStyle(
                         fontFamily: 'Raleway', fontSize: 11, color: textLight)),
                 const Spacer(),
@@ -1363,8 +1284,8 @@ class _TeacherDashboardState extends State<TeacherDashboard>
     final titleCtrl = TextEditingController();
     final descCtrl = TextEditingController();
     final marksCtrl = TextEditingController(text: '10');
-    String selectedClassId = _classes[0]['classId'] as String;
-    String selectedClassName = _classes[0]['name'] as String;
+    String selectedClassId = _classes[0].id;
+    String selectedClassName = _classes[0].name;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1414,8 +1335,8 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                             color: textDark),
                         items: _classes
                             .map((c) => DropdownMenuItem<String>(
-                                  value: c['classId'] as String,
-                                  child: Text(c['name'] as String,
+                                  value: c.id,
+                                  child: Text(c.name,
                                       style: const TextStyle(
                                           fontFamily: 'Raleway',
                                           fontSize: 14,
@@ -1427,7 +1348,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                           setModal(() {
                             selectedClassId = v;
                             selectedClassName = _classes.firstWhere(
-                                (c) => c['classId'] == v)['name'] as String;
+                                (c) => c.id == v).name;
                           });
                         },
                       ),
@@ -1518,33 +1439,26 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                   ),
                   const SizedBox(height: 20),
                   GestureDetector(
-                    onTap: () {
+                    onTap: () async {
                       final title = titleCtrl.text.trim();
                       if (title.isEmpty) return;
-                      final marks = int.tryParse(marksCtrl.text.trim()) ?? 10;
-                      final classStudents = (_classes.firstWhere((c) =>
-                              c['classId'] ==
-                              selectedClassId)['studentUids'] as List)
-                          .length;
-                      setState(() {
-                        _homework.insert(0, {
-                          'id': 'hw${DateTime.now().millisecondsSinceEpoch}',
-                          'title': title,
-                          'description': descCtrl.text.trim().isEmpty
-                              ? 'No additional instructions.'
-                              : descCtrl.text.trim(),
-                          'classId': selectedClassId,
-                          'className': selectedClassName,
-                          'dueDate': 'Dec 20, 2024',
-                          'totalMarks': marks,
-                          'subject': 'Mathematics',
-                          'submissions': [],
-                          'totalStudents': classStudents,
-                          'status': 'active',
-                        });
-                      });
+                      await _hwSvc.create(HomeworkModel(
+                        id: '',
+                        title: title,
+                        description: descCtrl.text.trim().isEmpty
+                            ? 'No additional instructions.'
+                            : descCtrl.text.trim(),
+                        subject: 'Mathematics',
+                        classId: selectedClassId,
+                        className: selectedClassName,
+                        teacherUid: _uid,
+                        teacherName: _user?.name ?? '',
+                        dueDate: 'Dec 20, 2024',
+                      ));
+                      if (!context.mounted) return;
                       Navigator.pop(context);
                       _snack('Homework posted to $selectedClassName!');
+                      _loadUser();
                     },
                     child: Container(
                       width: double.infinity,
@@ -1638,28 +1552,28 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                           decoration: BoxDecoration(
                               color: primary.withOpacity(0.08),
                               borderRadius: BorderRadius.circular(6)),
-                          child: Text(e.value['audience'],
+                          child: Text(e.value.audience.label,
                               style: const TextStyle(
                                   fontFamily: 'Raleway',
                                   fontSize: 10,
                                   color: primary,
                                   fontWeight: FontWeight.w700))),
                       const SizedBox(height: 8),
-                      Text(e.value['title'],
+                      Text(e.value.title,
                           style: const TextStyle(
                               fontFamily: 'Raleway',
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
                               color: textDark)),
                       const SizedBox(height: 4),
-                      Text(e.value['body'],
+                      Text(e.value.body,
                           style: const TextStyle(
                               fontFamily: 'Raleway',
                               fontSize: 12,
                               color: textMid,
                               height: 1.5)),
                       const SizedBox(height: 6),
-                      Text('By ${e.value['createdByName']}',
+                      Text('By ${e.value.createdByName}',
                           style: const TextStyle(
                               fontFamily: 'Raleway',
                               fontSize: 10,
@@ -1700,10 +1614,10 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                           context,
                           MaterialPageRoute(
                               builder: (_) => MessagingScreen(
-                                    otherUserId: p['uid'],
-                                    otherUserName: p['name'],
-                                    otherUserRole: 'Parent · ${p['childName']}',
-                                    otherUserEmail: p['email'],
+                                    otherUserId: p.uid,
+                                    otherUserName: p.name,
+                                    otherUserRole: 'Parent · ${p.children.isNotEmpty ? p.children.first.childName : ''}',
+                                    otherUserEmail: p.email,
                                     avatarColor: primary,
                                   ))),
                       child: Container(
@@ -1716,7 +1630,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                             CircleAvatar(
                                 radius: 22,
                                 backgroundColor: primary.withOpacity(0.1),
-                                child: Text((p['name'] as String)[0],
+                                child: Text(p.initial,
                                     style: const TextStyle(
                                         fontFamily: 'Raleway',
                                         fontSize: 16,
@@ -1728,13 +1642,13 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                  Text(p['name'],
+                                  Text(p.name,
                                       style: const TextStyle(
                                           fontFamily: 'Raleway',
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
                                           color: textDark)),
-                                  Text('Parent of ${p['childName']}',
+                                  Text('Parent of ${p.children.isNotEmpty ? p.children.first.childName : ''}',
                                       style: const TextStyle(
                                           fontFamily: 'Raleway',
                                           fontSize: 12,
@@ -1776,7 +1690,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
           FadeSlideIn(
               child: HeroAvatar(
                   heroTag: 'teacher_avatar',
-                  initial: userName[0],
+                  initial: _user?.initial ?? '?',
                   radius: 46,
                   bgColor: primary.withOpacity(0.1),
                   textColor: primary,
@@ -1784,7 +1698,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
           const SizedBox(height: 16),
           FadeSlideIn(
               delayMs: 80,
-              child: Text(userName,
+              child: Text(_user?.name ?? '',
                   style: const TextStyle(
                       fontFamily: 'Raleway',
                       fontSize: 24,
@@ -1794,7 +1708,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
           const SizedBox(height: 4),
           FadeSlideIn(
               delayMs: 100,
-              child: Text(userEmail,
+              child: Text(_user?.email ?? '',
                   style: const TextStyle(
                       fontFamily: 'Raleway', fontSize: 13, color: textLight))),
           const SizedBox(height: 10),

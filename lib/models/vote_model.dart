@@ -56,6 +56,8 @@ class VoteModel {
     this.createdAt,
   });
 
+  bool hasVoted(String uid) => voters.contains(uid);
+
   factory VoteModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>? ?? {};
     return VoteModel(

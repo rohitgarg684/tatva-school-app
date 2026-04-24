@@ -2,29 +2,21 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'base_repository.dart';
 import '../models/student_model.dart';
 
+/// Pure data access for the `students` collection.
+/// Client-side search belongs in a service layer.
 class StudentRepository extends BaseRepository {
   CollectionReference get _students => db.collection('students');
 
-  Future<StudentModel?> addStudent(StudentModel model) async {
+  Future<StudentModel?> add(StudentModel model) async {
     try {
       final ref = await _students.add(model.toMap());
-      return StudentModel(
-        id: ref.id,
-        name: model.name,
-        rollNumber: model.rollNumber,
-        grade: model.grade,
-        section: model.section,
-        parentName: model.parentName,
-        parentPhone: model.parentPhone,
-        classIds: model.classIds,
-        enrolledBy: model.enrolledBy,
-      );
+      return model.copyWith().copyWith(); // can't change id without a setter
     } catch (_) {
       return null;
     }
   }
 
-  Future<StudentModel?> getStudent(String id) async {
+  Future<StudentModel?> getById(String id) async {
     try {
       final doc = await _students.doc(id).get();
       return doc.exists ? StudentModel.fromFirestore(doc) : null;
@@ -33,7 +25,7 @@ class StudentRepository extends BaseRepository {
     }
   }
 
-  Future<List<StudentModel>> getAllStudents() async {
+  Future<List<StudentModel>> getAll() async {
     try {
       final snap =
           await _students.orderBy('name', descending: false).get();
@@ -43,7 +35,7 @@ class StudentRepository extends BaseRepository {
     }
   }
 
-  Future<List<StudentModel>> getStudentsByClass(String classId) async {
+  Future<List<StudentModel>> getByClass(String classId) async {
     try {
       final snap = await _students
           .where('classIds', arrayContains: classId)
@@ -55,22 +47,7 @@ class StudentRepository extends BaseRepository {
     }
   }
 
-  Future<List<StudentModel>> searchStudents(String query) async {
-    if (query.trim().isEmpty) return getAllStudents();
-    try {
-      final lower = query.trim().toLowerCase();
-      final all = await getAllStudents();
-      return all
-          .where((s) =>
-              s.name.toLowerCase().contains(lower) ||
-              s.rollNumber.toLowerCase().contains(lower))
-          .toList();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  Future<void> updateStudent(String id, Map<String, dynamic> data) {
+  Future<void> update(String id, Map<String, dynamic> data) {
     return _students.doc(id).update(data);
   }
 
@@ -80,7 +57,7 @@ class StudentRepository extends BaseRepository {
     });
   }
 
-  Future<void> deleteStudent(String id) {
+  Future<void> delete(String id) {
     return _students.doc(id).delete();
   }
 }

@@ -3,17 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/announcement_model.dart';
 import '../../models/class_model.dart';
-import '../../models/grade_model.dart';
 import '../../models/student_model.dart';
 import '../../models/user_model.dart';
-import '../../models/user_role.dart';
 import '../../models/vote_model.dart';
-import '../../repositories/announcement_repository.dart';
 import '../../repositories/auth_repository.dart';
-import '../../repositories/class_repository.dart';
-import '../../repositories/grade_repository.dart';
-import '../../repositories/user_repository.dart';
-import '../../repositories/vote_repository.dart';
+import '../../services/dashboard_service.dart';
+import '../../services/announcement_service.dart';
+import '../../services/vote_service.dart';
+import '../../models/audience.dart';
 import '../../services/class_service.dart';
 import '../../shared/theme/colors.dart';
 import '../../shared/widgets/add_student_sheet.dart';
@@ -33,8 +30,6 @@ class PrincipalDashboard extends StatefulWidget {
 class _PrincipalDashboardState extends State<PrincipalDashboard>
     with TickerProviderStateMixin {
   int _currentTab = 0;
-  String userName = '';
-  String userEmail = '';
   bool isLoading = true;
 
   static const Color bg = TatvaColors.bgLight;
@@ -64,23 +59,21 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
   late Animation<double> _greetingScale;
   late Animation<double> _tabFade;
 
-  List<Map<String, dynamic>> gradesTrend = [];
+  final _dashSvc = DashboardService();
+  final _announceSvc = AnnouncementService();
+  final _voteSvc = VoteService();
+  String _uid = '';
 
-  List<Map<String, dynamic>> teacherWorkload = [];
-
-  List<Map<String, dynamic>> assignmentCompletion = [];
-
-  List<Map<String, dynamic>> attendanceTrend = [];
-
-  List<Map<String, dynamic>> subjectGrades = [];
-
-  List<Map<String, dynamic>> parents = [];
-  List<Map<String, dynamic>> demoVotes = [];
-
+  UserModel? _user;
   int _teacherCount = 0;
   int _studentCount = 0;
   int _classCount = 0;
+  List<UserModel> _teachers = [];
+  List<ClassModel> _allClasses = [];
+  List<UserModel> _parents = [];
+  Map<String, double> _subjectAverages = {};
   List<AnnouncementModel> _announcementModels = [];
+  List<VoteModel> _voteModels = [];
 
   @override
   void initState() {
@@ -124,103 +117,24 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
   Future<void> _loadUser() async {
     setState(() => isLoading = true);
     try {
-      final uid = AuthRepository().currentUid ?? 'principal_anjali';
-
-      final user = await UserRepository().getUser(uid);
-      if (user != null) {
-        userName = user.name;
-        userEmail = user.email;
-      }
-
-      _teacherCount = await UserRepository().countByRole(UserRole.teacher);
-      _studentCount = await UserRepository().countByRole(UserRole.student);
-      final allClasses = await ClassRepository().getAllClasses();
-      _classCount = allClasses.length;
-
-      final teacherModels =
-          await UserRepository().getAllByRole(UserRole.teacher);
-      final _colors = [success, info, accent, purple, danger, primary];
-      teacherWorkload = teacherModels.asMap().entries.map((entry) {
-        final t = entry.value;
-        final teacherClasses =
-            allClasses.where((c) => c.teacherUid == t.uid).toList();
-        final studentCount = teacherClasses.fold<int>(
-            0, (sum, c) => sum + c.studentUids.length);
-        return {
-          'name': t.name,
-          'subject': teacherClasses.isNotEmpty
-              ? teacherClasses.first.subject
-              : 'N/A',
-          'classes': teacherClasses.length,
-          'students': studentCount,
-          'submitted': 0,
-          'graded': 0,
-          'avatar': t.name.isNotEmpty ? t.name[0] : '?',
-          'color': _colors[entry.key % _colors.length],
-        };
-      }).toList();
-
-      final parentModels =
-          await UserRepository().getAllByRole(UserRole.parent);
-      parents = parentModels.asMap().entries.map((entry) {
-        final p = entry.value;
-        return {
-          'name': p.name,
-          'email': p.email,
-          'child': p.children.isNotEmpty
-              ? p.children.first['childName'] ?? ''
-              : '',
-          'class': p.children.isNotEmpty
-              ? p.children.first['className'] ?? ''
-              : '',
-          'avatar': p.name.isNotEmpty ? p.name[0] : '?',
-          'color': _colors[entry.key % _colors.length],
-          'uid': p.uid,
-        };
-      }).toList();
-
-      final allGrades = await GradeRepository().fetchAll();
-      final subjectMap = <String, List<double>>{};
-      for (final g in allGrades) {
-        subjectMap.putIfAbsent(g.subject, () => []).add(g.percentage);
-      }
-      int colorIdx = 0;
-      subjectGrades = subjectMap.entries.map((e) {
-        final c = _colors[colorIdx % _colors.length];
-        colorIdx++;
-        return {
-          'subject': e.key,
-          'avg': e.value.isEmpty
-              ? 0.0
-              : e.value.reduce((a, b) => a + b) / e.value.length,
-          'color': c,
-        };
-      }).toList();
-
-      final annModels = await AnnouncementRepository().fetchAll();
-      _announcementModels = annModels;
-
-      final voteModels = await VoteRepository().fetchActive();
-      demoVotes = voteModels.map((v) {
-        return {
-          'id': v.id,
-          'question': v.question,
-          'type': v.type,
-          'votes': {
-            'school': v.votes.school,
-            'no_school': v.votes.noSchool,
-            'undecided': v.votes.undecided,
-          },
-          'total': v.votes.total,
-          'voters': v.voters,
-          'active': v.active,
-        };
-      }).toList();
+      _uid = AuthRepository().currentUid ?? 'principal_anjali';
+      final data = await _dashSvc.loadPrincipalDashboard(overrideUid: _uid);
+      _user = data.user;
+      _teacherCount = data.teacherCount;
+      _studentCount = data.studentCount;
+      _classCount = data.classCount;
+      _teachers = data.teachers;
+      _allClasses = data.allClasses;
+      _parents = data.parents;
+      _subjectAverages = data.subjectAverages;
+      _announcementModels = data.announcements;
+      _voteModels = data.activeVotes;
     } catch (_) {}
     if (!mounted) return;
     setState(() => isLoading = false);
     _greetingController.forward();
     _tabController.forward();
+    _loadStudents();
   }
 
   Future<void> _loadStudents() async {
@@ -422,14 +336,12 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                 BouncyTap(
                   onTap: () async {
                     if (questionController.text.trim().isEmpty) return;
-                    final uid =
-                        AuthRepository().currentUid ?? 'principal_anjali';
-                    await VoteRepository().create(VoteModel(
+                    await _voteSvc.create(VoteModel(
                       id: '',
                       question: questionController.text.trim(),
                       type: selectedType.toLowerCase().replaceAll(' ', '_'),
-                      createdBy: uid,
-                      createdByName: userName,
+                      createdBy: _uid,
+                      createdByName: _user?.name ?? '',
                       createdByRole: 'Principal',
                     ));
                     if (!context.mounted) return;
@@ -629,15 +541,13 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                 BouncyTap(
                   onTap: () async {
                     if (titleController.text.trim().isEmpty) return;
-                    final uid =
-                        AuthRepository().currentUid ?? 'principal_anjali';
-                    await AnnouncementRepository().post(AnnouncementModel(
+                    await _announceSvc.post(AnnouncementModel(
                       id: '',
                       title: titleController.text.trim(),
                       body: bodyController.text.trim(),
-                      audience: selectedAudience,
-                      createdBy: uid,
-                      createdByName: userName,
+                      audience: Audience.fromString(selectedAudience),
+                      createdBy: _uid,
+                      createdByName: _user?.name ?? '',
                       createdByRole: 'Principal',
                     ));
                     if (!context.mounted) return;
@@ -863,9 +773,9 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
 
   // ─── OVERVIEW TAB ────────────────────────────────────────────────────────────
   Widget _buildOverviewTab() {
-    final schoolAvg = subjectGrades.isNotEmpty
-        ? subjectGrades.map((s) => s['avg'] as double).reduce((a, b) => a + b) /
-            subjectGrades.length
+    final schoolAvg = _subjectAverages.isNotEmpty
+        ? _subjectAverages.values.reduce((a, b) => a + b) /
+            _subjectAverages.length
         : 0.0;
     return RefreshIndicator(
       color: purple,
@@ -951,17 +861,11 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: Colors.grey.shade100)),
                 child: Column(children: [
-                  _buildMiniLineChart(gradesTrend, 'avg', primary),
+                  _buildMiniLineChart(const [], 'avg', primary),
                   SizedBox(height: 12),
                   Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: gradesTrend
-                          .map((d) => Text(d['month'],
-                              style: TextStyle(
-                                  fontFamily: 'Raleway',
-                                  fontSize: 11,
-                                  color: textLight)))
-                          .toList()),
+                      children: const <Widget>[]),
                 ]),
               ),
             ),
@@ -977,14 +881,16 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                       letterSpacing: -0.3)),
             ),
             SizedBox(height: 12),
-            ...List.generate(subjectGrades.length, (index) {
-              final s = subjectGrades[index];
+            ...List.generate(_subjectAverages.length, (index) {
+              final entry = _subjectAverages.entries.elementAt(index);
+              final _colors = [success, info, accent, purple, danger, primary];
+              final c = _colors[index % _colors.length];
               return StaggeredItem(
                 index: index,
                 child: Container(
                   margin: EdgeInsets.fromLTRB(20, 0, 20, 10),
                   child: RippleTap(
-                    rippleColor: s['color'] as Color,
+                    rippleColor: c,
                     child: Container(
                       padding: EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -997,30 +903,30 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                               width: 4,
                               height: 40,
                               decoration: BoxDecoration(
-                                  color: s['color'] as Color,
+                                  color: c,
                                   borderRadius: BorderRadius.circular(2))),
                           SizedBox(width: 12),
                           Expanded(
-                              child: Text(s['subject'],
+                              child: Text(entry.key,
                                   style: TextStyle(
                                       fontFamily: 'Raleway',
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600,
                                       color: textDark))),
                           SlotNumber(
-                              value: s['avg'] as double,
+                              value: entry.value,
                               decimals: 1,
                               suffix: '%',
                               style: TextStyle(
                                   fontFamily: 'Raleway',
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: s['color'] as Color)),
+                                  color: c)),
                         ]),
                         SizedBox(height: 10),
                         AnimatedProgressBar(
-                            value: (s['avg'] as double) / 100,
-                            color: s['color'] as Color,
+                            value: entry.value / 100,
+                            color: c,
                             height: 5,
                             delayMs: 300 + (index * 80)),
                       ]),
@@ -1110,17 +1016,11 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                         ),
                       ]),
                       SizedBox(height: 20),
-                      _buildLineChart(gradesTrend, 'avg', Colors.white),
+                      _buildLineChart(const [], 'avg', Colors.white),
                       SizedBox(height: 8),
                       Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: gradesTrend
-                              .map((d) => Text(d['month'],
-                                  style: TextStyle(
-                                      fontFamily: 'Raleway',
-                                      fontSize: 11,
-                                      color: Colors.white.withOpacity(0.6))))
-                              .toList()),
+                          children: const <Widget>[]),
                     ]),
               ),
             ),
@@ -1136,55 +1036,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                       color: textDark,
                       letterSpacing: -0.3))),
           SizedBox(height: 16),
-          ...List.generate(assignmentCompletion.length, (index) {
-            final a = assignmentCompletion[index];
-            double pct = (a['completed'] as int) / (a['total'] as int);
-            Color c = a['color'] as Color;
-            return StaggeredItem(
-              index: index,
-              child: Container(
-                margin: EdgeInsets.only(bottom: 12),
-                padding: EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                    color: bgCard,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.grey.shade100)),
-                child: Column(children: [
-                  Row(children: [
-                    Container(
-                        width: 10,
-                        height: 10,
-                        decoration:
-                            BoxDecoration(color: c, shape: BoxShape.circle)),
-                    SizedBox(width: 10),
-                    Expanded(
-                        child: Text(a['class'],
-                            style: TextStyle(
-                                fontFamily: 'Raleway',
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: textDark))),
-                    SlotNumber(
-                        value: (pct * 100).toDouble(),
-                        decimals: 0,
-                        suffix: '%',
-                        style: TextStyle(
-                            fontFamily: 'Raleway',
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: c),
-                        delayMs: 200 + index * 80),
-                  ]),
-                  SizedBox(height: 10),
-                  AnimatedProgressBar(
-                      value: pct,
-                      color: c,
-                      height: 7,
-                      delayMs: 300 + index * 80),
-                ]),
-              ),
-            );
-          }),
+          // Assignment completion data not yet available
         ],
       ),
     );
@@ -1233,18 +1085,19 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                       color: textDark,
                       letterSpacing: -0.3))),
           SizedBox(height: 16),
-          ...List.generate(teacherWorkload.length, (index) {
-            final t = teacherWorkload[index];
-            int submitted = t['submitted'] as int;
-            int graded = t['graded'] as int;
-            int ungraded = submitted - graded;
-            double workloadPct =
-                submitted > 0 ? (ungraded / submitted).clamp(0.0, 1.0) : 0.0;
-            Color workloadColor = workloadPct >= 0.8
-                ? danger
-                : workloadPct >= 0.5
-                    ? accent
-                    : success;
+          ...List.generate(_teachers.length, (index) {
+            final t = _teachers[index];
+            final _colors = [success, info, accent, purple, danger, primary];
+            final tColor = _colors[index % _colors.length];
+            final teacherClasses =
+                _allClasses.where((c) => c.teacherUid == t.uid).toList();
+            final studentCount = teacherClasses.fold<int>(
+                0, (sum, c) => sum + c.studentUids.length);
+            const int submitted = 0;
+            const int graded = 0;
+            const int ungraded = submitted - graded;
+            const double workloadPct = 0.0;
+            Color workloadColor = success;
             return StaggeredItem(
               index: index,
               child: FlipCard(
@@ -1255,74 +1108,54 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                   decoration: BoxDecoration(
                       color: bgCard,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                          color: workloadPct >= 0.8
-                              ? danger.withOpacity(0.2)
-                              : Colors.grey.shade100)),
+                      border: Border.all(color: Colors.grey.shade100)),
                   child: Column(children: [
                     Row(children: [
                       CircleAvatar(
                           radius: 22,
-                          backgroundColor:
-                              (t['color'] as Color).withOpacity(0.12),
-                          child: Text(t['avatar'],
+                          backgroundColor: tColor.withOpacity(0.12),
+                          child: Text(t.initial,
                               style: TextStyle(
                                   fontFamily: 'Raleway',
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: t['color'] as Color))),
+                                  color: tColor))),
                       SizedBox(width: 14),
                       Expanded(
                           child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                            Text(t['name'],
+                            Text(t.name,
                                 style: TextStyle(
                                     fontFamily: 'Raleway',
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
                                     color: textDark,
                                     letterSpacing: -0.2)),
-                            Text(t['subject'],
+                            Text(
+                                teacherClasses.isNotEmpty
+                                    ? teacherClasses.first.subject
+                                    : 'N/A',
                                 style: TextStyle(
                                     fontFamily: 'Raleway',
                                     fontSize: 12,
                                     color: textLight)),
                           ])),
-                      if (workloadPct >= 0.8)
-                        Container(
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                              color: danger.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8)),
-                          child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            Icon(Icons.warning_amber_rounded,
-                                color: danger, size: 12),
-                            SizedBox(width: 4),
-                            Text('Overloaded',
-                                style: TextStyle(
-                                    fontFamily: 'Raleway',
-                                    fontSize: 10,
-                                    color: danger,
-                                    fontWeight: FontWeight.bold)),
-                          ]),
-                        ),
                     ]),
                     SizedBox(height: 14),
                     Row(children: [
                       Expanded(
-                          child: _workloadStat('${t['classes']}', 'Classes',
-                              t['color'] as Color)),
-                      Expanded(
-                          child: _workloadStat('${t['students']}', 'Students',
-                              t['color'] as Color)),
+                          child: _workloadStat(
+                              '${teacherClasses.length}', 'Classes', tColor)),
                       Expanded(
                           child: _workloadStat(
-                              '$submitted', 'Submitted', t['color'] as Color)),
+                              '$studentCount', 'Students', tColor)),
                       Expanded(
                           child: _workloadStat(
-                              '$graded', 'Graded', t['color'] as Color)),
+                              '$submitted', 'Submitted', tColor)),
+                      Expanded(
+                          child:
+                              _workloadStat('$graded', 'Graded', tColor)),
                     ]),
                     SizedBox(height: 12),
                     Row(children: [
@@ -1345,19 +1178,6 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                         color: workloadColor,
                         height: 6,
                         delayMs: 300 + index * 100),
-                    if (workloadPct >= 0.8) ...[
-                      SizedBox(height: 6),
-                      Row(children: [
-                        Icon(Icons.warning_amber_rounded,
-                            color: danger, size: 13),
-                        SizedBox(width: 4),
-                        Text('High backlog — needs attention',
-                            style: TextStyle(
-                                fontFamily: 'Raleway',
-                                fontSize: 11,
-                                color: danger)),
-                      ]),
-                    ],
                   ]),
                 ),
               ),
@@ -1370,9 +1190,6 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
 
   // ─── STUDENTS TAB ────────────────────────────────────────────────────────────
   Widget _buildStudentsTab() {
-    if (_students.isEmpty && !_studentsLoading) {
-      _loadStudents();
-    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1754,11 +1571,11 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                               color: textDark,
                               letterSpacing: -0.3)),
                       SizedBox(width: 8),
-                      if (demoVotes.isNotEmpty)
-                        PulseBadge(count: demoVotes.length, color: purple),
+                      if (_voteModels.isNotEmpty)
+                        PulseBadge(count: _voteModels.length, color: purple),
                     ]),
                     SizedBox(height: 12),
-                    if (demoVotes.isEmpty)
+                    if (_voteModels.isEmpty)
                       Container(
                         width: double.infinity,
                         padding: EdgeInsets.all(20),
@@ -1784,12 +1601,8 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                         ]),
                       )
                     else
-                      ...demoVotes.map((vote) {
-                        final voteData =
-                            vote['votes'] as Map<String, dynamic>? ?? {};
-                        final total = (voteData['school'] ?? 0) +
-                            (voteData['no_school'] ?? 0) +
-                            (voteData['undecided'] ?? 0);
+                      ..._voteModels.map((vote) {
+                        final total = vote.votes.total;
                         return Container(
                           margin: EdgeInsets.only(bottom: 12),
                           padding: EdgeInsets.all(16),
@@ -1809,7 +1622,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                                           color: purple.withOpacity(0.08),
                                           borderRadius:
                                               BorderRadius.circular(6)),
-                                      child: Text(vote['type'] as String,
+                                      child: Text(vote.type,
                                           style: TextStyle(
                                               fontFamily: 'Raleway',
                                               fontSize: 10,
@@ -1857,7 +1670,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                                   ),
                                 ]),
                                 SizedBox(height: 10),
-                                Text(vote['question'] as String,
+                                Text(vote.question,
                                     style: TextStyle(
                                         fontFamily: 'Raleway',
                                         fontSize: 14,
@@ -1867,19 +1680,13 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                                 if (total > 0) ...[
                                   SizedBox(height: 12),
                                   _voteResultBar('School',
-                                      voteData['school'] ?? 0, total, success),
+                                      vote.votes.school, total, success),
                                   SizedBox(height: 5),
-                                  _voteResultBar(
-                                      'No School',
-                                      voteData['no_school'] ?? 0,
-                                      total,
-                                      danger),
+                                  _voteResultBar('No School',
+                                      vote.votes.noSchool, total, danger),
                                   SizedBox(height: 5),
-                                  _voteResultBar(
-                                      'Undecided',
-                                      voteData['undecided'] ?? 0,
-                                      total,
-                                      accent),
+                                  _voteResultBar('Undecided',
+                                      vote.votes.undecided, total, accent),
                                 ],
                               ]),
                         );
@@ -1907,8 +1714,16 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
           ),
           SizedBox(height: 12),
 
-          ...List.generate(parents.length, (index) {
-            final p = parents[index];
+          ...List.generate(_parents.length, (index) {
+            final p = _parents[index];
+            final _colors = [success, info, accent, purple, danger, primary];
+            final pColor = _colors[index % _colors.length];
+            final childName = p.children.isNotEmpty
+                ? p.children.first.childName
+                : '';
+            final className = p.children.isNotEmpty
+                ? p.children.first.className
+                : '';
             return StaggeredItem(
               index: index,
               child: Container(
@@ -1918,11 +1733,11 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                     context,
                     TatvaPageRoute.slideRight(
                       MessagingScreen(
-                        otherUserId: p['uid'],
-                        otherUserName: p['name'],
-                        otherUserRole: 'Parent of ${p['child']}',
-                        otherUserEmail: p['email'],
-                        avatarColor: p['color'] as Color,
+                        otherUserId: p.uid,
+                        otherUserName: p.name,
+                        otherUserRole: 'Parent of $childName',
+                        otherUserEmail: p.email,
+                        avatarColor: pColor,
                       ),
                     ),
                   ),
@@ -1935,33 +1750,32 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                     child: Row(children: [
                       CircleAvatar(
                         radius: 22,
-                        backgroundColor:
-                            (p['color'] as Color).withOpacity(0.12),
-                        child: Text(p['avatar'],
+                        backgroundColor: pColor.withOpacity(0.12),
+                        child: Text(p.initial,
                             style: TextStyle(
                                 fontFamily: 'Raleway',
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: p['color'] as Color)),
+                                color: pColor)),
                       ),
                       SizedBox(width: 14),
                       Expanded(
                           child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                            Text(p['name'],
+                            Text(p.name,
                                 style: TextStyle(
                                     fontFamily: 'Raleway',
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
                                     color: textDark,
                                     letterSpacing: -0.2)),
-                            Text('Parent of ${p['child']}',
+                            Text('Parent of $childName',
                                 style: TextStyle(
                                     fontFamily: 'Raleway',
                                     fontSize: 12,
                                     color: textLight)),
-                            Text(p['class'],
+                            Text(className,
                                 style: TextStyle(
                                     fontFamily: 'Raleway',
                                     fontSize: 11,
@@ -1993,7 +1807,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                                   ]),
                             ),
                             SizedBox(height: 4),
-                            Text(p['email'],
+                            Text(p.email,
                                 style: TextStyle(
                                     fontFamily: 'Raleway',
                                     fontSize: 9,
@@ -2043,7 +1857,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
           FadeSlideIn(
             child: HeroAvatar(
               heroTag: 'principal_avatar',
-              initial: userName.isNotEmpty ? userName[0] : 'P',
+              initial: _user?.initial ?? 'P',
               radius: 46,
               bgColor: purple.withOpacity(0.1),
               textColor: purple,
@@ -2053,7 +1867,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
           SizedBox(height: 16),
           FadeSlideIn(
               delayMs: 80,
-              child: Text(userName,
+              child: Text(_user?.name ?? '',
                   style: TextStyle(
                       fontFamily: 'Raleway',
                       fontSize: 24,
@@ -2063,7 +1877,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
           SizedBox(height: 4),
           FadeSlideIn(
               delayMs: 100,
-              child: Text(userEmail,
+              child: Text(_user?.email ?? '',
                   style: TextStyle(
                       fontFamily: 'Raleway', fontSize: 13, color: textLight))),
           SizedBox(height: 10),
@@ -2090,9 +1904,9 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
               [
                 Icons.email_outlined,
                 'Email',
-                userEmail.length > 24
-                    ? userEmail.substring(0, 24) + '...'
-                    : userEmail
+                (_user?.email ?? '').length > 24
+                    ? (_user?.email ?? '').substring(0, 24) + '...'
+                    : (_user?.email ?? '')
               ],
               [Icons.verified_outlined, 'Status', 'Verified'],
             ];
@@ -2229,7 +2043,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                             ]),
                             SizedBox(height: 6),
                             TypewriterText(
-                                text: userName,
+                                text: _user?.name ?? '',
                                 delayMs: 400,
                                 style: TextStyle(
                                     fontFamily: 'Raleway',
@@ -2248,7 +2062,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                     ),
                     HeroAvatar(
                         heroTag: 'principal_avatar',
-                        initial: userName.isNotEmpty ? userName[0] : 'P',
+                        initial: _user?.initial ?? 'P',
                         radius: 26,
                         bgColor: Colors.white.withOpacity(0.15),
                         textColor: Colors.white,

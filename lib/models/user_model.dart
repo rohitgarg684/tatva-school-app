@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_role.dart';
+import 'child_info.dart';
 
 class UserModel {
   final String uid;
@@ -7,7 +8,7 @@ class UserModel {
   final String email;
   final UserRole role;
   final List<String> classIds;
-  final List<Map<String, dynamic>> children;
+  final List<ChildInfo> children;
   final String? fcmToken;
   final DateTime? createdAt;
 
@@ -22,6 +23,8 @@ class UserModel {
     this.createdAt,
   });
 
+  String get initial => name.isNotEmpty ? name[0] : '?';
+
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>? ?? {};
     return UserModel(
@@ -30,7 +33,9 @@ class UserModel {
       email: data['email'] as String? ?? '',
       role: UserRole.fromString(data['role'] as String? ?? 'Student'),
       classIds: List<String>.from(data['classIds'] ?? []),
-      children: List<Map<String, dynamic>>.from(data['children'] ?? []),
+      children: (data['children'] as List<dynamic>? ?? [])
+          .map((c) => ChildInfo.fromMap(c as Map<String, dynamic>))
+          .toList(),
       fcmToken: data['fcmToken'] as String?,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
     );
@@ -43,7 +48,7 @@ class UserModel {
       'role': role.label,
       'uid': uid,
       'classIds': classIds,
-      'children': children,
+      'children': children.map((c) => c.toMap()).toList(),
       if (fcmToken != null) 'fcmToken': fcmToken,
       'createdAt': FieldValue.serverTimestamp(),
     };
@@ -54,7 +59,7 @@ class UserModel {
     String? email,
     UserRole? role,
     List<String>? classIds,
-    List<Map<String, dynamic>>? children,
+    List<ChildInfo>? children,
     String? fcmToken,
   }) {
     return UserModel(

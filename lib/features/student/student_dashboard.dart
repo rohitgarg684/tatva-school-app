@@ -6,12 +6,9 @@ import '../../shared/widgets/logout_sheet.dart';
 import '../../core/router/app_router.dart';
 import '../auth/welcome_screen.dart';
 import '../../repositories/auth_repository.dart';
-import '../../repositories/user_repository.dart';
-import '../../repositories/class_repository.dart';
-import '../../repositories/grade_repository.dart';
-import '../../repositories/announcement_repository.dart';
-import '../../repositories/homework_repository.dart';
-import '../../repositories/vote_repository.dart';
+import '../../services/dashboard_service.dart';
+import '../../services/homework_service.dart';
+import '../../models/audience.dart';
 import '../../models/user_model.dart';
 import '../../models/grade_model.dart';
 import '../../models/announcement_model.dart';
@@ -43,24 +40,16 @@ class _StudentDashboardState extends State<StudentDashboard>
   static const Color info = TatvaColors.info;
   static const Color purple = TatvaColors.purple;
 
-  String userName = '';
-  String userEmail = '';
-  String className = '';
-  String subject = '';
-  String teacherName = '';
-  String teacherEmail = '';
-  String classCode = '';
+  final _dashSvc = DashboardService();
+  final _hwSvc = HomeworkService();
+  String _uid = '';
 
-  List<Map<String, dynamic>> _grades = [];
-
-  List<Map<String, dynamic>> _announcements = [];
-
-  List<Map<String, dynamic>> _activeVotes = [];
-
-  // ── HOMEWORK DATA ──────────────────────────────────────────────────────────
-  late List<Map<String, dynamic>> _homework;
-
-  // Tracks which homework IDs the student has marked as done
+  UserModel? _user;
+  ClassModel? _primaryClass;
+  List<GradeModel> _grades = [];
+  List<AnnouncementModel> _announcements = [];
+  List<HomeworkModel> _homework = [];
+  List<VoteModel> _activeVotes = [];
   final Set<String> _completedIds = {};
 
   // ── ANIMATIONS ─────────────────────────────────────────────────────────────
@@ -76,8 +65,6 @@ class _StudentDashboardState extends State<StudentDashboard>
   @override
   void initState() {
     super.initState();
-
-    _homework = [];
 
     _shimmerController = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 1200))
@@ -118,80 +105,18 @@ class _StudentDashboardState extends State<StudentDashboard>
   Future<void> _loadUser() async {
     setState(() => isLoading = true);
     try {
-      final uid = AuthRepository().currentUid ?? 'student_arjun';
-
-      final user = await UserRepository().getUser(uid);
-      if (user != null) {
-        userName = user.name;
-        userEmail = user.email;
+      _uid = AuthRepository().currentUid ?? 'student_arjun';
+      final data = await _dashSvc.loadStudentDashboard(overrideUid: _uid);
+      _user = data.user;
+      _primaryClass = data.primaryClass;
+      _grades = data.grades;
+      _announcements = data.announcements;
+      _homework = data.homework;
+      _activeVotes = data.activeVotes;
+      _completedIds.clear();
+      for (final hw in _homework) {
+        if (hw.isSubmittedBy(_uid)) _completedIds.add(hw.id);
       }
-
-      if (user != null && user.classIds.isNotEmpty) {
-        final cls = await ClassRepository().getClass(user.classIds.first);
-        if (cls != null) {
-          className = cls.name;
-          subject = cls.subject;
-          teacherName = cls.teacherName;
-          teacherEmail = cls.teacherEmail;
-          classCode = cls.classCode;
-        }
-      }
-
-      final gradeModels = await GradeRepository().fetchStudentGrades(uid);
-      _grades = gradeModels
-          .map((g) => {
-                'subject': g.subject,
-                'assessmentName': g.assessmentName,
-                'score': g.score,
-                'total': g.total,
-              })
-          .toList();
-
-      final annModels =
-          await AnnouncementRepository().getForAudience('Students');
-      _announcements = annModels
-          .map((a) => {
-                'title': a.title,
-                'body': a.body,
-                'createdByName': a.createdByName,
-                'audience': a.audience,
-              })
-          .toList();
-
-      if (user != null && user.classIds.isNotEmpty) {
-        final allHw = <HomeworkModel>[];
-        for (final cid in user.classIds) {
-          allHw.addAll(await HomeworkRepository().getByClass(cid));
-        }
-        _homework = allHw
-            .map((h) => {
-                  'id': h.id,
-                  'title': h.title,
-                  'description': h.description,
-                  'dueDate': h.dueDate,
-                  'totalMarks': 0,
-                  'subject': h.subject,
-                  'teacherName': h.teacherName,
-                  'isSubmitted': h.isSubmittedBy(uid),
-                })
-            .toList();
-        _completedIds.clear();
-        for (final hw in _homework) {
-          if (hw['isSubmitted'] == true) _completedIds.add(hw['id'] as String);
-        }
-      }
-
-      final voteModels = await VoteRepository().fetchActive();
-      _activeVotes = voteModels
-          .map((v) => {
-                'question': v.question,
-                'type': v.type,
-                'school': v.votes.school,
-                'noSchool': v.votes.noSchool,
-                'undecided': v.votes.undecided,
-                'total': v.votes.total,
-              })
-          .toList();
     } catch (_) {}
     if (!mounted) return;
     setState(() => isLoading = false);
@@ -362,7 +287,7 @@ class _StudentDashboardState extends State<StudentDashboard>
               final isActive = _currentTab == index;
               // Badge for pending homework
               final pendingHw = _homework
-                  .where((h) => !_completedIds.contains(h['id']))
+                  .where((h) => !_completedIds.contains(h.id))
                   .length;
               return Expanded(
                   child: GestureDetector(
@@ -429,7 +354,7 @@ class _StudentDashboardState extends State<StudentDashboard>
   // ─── HOME TAB ──────────────────────────────────────────────────────────────
   Widget _buildHomeTab() {
     final pendingHw =
-        _homework.where((h) => !_completedIds.contains(h['id'])).length;
+        _homework.where((h) => !_completedIds.contains(h.id)).length;
     return RefreshIndicator(
       color: info,
       onRefresh: _loadUser,
@@ -557,17 +482,13 @@ class _StudentDashboardState extends State<StudentDashboard>
       ));
 
   Widget _buildAnnouncements() {
-    final filtered = _announcements
-        .where(
-            (a) => a['audience'] == 'Everyone' || a['audience'] == 'Students')
-        .toList();
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemCount: filtered.length,
+      itemCount: _announcements.length,
       itemBuilder: (context, index) {
-        final a = filtered[index];
+        final a = _announcements[index];
         return StaggeredItem(
           index: index,
           child: Container(
@@ -594,7 +515,7 @@ class _StudentDashboardState extends State<StudentDashboard>
                       children: [
                     Row(children: [
                       Expanded(
-                          child: Text(a['title'],
+                          child: Text(a.title,
                               style: const TextStyle(
                                   fontFamily: 'Raleway',
                                   fontSize: 13,
@@ -616,14 +537,14 @@ class _StudentDashboardState extends State<StudentDashboard>
                         ),
                     ]),
                     const SizedBox(height: 5),
-                    Text(a['body'],
+                    Text(a.body,
                         style: const TextStyle(
                             fontFamily: 'Raleway',
                             fontSize: 12,
                             color: textMid,
                             height: 1.55)),
                     const SizedBox(height: 4),
-                    Text('By ${a['createdByName']}',
+                    Text('By ${a.createdByName}',
                         style: const TextStyle(
                             fontFamily: 'Raleway',
                             fontSize: 10,
@@ -659,7 +580,7 @@ class _StudentDashboardState extends State<StudentDashboard>
       const SizedBox(height: 12),
       ...List.generate(_activeVotes.length, (i) {
         final v = _activeVotes[i];
-        final total = v['total'] as int;
+        final total = v.votes.total;
         return Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
           child: Container(
@@ -677,7 +598,7 @@ class _StudentDashboardState extends State<StudentDashboard>
                     decoration: BoxDecoration(
                         color: info.withOpacity(0.08),
                         borderRadius: BorderRadius.circular(8)),
-                    child: Text(v['type'] as String,
+                    child: Text(v.type,
                         style: const TextStyle(
                             fontFamily: 'Raleway',
                             fontSize: 11,
@@ -692,7 +613,7 @@ class _StudentDashboardState extends State<StudentDashboard>
                         fontFamily: 'Raleway', fontSize: 11, color: textLight)),
               ]),
               const SizedBox(height: 10),
-              Text(v['question'] as String,
+              Text(v.question,
                   style: const TextStyle(
                       fontFamily: 'Raleway',
                       fontSize: 14,
@@ -700,13 +621,13 @@ class _StudentDashboardState extends State<StudentDashboard>
                       color: textDark,
                       height: 1.4)),
               const SizedBox(height: 12),
-              _simpleVoteBar('🏫 School', v['school'] as int, total, success),
+              _simpleVoteBar('🏫 School', v.votes.school, total, success),
               const SizedBox(height: 6),
               _simpleVoteBar(
-                  '🏠 No School', v['noSchool'] as int, total, danger),
+                  '🏠 No School', v.votes.noSchool, total, danger),
               const SizedBox(height: 6),
               _simpleVoteBar(
-                  '🤷 Undecided', v['undecided'] as int, total, accent),
+                  '🤷 Undecided', v.votes.undecided, total, accent),
             ]),
           ),
         );
@@ -738,9 +659,9 @@ class _StudentDashboardState extends State<StudentDashboard>
   // ─── HOMEWORK TAB ──────────────────────────────────────────────────────────
   Widget _buildHomeworkTab() {
     final pending =
-        _homework.where((h) => !_completedIds.contains(h['id'])).toList();
+        _homework.where((h) => !_completedIds.contains(h.id)).toList();
     final done =
-        _homework.where((h) => _completedIds.contains(h['id'])).toList();
+        _homework.where((h) => _completedIds.contains(h.id)).toList();
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -848,7 +769,7 @@ class _StudentDashboardState extends State<StudentDashboard>
     );
   }
 
-  Widget _hwStudentCard(Map<String, dynamic> hw, int idx, bool isDone) {
+  Widget _hwStudentCard(HomeworkModel hw, int idx, bool isDone) {
     final color = isDone ? success : info;
     return StaggeredItem(
       index: idx,
@@ -885,7 +806,7 @@ class _StudentDashboardState extends State<StudentDashboard>
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                    Text(hw['title'],
+                    Text(hw.title,
                         style: TextStyle(
                             fontFamily: 'Raleway',
                             fontSize: 14,
@@ -894,32 +815,19 @@ class _StudentDashboardState extends State<StudentDashboard>
                             decoration:
                                 isDone ? TextDecoration.lineThrough : null,
                             decorationColor: textLight)),
-                    Text(hw['subject'],
+                    Text(hw.subject,
                         style: const TextStyle(
                             fontFamily: 'Raleway',
                             fontSize: 11,
                             color: textLight)),
                   ])),
-              Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                      color: color.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: color.withOpacity(0.25))),
-                  child: Text('${hw['totalMarks']} marks',
-                      style: TextStyle(
-                          fontFamily: 'Raleway',
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: color))),
             ]),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(hw['description'],
+              Text(hw.description,
                   style: const TextStyle(
                       fontFamily: 'Raleway',
                       fontSize: 12,
@@ -929,13 +837,13 @@ class _StudentDashboardState extends State<StudentDashboard>
               Row(children: [
                 Icon(Icons.calendar_today_outlined, size: 12, color: textLight),
                 const SizedBox(width: 4),
-                Text('Due ${hw['dueDate']}',
+                Text('Due ${hw.dueDate}',
                     style: const TextStyle(
                         fontFamily: 'Raleway', fontSize: 11, color: textLight)),
                 const SizedBox(width: 12),
                 Icon(Icons.person_outline, size: 12, color: textLight),
                 const SizedBox(width: 4),
-                Text(hw['teacherName'],
+                Text(hw.teacherName,
                     style: const TextStyle(
                         fontFamily: 'Raleway', fontSize: 11, color: textLight)),
               ]),
@@ -945,9 +853,10 @@ class _StudentDashboardState extends State<StudentDashboard>
                   HapticFeedback.lightImpact();
                   setState(() {
                     if (isDone) {
-                      _completedIds.remove(hw['id']);
+                      _completedIds.remove(hw.id);
                     } else {
-                      _completedIds.add(hw['id'] as String);
+                      _completedIds.add(hw.id);
+                      _hwSvc.markSubmitted(homeworkId: hw.id, studentUid: _uid);
                     }
                   });
                   if (!isDone) _snack('Marked as done! Great work 🎉');
@@ -987,13 +896,12 @@ class _StudentDashboardState extends State<StudentDashboard>
 
   // ─── GRADES TAB ────────────────────────────────────────────────────────────
   Widget _buildGradesTab() {
-    final Map<String, List<Map<String, dynamic>>> bySubject = {};
+    final Map<String, List<GradeModel>> bySubject = {};
     for (final g in _grades)
-      bySubject.putIfAbsent(g['subject'], () => []).add(g);
+      bySubject.putIfAbsent(g.subject, () => []).add(g);
     double totalPct = 0;
-    for (final g in _grades)
-      totalPct += (g['score'] as double) / (g['total'] as double) * 100;
-    final overallAvg = totalPct / _grades.length;
+    for (final g in _grades) totalPct += g.percentage;
+    final overallAvg = _grades.isEmpty ? 0.0 : totalPct / _grades.length;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -1099,8 +1007,7 @@ class _StudentDashboardState extends State<StudentDashboard>
           final colors = [info, success, accent, purple, danger];
           final color = colors[index % colors.length];
           double subAvg = subjectGrades
-                  .map((g) =>
-                      (g['score'] as double) / (g['total'] as double) * 100)
+                  .map((g) => g.percentage)
                   .reduce((a, b) => a + b) /
               subjectGrades.length;
           final grade = subAvg >= 90
@@ -1173,8 +1080,8 @@ class _StudentDashboardState extends State<StudentDashboard>
                     delayMs: 300 + index * 80),
                 const SizedBox(height: 12),
                 ...subjectGrades.map((g) {
-                  final score = g['score'] as double;
-                  final total = g['total'] as double;
+                  final score = g.score;
+                  final total = g.total;
                   final pct = total > 0 ? score / total : 0.0;
                   final gc = pct >= 0.9
                       ? success
@@ -1191,7 +1098,7 @@ class _StudentDashboardState extends State<StudentDashboard>
                               BoxDecoration(color: gc, shape: BoxShape.circle)),
                       const SizedBox(width: 8),
                       Expanded(
-                          child: Text(g['assessmentName'],
+                          child: Text(g.assessmentName,
                               style: const TextStyle(
                                   fontFamily: 'Raleway',
                                   fontSize: 12,
@@ -1230,7 +1137,7 @@ class _StudentDashboardState extends State<StudentDashboard>
         FadeSlideIn(
             child: HeroAvatar(
                 heroTag: 'student_avatar',
-                initial: userName[0],
+                initial: _user?.initial ?? '?',
                 radius: 46,
                 bgColor: info.withOpacity(0.1),
                 textColor: info,
@@ -1238,7 +1145,7 @@ class _StudentDashboardState extends State<StudentDashboard>
         const SizedBox(height: 16),
         FadeSlideIn(
             delayMs: 80,
-            child: Text(userName,
+            child: Text(_user?.name ?? '',
                 style: const TextStyle(
                     fontFamily: 'Raleway',
                     fontSize: 24,
@@ -1248,7 +1155,7 @@ class _StudentDashboardState extends State<StudentDashboard>
         const SizedBox(height: 4),
         FadeSlideIn(
             delayMs: 100,
-            child: Text(userEmail,
+            child: Text(_user?.email ?? '',
                 style: const TextStyle(
                     fontFamily: 'Raleway', fontSize: 13, color: textLight))),
         const SizedBox(height: 10),
@@ -1296,13 +1203,13 @@ class _StudentDashboardState extends State<StudentDashboard>
                           child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                            Text(className,
+                            Text(_primaryClass?.name ?? '',
                                 style: const TextStyle(
                                     fontFamily: 'Raleway',
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                     color: textDark)),
-                            Text(subject,
+                            Text(_primaryClass?.subject ?? '',
                                 style: const TextStyle(
                                     fontFamily: 'Raleway',
                                     fontSize: 12,
@@ -1316,7 +1223,7 @@ class _StudentDashboardState extends State<StudentDashboard>
                               borderRadius: BorderRadius.circular(10),
                               border:
                                   Border.all(color: accent.withOpacity(0.3))),
-                          child: Text(classCode,
+                          child: Text(_primaryClass?.classCode ?? '',
                               style: const TextStyle(
                                   fontFamily: 'Raleway',
                                   fontSize: 13,
@@ -1340,7 +1247,7 @@ class _StudentDashboardState extends State<StudentDashboard>
                 CircleAvatar(
                     radius: 22,
                     backgroundColor: primary.withOpacity(0.1),
-                    child: Text(teacherName[0],
+                    child: Text((_primaryClass?.teacherName ?? '?').isNotEmpty ? _primaryClass!.teacherName[0] : '?',
                         style: const TextStyle(
                             fontFamily: 'Raleway',
                             fontSize: 16,
@@ -1351,13 +1258,13 @@ class _StudentDashboardState extends State<StudentDashboard>
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                      Text(teacherName,
+                      Text(_primaryClass?.teacherName ?? '',
                           style: const TextStyle(
                               fontFamily: 'Raleway',
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
                               color: textDark)),
-                      Text('Your Teacher · $subject',
+                      Text('Your Teacher · ${_primaryClass?.subject ?? ''}',
                           style: const TextStyle(
                               fontFamily: 'Raleway',
                               fontSize: 12,
@@ -1367,7 +1274,7 @@ class _StudentDashboardState extends State<StudentDashboard>
                         const Icon(Icons.email_outlined,
                             size: 11, color: textLight),
                         const SizedBox(width: 4),
-                        Text(teacherEmail,
+                        Text(_primaryClass?.teacherEmail ?? '',
                             style: const TextStyle(
                                 fontFamily: 'Raleway',
                                 fontSize: 10,
@@ -1510,7 +1417,7 @@ class _StudentDashboardState extends State<StudentDashboard>
                             ]),
                             const SizedBox(height: 6),
                             TypewriterText(
-                                text: userName,
+                                text: _user?.name ?? '',
                                 delayMs: 400,
                                 style: const TextStyle(
                                     fontFamily: 'Raleway',
@@ -1520,7 +1427,7 @@ class _StudentDashboardState extends State<StudentDashboard>
                                     letterSpacing: -0.5,
                                     height: 1.1)),
                             const SizedBox(height: 6),
-                            Text('$className · $subject',
+                            Text('${_primaryClass?.name ?? ''} · ${_primaryClass?.subject ?? ''}',
                                 style: TextStyle(
                                     fontFamily: 'Raleway',
                                     fontSize: 13,
@@ -1528,7 +1435,7 @@ class _StudentDashboardState extends State<StudentDashboard>
                           ])),
                       HeroAvatar(
                           heroTag: 'student_avatar',
-                          initial: userName[0],
+                          initial: _user?.initial ?? '?',
                           radius: 26,
                           bgColor: Colors.white.withOpacity(0.15),
                           textColor: Colors.white,

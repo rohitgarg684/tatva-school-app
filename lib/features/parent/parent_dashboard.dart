@@ -7,12 +7,14 @@ import '../../shared/theme/colors.dart';
 import '../../shared/widgets/logout_sheet.dart';
 import '../../core/router/app_router.dart';
 import '../../repositories/auth_repository.dart';
-import '../../repositories/user_repository.dart';
-import '../../repositories/class_repository.dart';
-import '../../repositories/grade_repository.dart';
-import '../../repositories/announcement_repository.dart';
-import '../../repositories/vote_repository.dart';
-import '../../models/user_role.dart';
+import '../../services/dashboard_service.dart';
+import '../../services/vote_service.dart';
+import '../../models/user_model.dart';
+import '../../models/class_model.dart';
+import '../../models/grade_model.dart';
+import '../../models/announcement_model.dart';
+import '../../models/vote_model.dart';
+import '../../models/child_info.dart';
 
 class ParentDashboard extends StatefulWidget {
   const ParentDashboard({super.key});
@@ -38,20 +40,17 @@ class _ParentDashboardState extends State<ParentDashboard>
   static const Color info = TatvaColors.info;
   static const Color purple = TatvaColors.purple;
 
-  String _currentUid = '';
-  String userName = '';
-  String userEmail = '';
-  String childName = '';
-  String className = '';
-  String subject = '';
-  String teacherName = '';
-  String teacherEmail = '';
-  String teacherUid = '';
-  String classCode = '';
+  final _dashSvc = DashboardService();
+  final _voteSvc = VoteService();
+  String _uid = '';
 
-  List<Map<String, dynamic>> _grades = [];
-  List<Map<String, dynamic>> _announcements = [];
-  List<Map<String, dynamic>> _activeVotes = [];
+  UserModel? _user;
+  ChildInfo? _childInfo;
+  ClassModel? _childClass;
+  String _childUid = '';
+  List<GradeModel> _grades = [];
+  List<AnnouncementModel> _announcements = [];
+  List<VoteModel> _activeVotes = [];
 
   late AnimationController _shimmerController;
   late AnimationController _greetingController;
@@ -101,77 +100,17 @@ class _ParentDashboardState extends State<ParentDashboard>
   Future<void> _loadData() async {
     setState(() => isLoading = true);
     try {
-      final uid = AuthRepository().currentUid ?? 'parent_suresh';
-      _currentUid = uid;
-
-      final user = await UserRepository().getUser(uid);
-      if (user != null) {
-        userName = user.name;
-        userEmail = user.email;
+      _uid = AuthRepository().currentUid ?? 'parent_suresh';
+      final data = await _dashSvc.loadParentDashboard(overrideUid: _uid);
+      _user = data.user;
+      _childClass = data.childClass;
+      _childUid = data.childUid;
+      _grades = data.childGrades;
+      _announcements = data.announcements;
+      _activeVotes = data.activeVotes;
+      if (_user != null && _user!.children.isNotEmpty) {
+        _childInfo = _user!.children.first;
       }
-
-      if (user != null && user.children.isNotEmpty) {
-        final child = user.children.first;
-        childName = child['childName'] ?? '';
-        final classId = child['classId'] ?? '';
-        className = child['className'] ?? '';
-        subject = child['subject'] ?? '';
-        teacherName = child['teacherName'] ?? '';
-        teacherEmail = child['teacherEmail'] ?? '';
-        teacherUid = child['teacherUid'] ?? '';
-
-        if (classId.isNotEmpty) {
-          final cls = await ClassRepository().getClass(classId);
-          if (cls != null) {
-            classCode = cls.classCode;
-          }
-        }
-
-        final childUsers = await UserRepository().getAllByRole(UserRole.student);
-        final childUser = childUsers.where((u) => u.name == childName).toList();
-        String childUid = '';
-        if (childUser.isNotEmpty) {
-          childUid = childUser.first.uid;
-        }
-
-        if (childUid.isNotEmpty) {
-          final gradeModels =
-              await GradeRepository().fetchStudentGrades(childUid);
-          _grades = gradeModels
-              .map((g) => {
-                    'subject': g.subject,
-                    'assessmentName': g.assessmentName,
-                    'score': g.score,
-                    'total': g.total,
-                  })
-              .toList();
-        }
-      }
-
-      final annModels = await AnnouncementRepository().getForAudience('Parents');
-      _announcements = annModels
-          .map((a) => {
-                'title': a.title,
-                'body': a.body,
-                'by': a.createdByName,
-                'audience': a.audience,
-              })
-          .toList();
-
-      final voteModels = await VoteRepository().fetchActive();
-      _activeVotes = voteModels
-          .map((v) => {
-                'id': v.id,
-                'question': v.question,
-                'type': v.type,
-                'votes': {
-                  'school': v.votes.school,
-                  'no_school': v.votes.noSchool,
-                  'undecided': v.votes.undecided,
-                },
-                'myVote': v.voters.contains(uid) ? 'voted' : null,
-              })
-          .toList();
     } catch (_) {}
     if (!mounted) return;
     setState(() => isLoading = false);
@@ -202,18 +141,11 @@ class _ParentDashboardState extends State<ParentDashboard>
   }
 
   void _castVote(int index, String option) async {
-    if (_activeVotes[index]['myVote'] != null) return;
-    final voteId = _activeVotes[index]['id'] as String;
-    setState(() {
-      (_activeVotes[index]['votes'] as Map<String, dynamic>)[option] =
-          ((_activeVotes[index]['votes'] as Map<String, dynamic>)[option]
-                  as int) +
-              1;
-      _activeVotes[index]['myVote'] = option;
-    });
-    await VoteRepository()
-        .castVote(voteId: voteId, option: option, voterUid: _currentUid);
+    if (_activeVotes[index].hasVoted(_uid)) return;
+    final voteId = _activeVotes[index].id;
+    await _voteSvc.castVote(voteId: voteId, option: option, voterUid: _uid);
     if (!mounted) return;
+    await _loadData();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: const Text('Vote submitted!',
           style: TextStyle(fontFamily: 'Raleway')),
@@ -225,6 +157,12 @@ class _ParentDashboardState extends State<ParentDashboard>
 
   // ── TEACHER PROFILE SHEET ──────────────────────────────────────────────────
   void _showTeacherProfile() {
+    final tName = _childInfo?.teacherName ?? '';
+    final tEmail = _childInfo?.teacherEmail ?? '';
+    final tUid = _childInfo?.teacherUid ?? '';
+    final subj = _childInfo?.subject ?? '';
+    final cls = _childInfo?.className ?? '';
+    final code = _childClass?.classCode ?? '';
     HapticFeedback.lightImpact();
     showModalBottomSheet(
       context: context,
@@ -248,21 +186,21 @@ class _ParentDashboardState extends State<ParentDashboard>
           CircleAvatar(
               radius: 36,
               backgroundColor: primary.withOpacity(0.1),
-              child: Text(teacherName.isNotEmpty ? teacherName[0] : '?',
+              child: Text(tName.isNotEmpty ? tName[0] : '?',
                   style: const TextStyle(
                       fontFamily: 'Raleway',
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
                       color: primary))),
           const SizedBox(height: 14),
-          Text(teacherName,
+          Text(tName,
               style: const TextStyle(
                   fontFamily: 'Raleway',
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: textDark)),
           const SizedBox(height: 4),
-          Text('$subject Teacher · $className',
+          Text('$subj Teacher · $cls',
               style: const TextStyle(
                   fontFamily: 'Raleway', fontSize: 13, color: textLight)),
           const SizedBox(height: 24),
@@ -292,7 +230,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                             fontSize: 11,
                             color: textLight)),
                     const SizedBox(height: 2),
-                    Text(teacherEmail,
+                    Text(tEmail,
                         style: const TextStyle(
                             fontFamily: 'Raleway',
                             fontSize: 14,
@@ -328,7 +266,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                             fontSize: 11,
                             color: textLight)),
                     const SizedBox(height: 2),
-                    Text(classCode,
+                    Text(code,
                         style: const TextStyle(
                             fontFamily: 'Raleway',
                             fontSize: 16,
@@ -347,10 +285,10 @@ class _ParentDashboardState extends State<ParentDashboard>
                   context,
                   MaterialPageRoute(
                       builder: (_) => MessagingScreen(
-                            otherUserId: teacherUid,
-                            otherUserName: teacherName,
+                            otherUserId: tUid,
+                            otherUserName: tName,
                             otherUserRole: 'Teacher',
-                            otherUserEmail: teacherEmail,
+                            otherUserEmail: tEmail,
                             avatarColor: primary,
                           )));
             },
@@ -539,8 +477,8 @@ class _ParentDashboardState extends State<ParentDashboard>
 
   // ─── HOME ──────────────────────────────────────────────────────────────────
   Widget _homeTab() {
-    double total = _grades.fold(0.0,
-        (s, g) => s + (g['score'] as double) / (g['total'] as double) * 100);
+    double total = _grades.fold(
+        0.0, (s, g) => s + (g.total > 0 ? g.score / g.total * 100 : 0.0));
     final avg = _grades.isEmpty ? 0.0 : total / _grades.length;
     return RefreshIndicator(
         color: purple,
@@ -570,7 +508,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                       Row(children: [
                         Icon(Icons.class_outlined, color: purple, size: 15),
                         const SizedBox(width: 6),
-                        Text("$childName's Class",
+                        Text("${_childInfo?.childName ?? ''}'s Class",
                             style: const TextStyle(
                                 fontFamily: 'Raleway',
                                 fontSize: 12,
@@ -583,7 +521,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                             child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                              Text(className,
+                              Text(_childInfo?.className ?? '',
                                   style: const TextStyle(
                                       fontFamily: 'Raleway',
                                       fontSize: 16,
@@ -596,12 +534,12 @@ class _ParentDashboardState extends State<ParentDashboard>
                                 child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Text('$subject · ',
+                                      Text('${_childInfo?.subject ?? ''} · ',
                                           style: const TextStyle(
                                               fontFamily: 'Raleway',
                                               fontSize: 12,
                                               color: textLight)),
-                                      Text(teacherName,
+                                      Text(_childInfo?.teacherName ?? '',
                                           style: const TextStyle(
                                               fontFamily: 'Raleway',
                                               fontSize: 12,
@@ -624,7 +562,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                                 borderRadius: BorderRadius.circular(10),
                                 border:
                                     Border.all(color: accent.withOpacity(0.3))),
-                            child: Text(classCode,
+                            child: Text(_childClass?.classCode ?? '',
                                 style: const TextStyle(
                                     fontFamily: 'Raleway',
                                     fontSize: 13,
@@ -673,7 +611,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                       children: [
                         Row(children: [
                           Expanded(
-                              child: Text(e.value['title'],
+                              child: Text(e.value.title,
                                   style: const TextStyle(
                                       fontFamily: 'Raleway',
                                       fontSize: 13,
@@ -694,14 +632,14 @@ class _ParentDashboardState extends State<ParentDashboard>
                                         fontWeight: FontWeight.w700))),
                         ]),
                         const SizedBox(height: 5),
-                        Text(e.value['body'],
+                        Text(e.value.body,
                             style: const TextStyle(
                                 fontFamily: 'Raleway',
                                 fontSize: 12,
                                 color: textMid,
                                 height: 1.55)),
                         const SizedBox(height: 4),
-                        Text('By ${e.value['by']}',
+                        Text('By ${e.value.createdByName}',
                             style: const TextStyle(
                                 fontFamily: 'Raleway',
                                 fontSize: 10,
@@ -769,7 +707,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                             ]),
                             const SizedBox(height: 6),
                             TypewriterText(
-                                text: userName,
+                                text: _user?.name ?? '',
                                 delayMs: 400,
                                 style: const TextStyle(
                                     fontFamily: 'Raleway',
@@ -779,7 +717,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                                     letterSpacing: -0.5,
                                     height: 1.1)),
                             const SizedBox(height: 4),
-                            Text('Parent of $childName',
+                            Text('Parent of ${_childInfo?.childName ?? ''}',
                                 style: TextStyle(
                                     fontFamily: 'Raleway',
                                     fontSize: 12,
@@ -787,7 +725,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                           ])),
                       HeroAvatar(
                           heroTag: 'parent_avatar',
-                          initial: userName.isNotEmpty ? userName[0] : '?',
+                          initial: _user?.initial ?? '?',
                           radius: 26,
                           bgColor: Colors.white.withOpacity(0.15),
                           textColor: Colors.white,
@@ -800,7 +738,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                       const SizedBox(width: 20),
                       _miniStat('${_grades.length}', 'Tests', Colors.white),
                       const SizedBox(width: 20),
-                      _miniStat('${_grades.map((g) => g['subject']).toSet().length}', 'Subjects', Colors.white),
+                      _miniStat('${_grades.map((g) => g.subject).toSet().length}', 'Subjects', Colors.white),
                     ]),
                   ])),
         ]),
@@ -825,11 +763,11 @@ class _ParentDashboardState extends State<ParentDashboard>
 
   // ─── PROGRESS ──────────────────────────────────────────────────────────────
   Widget _progressTab() {
-    final bySubject = <String, List<Map<String, dynamic>>>{};
+    final bySubject = <String, List<GradeModel>>{};
     for (final g in _grades)
-      bySubject.putIfAbsent(g['subject'], () => []).add(g);
-    double total = _grades.fold(0.0,
-        (s, g) => s + (g['score'] as double) / (g['total'] as double) * 100);
+      bySubject.putIfAbsent(g.subject, () => []).add(g);
+    double total = _grades.fold(
+        0.0, (s, g) => s + (g.total > 0 ? g.score / g.total * 100 : 0.0));
     final overallAvg = _grades.isEmpty ? 0.0 : total / _grades.length;
     final colors = [info, success, accent, purple, danger];
 
@@ -838,7 +776,7 @@ class _ParentDashboardState extends State<ParentDashboard>
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const SizedBox(height: 8),
           FadeSlideIn(
-              child: Text("$childName's Progress",
+              child: Text("${_childInfo?.childName ?? ''}'s Progress",
                   style: const TextStyle(
                       fontFamily: 'Raleway',
                       fontSize: 28,
@@ -934,12 +872,11 @@ class _ParentDashboardState extends State<ParentDashboard>
             final subName = entry.value.key;
             final subGrades = entry.value.value;
             final color = colors[i % colors.length];
-            double subAvg = subGrades.fold(
-                    0.0,
-                    (s, g) =>
-                        s +
-                        (g['score'] as double) / (g['total'] as double) * 100) /
-                subGrades.length;
+            double subAvg = subGrades.isEmpty
+                ? 0.0
+                : subGrades.fold(0.0,
+                        (s, g) => s + (g.total > 0 ? g.score / g.total * 100 : 0.0)) /
+                    subGrades.length;
             final grade = subAvg >= 90
                 ? 'A+'
                 : subAvg >= 80
@@ -1009,8 +946,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                         delayMs: 300 + i * 80),
                     const SizedBox(height: 12),
                     ...subGrades.map((g) {
-                      final pct =
-                          (g['score'] as double) / (g['total'] as double);
+                      final pct = g.total > 0 ? g.score / g.total : 0.0;
                       final c = pct >= 0.9
                           ? success
                           : pct >= 0.75
@@ -1026,7 +962,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                                     color: c, shape: BoxShape.circle)),
                             const SizedBox(width: 8),
                             Expanded(
-                                child: Text(g['assessmentName'],
+                                child: Text(g.assessmentName,
                                     style: const TextStyle(
                                         fontFamily: 'Raleway',
                                         fontSize: 12,
@@ -1038,7 +974,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                                     color: c.withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(6)),
                                 child: Text(
-                                    '${(g['score'] as double).toInt()}/${(g['total'] as double).toInt()}',
+                                    '${g.score.toInt()}/${g.total.toInt()}',
                                     style: TextStyle(
                                         fontFamily: 'Raleway',
                                         fontSize: 11,
@@ -1097,11 +1033,8 @@ class _ParentDashboardState extends State<ParentDashboard>
             ..._activeVotes.asMap().entries.map((entry) {
               final i = entry.key;
               final voteData = entry.value;
-              final votes = voteData['votes'] as Map<String, dynamic>;
-              final total = (votes['school'] as int) +
-                  (votes['no_school'] as int) +
-                  (votes['undecided'] as int);
-              final myVote = voteData['myVote'] as String?;
+              final total = voteData.votes.total;
+              final hasVoted = voteData.hasVoted(_uid);
               return FadeSlideIn(
                   delayMs: 80 + i * 60,
                   child: Container(
@@ -1123,7 +1056,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                                 decoration: BoxDecoration(
                                     color: info.withOpacity(0.08),
                                     borderRadius: BorderRadius.circular(8)),
-                                child: Text(voteData['type'],
+                                child: Text(voteData.type,
                                     style: const TextStyle(
                                         fontFamily: 'Raleway',
                                         fontSize: 11,
@@ -1137,7 +1070,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                                     color: textLight)),
                           ]),
                           const SizedBox(height: 14),
-                          Text(voteData['question'],
+                          Text(voteData.question,
                               style: const TextStyle(
                                   fontFamily: 'Raleway',
                                   fontSize: 16,
@@ -1145,7 +1078,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                                   color: textDark,
                                   height: 1.4)),
                           const SizedBox(height: 20),
-                          if (myVote == null)
+                          if (!hasVoted)
                             ...[
                               'school',
                               'no_school',
@@ -1189,9 +1122,9 @@ class _ParentDashboardState extends State<ParentDashboard>
                                     ))))
                           else
                             ...{
-                              '🏫 School': votes['school'] as int,
-                              '🏠 No School': votes['no_school'] as int,
-                              '🤷 Undecided': votes['undecided'] as int,
+                              '🏫 School': voteData.votes.school,
+                              '🏠 No School': voteData.votes.noSchool,
+                              '🤷 Undecided': voteData.votes.undecided,
                             }.entries.map((e) {
                               final pct =
                                   total > 0 ? e.value / total : 0.0;
@@ -1227,7 +1160,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                                             fontWeight: FontWeight.bold)),
                                   ]));
                             }),
-                          if (myVote != null)
+                          if (hasVoted)
                             Container(
                               margin: const EdgeInsets.only(top: 8),
                               padding: const EdgeInsets.symmetric(
@@ -1262,7 +1195,7 @@ class _ParentDashboardState extends State<ParentDashboard>
           FadeSlideIn(
               child: HeroAvatar(
                   heroTag: 'parent_avatar',
-                  initial: userName.isNotEmpty ? userName[0] : '?',
+                  initial: _user?.initial ?? '?',
                   radius: 46,
                   bgColor: purple.withOpacity(0.1),
                   textColor: purple,
@@ -1270,7 +1203,7 @@ class _ParentDashboardState extends State<ParentDashboard>
           const SizedBox(height: 16),
           FadeSlideIn(
               delayMs: 80,
-              child: Text(userName,
+              child: Text(_user?.name ?? '',
                   style: const TextStyle(
                       fontFamily: 'Raleway',
                       fontSize: 24,
@@ -1280,7 +1213,7 @@ class _ParentDashboardState extends State<ParentDashboard>
           const SizedBox(height: 4),
           FadeSlideIn(
               delayMs: 100,
-              child: Text(userEmail,
+              child: Text(_user?.email ?? '',
                   style: const TextStyle(
                       fontFamily: 'Raleway', fontSize: 13, color: textLight))),
           const SizedBox(height: 10),
@@ -1316,7 +1249,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                     CircleAvatar(
                         radius: 22,
                         backgroundColor: primary.withOpacity(0.1),
-                        child: Text(teacherName.isNotEmpty ? teacherName[0] : '?',
+                        child: Text((_childInfo?.teacherName ?? '').isNotEmpty ? _childInfo!.teacherName[0] : '?',
                             style: const TextStyle(
                                 fontFamily: 'Raleway',
                                 fontSize: 16,
@@ -1327,13 +1260,13 @@ class _ParentDashboardState extends State<ParentDashboard>
                         child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                          Text(teacherName,
+                          Text(_childInfo?.teacherName ?? '',
                               style: const TextStyle(
                                   fontFamily: 'Raleway',
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
                                   color: textDark)),
-                          Text("$childName's Teacher · $subject",
+                          Text("${_childInfo?.childName ?? ''}'s Teacher · ${_childInfo?.subject ?? ''}",
                               style: const TextStyle(
                                   fontFamily: 'Raleway',
                                   fontSize: 12,
@@ -1343,7 +1276,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                             const Icon(Icons.email_outlined,
                                 size: 11, color: info),
                             const SizedBox(width: 4),
-                            Text(teacherEmail,
+                            Text(_childInfo?.teacherEmail ?? '',
                                 style: const TextStyle(
                                     fontFamily: 'Raleway',
                                     fontSize: 10,
@@ -1362,9 +1295,9 @@ class _ParentDashboardState extends State<ParentDashboard>
               )),
           ...List.generate(4, (i) {
             final items = [
-              [Icons.child_care_outlined, 'Child', childName],
+              [Icons.child_care_outlined, 'Child', _childInfo?.childName ?? ''],
               [Icons.school_outlined, 'School', 'Tatva Academy'],
-              [Icons.class_outlined, 'Class', className],
+              [Icons.class_outlined, 'Class', _childInfo?.className ?? ''],
               [Icons.verified_outlined, 'Status', 'Verified'],
             ];
             return StaggeredItem(

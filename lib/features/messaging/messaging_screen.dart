@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/message_model.dart';
 import '../../repositories/auth_repository.dart';
-import '../../repositories/message_repository.dart';
+import '../../services/message_service.dart';
 import '../../shared/animations/animations.dart';
 
 class MessagingScreen extends StatefulWidget {
@@ -39,6 +39,7 @@ class _MessagingScreenState extends State<MessagingScreen>
   static const Color textDark = Color(0xFF1A2E22);
   static const Color textLight = Color(0xFF8FAF8F);
 
+  final _msgSvc = MessageService();
   List<MessageModel> _messages = [];
   StreamSubscription? _msgSubscription;
   late String _myUid;
@@ -48,10 +49,9 @@ class _MessagingScreenState extends State<MessagingScreen>
   void initState() {
     super.initState();
     _myUid = AuthRepository().currentUid ?? 'parent_suresh';
-    _conversationId =
-        MessageModel.makeConversationId(_myUid, widget.otherUserId);
+    _conversationId = _msgSvc.makeConversationId(_myUid, widget.otherUserId);
     _msgSubscription =
-        MessageRepository().getMessages(_conversationId).listen((msgs) {
+        _msgSvc.getMessages(_conversationId).listen((msgs) {
       if (mounted) {
         setState(() => _messages = msgs);
         _scrollToBottom();
@@ -74,7 +74,7 @@ class _MessagingScreenState extends State<MessagingScreen>
     _msgController.clear();
     HapticFeedback.lightImpact();
 
-    await MessageRepository().send(MessageModel(
+    await _msgSvc.send(MessageModel(
       text: text,
       senderUid: _myUid,
       receiverUid: widget.otherUserId,

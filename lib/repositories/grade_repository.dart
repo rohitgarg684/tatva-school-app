@@ -2,48 +2,48 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'base_repository.dart';
 import '../models/grade_model.dart';
 
+/// Pure data access for the `grades` collection.
+/// Business logic (upsert, aggregation) belongs in GradeService.
 class GradeRepository extends BaseRepository {
   CollectionReference get _grades => db.collection('grades');
 
-  Future<bool> enterGrade(GradeModel grade) async {
+  Future<String?> add(GradeModel grade) async {
     try {
-      final existing = await _grades
-          .where('studentUid', isEqualTo: grade.studentUid)
-          .where('classId', isEqualTo: grade.classId)
-          .where('assessmentName', isEqualTo: grade.assessmentName)
-          .limit(1)
-          .get();
+      final ref = await _grades.add(grade.toMap());
+      return ref.id;
+    } catch (_) {
+      return null;
+    }
+  }
 
-      if (existing.docs.isNotEmpty) {
-        await existing.docs.first.reference.update({
-          'score': grade.score,
-          'total': grade.total,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      } else {
-        await _grades.add(grade.toMap());
-      }
+  Future<bool> update(String id, Map<String, dynamic> data) async {
+    try {
+      await _grades.doc(id).update(data);
       return true;
     } catch (_) {
       return false;
     }
   }
 
-  Stream<QuerySnapshot> getStudentGrades(String studentUid) {
-    return _grades
-        .where('studentUid', isEqualTo: studentUid)
-        .orderBy('createdAt', descending: false)
-        .snapshots();
+  Future<List<GradeModel>> findByStudentClassAssessment({
+    required String studentUid,
+    required String classId,
+    required String assessmentName,
+  }) async {
+    try {
+      final snap = await _grades
+          .where('studentUid', isEqualTo: studentUid)
+          .where('classId', isEqualTo: classId)
+          .where('assessmentName', isEqualTo: assessmentName)
+          .limit(1)
+          .get();
+      return snap.docs.map((d) => GradeModel.fromFirestore(d)).toList();
+    } catch (_) {
+      return [];
+    }
   }
 
-  Stream<QuerySnapshot> getClassGrades(String classId) {
-    return _grades
-        .where('classId', isEqualTo: classId)
-        .orderBy('createdAt', descending: false)
-        .snapshots();
-  }
-
-  Future<List<GradeModel>> fetchStudentGrades(String studentUid) async {
+  Future<List<GradeModel>> fetchByStudent(String studentUid) async {
     try {
       final snap = await _grades
           .where('studentUid', isEqualTo: studentUid)
@@ -55,7 +55,7 @@ class GradeRepository extends BaseRepository {
     }
   }
 
-  Future<List<GradeModel>> fetchClassGrades(String classId) async {
+  Future<List<GradeModel>> fetchByClass(String classId) async {
     try {
       final snap = await _grades
           .where('classId', isEqualTo: classId)
@@ -67,11 +67,11 @@ class GradeRepository extends BaseRepository {
     }
   }
 
-  Future<List<GradeModel>> fetchAll() async {
+  Future<List<GradeModel>> fetchAll({int limit = 500}) async {
     try {
       final snap = await _grades
           .orderBy('createdAt', descending: true)
-          .limit(500)
+          .limit(limit)
           .get();
       return snap.docs.map((d) => GradeModel.fromFirestore(d)).toList();
     } catch (_) {

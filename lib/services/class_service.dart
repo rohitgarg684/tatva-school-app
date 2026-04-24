@@ -1,7 +1,9 @@
 import 'dart:math';
+import '../models/child_info.dart';
 import '../models/class_model.dart';
 import '../models/student_model.dart';
 import '../models/user_model.dart';
+import '../models/user_role.dart';
 import '../repositories/class_repository.dart';
 import '../repositories/student_repository.dart';
 import '../repositories/user_repository.dart';
@@ -61,9 +63,10 @@ class ClassService {
     }
   }
 
+  /// Joins a user to a class by code. Used by both AuthService and ClassService.
   Future<String?> joinClassByCode({
     required String classCode,
-    required String role,
+    required UserRole role,
     String? childName,
   }) async {
     try {
@@ -74,32 +77,25 @@ class ClassService {
 
       final uid = _classRepo.currentUid;
 
-      if (role == 'Student') {
+      if (role == UserRole.student) {
         await _classRepo.addStudentToClass(classModel.id, uid);
         await _userRepo.updateUser(uid, {
           'classIds': [classModel.id],
-          'classCode': classModel.classCode,
-          'className': classModel.name,
-          'subject': classModel.subject,
-          'teacherName': classModel.teacherName,
-          'teacherUid': classModel.teacherUid,
         });
-      } else if (role == 'Parent') {
+      } else if (role == UserRole.parent) {
         await _classRepo.addParentToClass(classModel.id, uid);
+        final child = ChildInfo(
+          childName: childName ?? '',
+          classId: classModel.id,
+          className: classModel.name,
+          subject: classModel.subject,
+          teacherName: classModel.teacherName,
+          teacherUid: classModel.teacherUid,
+          teacherEmail: classModel.teacherEmail,
+        );
         await _userRepo.updateUser(uid, {
           'classIds': [classModel.id],
-          'children': [
-            {
-              'classId': classModel.id,
-              'classCode': classModel.classCode,
-              'childName': childName ?? '',
-              'className': classModel.name,
-              'subject': classModel.subject,
-              'teacherName': classModel.teacherName,
-              'teacherUid': classModel.teacherUid,
-              'teacherEmail': classModel.teacherEmail,
-            }
-          ],
+          'children': [child.toMap()],
         });
       }
 
@@ -147,7 +143,7 @@ class ClassService {
         enrolledBy: enrollerUid,
       );
 
-      final student = await _studentRepo.addStudent(model);
+      final student = await _studentRepo.add(model);
       if (student == null) return null;
 
       if (classId != null) {
@@ -175,14 +171,22 @@ class ClassService {
   }
 
   Future<List<StudentModel>> getStudentRecordsInClass(String classId) {
-    return _studentRepo.getStudentsByClass(classId);
+    return _studentRepo.getByClass(classId);
   }
 
   Future<List<StudentModel>> getAllStudentRecords() {
-    return _studentRepo.getAllStudents();
+    return _studentRepo.getAll();
   }
 
-  Future<List<StudentModel>> searchStudentRecords(String query) {
-    return _studentRepo.searchStudents(query);
+  /// Client-side search across all student records.
+  Future<List<StudentModel>> searchStudentRecords(String query) async {
+    if (query.trim().isEmpty) return getAllStudentRecords();
+    final lower = query.trim().toLowerCase();
+    final all = await _studentRepo.getAll();
+    return all
+        .where((s) =>
+            s.name.toLowerCase().contains(lower) ||
+            s.rollNumber.toLowerCase().contains(lower))
+        .toList();
   }
 }
