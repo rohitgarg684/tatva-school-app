@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../models/student_model.dart';
-import '../../services/class_service.dart';
+import '../../services/api_service.dart';
 import '../theme/colors.dart';
 import '../animations/animations.dart';
 
@@ -68,30 +67,38 @@ class _AddStudentSheetState extends State<AddStudentSheet> {
       _error = '';
     });
 
-    final service = ClassService();
-    final student = await service.enrollStudent(
-      name: name,
-      rollNumber: _rollCtrl.text.trim(),
-      grade: _selectedGrade,
-      section: _selectedSection,
-      parentName: _parentNameCtrl.text.trim(),
-      parentPhone: _parentPhoneCtrl.text.trim(),
-      classId: widget.classId,
-    );
+    try {
+      final result = await ApiService().enrollStudent(
+        name: name,
+        rollNumber: _rollCtrl.text.trim(),
+        grade: _selectedGrade,
+        section: _selectedSection,
+        parentName: _parentNameCtrl.text.trim(),
+        parentPhone: _parentPhoneCtrl.text.trim(),
+        classIds: widget.classId != null ? [widget.classId!] : [],
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    if (student != null) {
-      widget.onStudentAdded?.call();
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('${student.name} added successfully',
-            style: const TextStyle(fontFamily: 'Raleway')),
-        backgroundColor: TatvaColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ));
-    } else {
+      if (result['enrolled'] == true || result['id'] != null) {
+        widget.onStudentAdded?.call();
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('$name added successfully',
+              style: const TextStyle(fontFamily: 'Raleway')),
+          backgroundColor: TatvaColors.success,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+      } else {
+        setState(() {
+          _isSaving = false;
+          _error = 'Failed to add student. Please try again.';
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isSaving = false;
         _error = 'Failed to add student. Please try again.';

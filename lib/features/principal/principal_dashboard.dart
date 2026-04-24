@@ -11,7 +11,6 @@ import '../../services/api_service.dart';
 import '../../services/dashboard_service.dart';
 import '../../models/activity_event.dart';
 import '../../models/audience.dart';
-import '../../services/class_service.dart';
 import '../../shared/theme/colors.dart';
 import '../../shared/widgets/add_student_sheet.dart';
 import '../../shared/widgets/logout_sheet.dart';
@@ -44,7 +43,6 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
   static const Color info = TatvaColors.info;
   static const Color purple = TatvaColors.purple;
 
-  final ClassService _classService = ClassService();
   List<StudentModel> _students = [];
   List<StudentModel> _filteredStudents = [];
   final _studentSearchCtrl = TextEditingController();

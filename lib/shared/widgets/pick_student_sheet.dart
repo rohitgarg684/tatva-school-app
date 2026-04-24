@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/student_model.dart';
-import '../../services/class_service.dart';
+import '../../services/api_service.dart';
 import '../theme/colors.dart';
 
 class PickStudentSheet extends StatefulWidget {
@@ -41,7 +41,7 @@ class PickStudentSheet extends StatefulWidget {
 
 class _PickStudentSheetState extends State<PickStudentSheet> {
   final _searchCtrl = TextEditingController();
-  final _service = ClassService();
+  final _api = ApiService();
 
   List<StudentModel> _allStudents = [];
   List<StudentModel> _filtered = [];
@@ -61,15 +61,20 @@ class _PickStudentSheetState extends State<PickStudentSheet> {
   }
 
   Future<void> _load() async {
-    final all = await _service.getAllStudentRecords();
-    if (!mounted) return;
-    setState(() {
-      _allStudents = all
-          .where((s) => !widget.excludeStudentIds.contains(s.id))
-          .toList();
-      _filtered = _allStudents;
-      _isLoading = false;
-    });
+    try {
+      final rawList = await _api.getStudents();
+      final all = rawList.map((m) => StudentModel.fromJson(m)).toList();
+      if (!mounted) return;
+      setState(() {
+        _allStudents = all
+            .where((s) => !widget.excludeStudentIds.contains(s.id))
+            .toList();
+        _filtered = _allStudents;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   void _filter(String query) {
@@ -89,13 +94,9 @@ class _PickStudentSheetState extends State<PickStudentSheet> {
 
   Future<void> _addToClass(StudentModel student) async {
     setState(() => _addingId = student.id);
-    final ok = await _service.addStudentToClassById(
-      classId: widget.classId,
-      studentId: student.id,
-    );
-    if (!mounted) return;
-
-    if (ok) {
+    try {
+      await _api.joinClass(classCode: widget.classId);
+      if (!mounted) return;
       widget.onStudentAdded?.call();
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -105,7 +106,8 @@ class _PickStudentSheetState extends State<PickStudentSheet> {
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ));
-    } else {
+    } catch (_) {
+      if (!mounted) return;
       setState(() => _addingId = null);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: const Text('Failed to add student',
