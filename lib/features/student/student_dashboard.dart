@@ -517,7 +517,7 @@ class _StudentDashboardState extends State<StudentDashboard>
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Row(children: [
-                        Text(cat.icon, style: const TextStyle(fontSize: 14)),
+                        Icon(cat.icon, size: 14, color: TatvaColors.primary),
                         const SizedBox(width: 8),
                         Expanded(
                             child: Column(
@@ -1605,7 +1605,7 @@ class _StudentDashboardState extends State<StudentDashboard>
         else
           ...List.generate(_storyPosts.length, (i) {
             final post = _storyPosts[i];
-            final timeAgo = _formatTimeAgo(post.createdAt);
+            final timeAgo = post.createdAt != null ? _formatTimeAgo(post.createdAt!) : '';
             return StaggeredItem(
               index: i,
               child: Container(
