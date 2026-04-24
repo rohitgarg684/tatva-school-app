@@ -19,7 +19,7 @@ class AnnouncementService {
   /// Returns announcements visible to the given audience.
   Future<List<AnnouncementModel>> fetchForAudience(Audience roleAudience,
       {int limit = 20}) async {
-    final all = await _repo.fetchAll(limit: 50);
+    final all = await _repo.fetchAll(limit: limit + 5);
     return all
         .where((a) => a.audience.isVisibleTo(roleAudience))
         .take(limit)

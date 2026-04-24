@@ -122,7 +122,7 @@ class _StudentDashboardState extends State<StudentDashboard>
     setState(() => isLoading = true);
     try {
       _uid = AuthRepository().currentUid ?? 'student_arjun';
-      final data = await _dashSvc.loadStudentDashboard(overrideUid: _uid);
+      final data = await _dashSvc.loadStudentDashboard(overrideUid: _uid, forceRefresh: true);
       _user = data.user;
       _primaryClass = data.primaryClass;
       _grades = data.grades;

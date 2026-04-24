@@ -114,7 +114,7 @@ class _ParentDashboardState extends State<ParentDashboard>
     setState(() => isLoading = true);
     try {
       _uid = AuthRepository().currentUid ?? 'parent_suresh';
-      final data = await _dashSvc.loadParentDashboard(overrideUid: _uid);
+      final data = await _dashSvc.loadParentDashboard(overrideUid: _uid, forceRefresh: true);
       _user = data.user;
       _childrenData = data.childrenData;
       _announcements = data.announcements;

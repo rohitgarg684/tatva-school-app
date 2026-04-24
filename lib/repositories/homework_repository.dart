@@ -24,6 +24,20 @@ class HomeworkRepository extends BaseRepository {
     }
   }
 
+  /// Fetches homework for multiple classes in a single query (up to 30 IDs).
+  Future<List<HomeworkModel>> getByClasses(List<String> classIds) async {
+    if (classIds.isEmpty) return [];
+    try {
+      final snap = await _homework
+          .where('classId', whereIn: classIds.take(30).toList())
+          .orderBy('createdAt', descending: true)
+          .get();
+      return snap.docs.map((d) => HomeworkModel.fromFirestore(d)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<List<HomeworkModel>> getByClass(String classId) async {
     try {
       final snap = await _homework

@@ -127,7 +127,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
     setState(() => isLoading = true);
     try {
       _uid = AuthRepository().currentUid ?? 'teacher_priya';
-      final data = await _dashSvc.loadTeacherDashboard(overrideUid: _uid);
+      final data = await _dashSvc.loadTeacherDashboard(overrideUid: _uid, forceRefresh: true);
       _user = data.user;
       _classes = data.classes;
       _students = data.studentsInFirstClass;

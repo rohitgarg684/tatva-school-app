@@ -163,6 +163,7 @@ class PrincipalDashboardData {
 }
 
 /// Orchestrates data loading for all dashboards.
+/// Uses Future.wait for parallel queries to minimize Firestore round-trips.
 class DashboardService {
   final AuthRepository _authRepo;
   final UserRepository _userRepo;
@@ -176,6 +177,12 @@ class DashboardService {
   final StoryService _storySvc;
   final ActivityService _activitySvc;
   final ContentService _contentSvc;
+
+  // In-memory cache to avoid redundant loads within the same session
+  StudentDashboardData? _cachedStudentData;
+  TeacherDashboardData? _cachedTeacherData;
+  ParentDashboardData? _cachedParentData;
+  PrincipalDashboardData? _cachedPrincipalData;
 
   DashboardService({
     AuthRepository? authRepo,
@@ -205,9 +212,22 @@ class DashboardService {
 
   String get _uid => _authRepo.currentUid ?? '';
 
+  /// Forces fresh data on next load.
+  void invalidateCache() {
+    _cachedStudentData = null;
+    _cachedTeacherData = null;
+    _cachedParentData = null;
+    _cachedPrincipalData = null;
+  }
+
   Future<StudentDashboardData> loadStudentDashboard({
     String? overrideUid,
+    bool forceRefresh = false,
   }) async {
+    if (!forceRefresh && _cachedStudentData != null) {
+      return _cachedStudentData!;
+    }
+
     final uid = overrideUid ?? _uid;
     if (uid.isEmpty) {
       return StudentDashboardData(
@@ -220,42 +240,54 @@ class DashboardService {
           user: UserModel(uid: uid, name: '', email: '', role: UserRole.student));
     }
 
-    ClassModel? primaryClass;
-    if (user.classIds.isNotEmpty) {
-      primaryClass = await _classRepo.getClass(user.classIds.first);
-    }
+    // Kick off class fetch (needed before homework)
+    final classFuture = user.classIds.isNotEmpty
+        ? _classRepo.getClass(user.classIds.first)
+        : Future.value(null);
 
-    final grades = await _gradeSvc.getStudentGrades(uid);
-    final announcements =
-        await _announcementSvc.fetchForAudience(Audience.students);
-    final homework = await _homeworkSvc.getForClasses(user.classIds);
-    final votes = await _voteSvc.fetchActive();
-    final behaviorPoints = await _behaviorSvc.getStudentPoints(uid);
-    final behaviorScore = _behaviorSvc.computeScore(behaviorPoints);
-    final attendance = await _attendanceSvc.getStudentAttendance(uid);
-    final storyPosts = await _storySvc.getStoriesForClasses(user.classIds);
-    final activityFeed = await _activitySvc.getUserFeed(uid);
-    final contentItems = await _contentSvc.fetchAll();
+    // Fire ALL independent queries in parallel (single round-trip batch)
+    final results = await Future.wait([
+      classFuture,                                                // 0
+      _gradeSvc.getStudentGrades(uid),                            // 1
+      _announcementSvc.fetchForAudience(Audience.students),       // 2
+      _homeworkSvc.getForClasses(user.classIds),                  // 3
+      _voteSvc.fetchActive(),                                     // 4
+      _behaviorSvc.getStudentPoints(uid),                         // 5
+      _attendanceSvc.getStudentAttendance(uid),                   // 6
+      _storySvc.getStoriesForClasses(user.classIds),              // 7
+      _activitySvc.getUserFeed(uid, limit: 10),                   // 8
+      _contentSvc.fetchAll(),                                     // 9
+    ]);
 
-    return StudentDashboardData(
+    final behaviorPoints = results[5] as List<BehaviorPoint>;
+
+    final data = StudentDashboardData(
       user: user,
-      primaryClass: primaryClass,
-      grades: grades,
-      announcements: announcements,
-      homework: homework,
-      activeVotes: votes,
+      primaryClass: results[0] as ClassModel?,
+      grades: results[1] as List<GradeModel>,
+      announcements: results[2] as List<AnnouncementModel>,
+      homework: results[3] as List<HomeworkModel>,
+      activeVotes: results[4] as List<VoteModel>,
       behaviorPoints: behaviorPoints,
-      behaviorScore: behaviorScore,
-      attendance: attendance,
-      storyPosts: storyPosts,
-      activityFeed: activityFeed,
-      contentItems: contentItems,
+      behaviorScore: _behaviorSvc.computeScore(behaviorPoints),
+      attendance: results[6] as List<AttendanceRecord>,
+      storyPosts: results[7] as List<StoryPost>,
+      activityFeed: results[8] as List<ActivityEvent>,
+      contentItems: results[9] as List<ContentItem>,
     );
+
+    _cachedStudentData = data;
+    return data;
   }
 
   Future<TeacherDashboardData> loadTeacherDashboard({
     String? overrideUid,
+    bool forceRefresh = false,
   }) async {
+    if (!forceRefresh && _cachedTeacherData != null) {
+      return _cachedTeacherData!;
+    }
+
     final uid = overrideUid ?? _uid;
     if (uid.isEmpty) {
       return TeacherDashboardData(
@@ -272,48 +304,63 @@ class DashboardService {
         ? await _classRepo.getClassesByIds(user.classIds)
         : <ClassModel>[];
 
-    List<UserModel> students = [];
-    List<UserModel> parents = [];
-    List<GradeModel> grades = [];
-    List<BehaviorPoint> classBehavior = [];
-    List<AttendanceRecord> todayAttendance = [];
-    List<StoryPost> classStory = [];
-    if (classes.isNotEmpty) {
-      final first = classes.first;
-      students = await _userRepo.getUsersByIds(first.studentUids);
-      parents = await _userRepo.getUsersByIds(first.parentUids);
-      grades = await _gradeSvc.getClassGrades(first.id);
-      classBehavior = await _behaviorSvc.getClassPoints(first.id);
-      final today = DateTime.now().toIso8601String().substring(0, 10);
-      todayAttendance =
-          await _attendanceSvc.getClassAttendance(first.id, today);
-      classStory = await _storySvc.getClassStory(first.id);
+    if (classes.isEmpty) {
+      // Only fetch announcements and homework — no class-dependent data
+      final results = await Future.wait([
+        _announcementSvc.fetchAll(),
+        _homeworkSvc.getByTeacher(uid),
+      ]);
+      final data = TeacherDashboardData(
+        user: user,
+        announcements: results[0] as List<AnnouncementModel>,
+        homework: results[1] as List<HomeworkModel>,
+      );
+      _cachedTeacherData = data;
+      return data;
     }
 
-    final announcements = await _announcementSvc.fetchAll();
-    final homework = await _homeworkSvc.getByTeacher(uid);
-    final activityFeed = classes.isNotEmpty
-        ? await _activitySvc.getClassFeed(classes.first.id)
-        : <ActivityEvent>[];
+    final first = classes.first;
+    final today = DateTime.now().toIso8601String().substring(0, 10);
 
-    return TeacherDashboardData(
+    // All queries in parallel
+    final results = await Future.wait([
+      _userRepo.getUsersByIds(first.studentUids),                 // 0
+      _userRepo.getUsersByIds(first.parentUids),                  // 1
+      _gradeSvc.getClassGrades(first.id),                         // 2
+      _behaviorSvc.getClassPoints(first.id),                      // 3
+      _attendanceSvc.getClassAttendance(first.id, today),         // 4
+      _storySvc.getClassStory(first.id),                          // 5
+      _announcementSvc.fetchAll(),                                // 6
+      _homeworkSvc.getByTeacher(uid),                             // 7
+      _activitySvc.getClassFeed(first.id, limit: 10),            // 8
+    ]);
+
+    final data = TeacherDashboardData(
       user: user,
       classes: classes,
-      studentsInFirstClass: students,
-      parentsInFirstClass: parents,
-      gradesInFirstClass: grades,
-      announcements: announcements,
-      homework: homework,
-      classBehavior: classBehavior,
-      todayAttendance: todayAttendance,
-      classStory: classStory,
-      activityFeed: activityFeed,
+      studentsInFirstClass: results[0] as List<UserModel>,
+      parentsInFirstClass: results[1] as List<UserModel>,
+      gradesInFirstClass: results[2] as List<GradeModel>,
+      announcements: results[6] as List<AnnouncementModel>,
+      homework: results[7] as List<HomeworkModel>,
+      classBehavior: results[3] as List<BehaviorPoint>,
+      todayAttendance: results[4] as List<AttendanceRecord>,
+      classStory: results[5] as List<StoryPost>,
+      activityFeed: results[8] as List<ActivityEvent>,
     );
+
+    _cachedTeacherData = data;
+    return data;
   }
 
   Future<ParentDashboardData> loadParentDashboard({
     String? overrideUid,
+    bool forceRefresh = false,
   }) async {
+    if (!forceRefresh && _cachedParentData != null) {
+      return _cachedParentData!;
+    }
+
     final uid = overrideUid ?? _uid;
     if (uid.isEmpty) {
       return ParentDashboardData(
@@ -326,69 +373,97 @@ class DashboardService {
           user: UserModel(uid: uid, name: '', email: '', role: UserRole.parent));
     }
 
-    // Build data for each child (multi-child support)
-    final allStudents = await _userRepo.getAllByRole(UserRole.student);
+    // Build child data — each child's UID should be stored on the parent doc
+    // but as a fallback we search by name. Use a single query for all children.
     final childrenData = <ChildDashboardData>[];
     final classIds = <String>{};
 
+    // Batch all child class fetches in parallel
+    final classFutures = <Future<ClassModel?>>[];
     for (final childInfo in user.children) {
-      ClassModel? childClass;
       if (childInfo.classId.isNotEmpty) {
-        childClass = await _classRepo.getClass(childInfo.classId);
+        classFutures.add(_classRepo.getClass(childInfo.classId));
         classIds.add(childInfo.classId);
+      } else {
+        classFutures.add(Future.value(null));
       }
+    }
+    final childClasses = await Future.wait(classFutures);
 
-      String childUid = '';
-      List<GradeModel> childGrades = [];
-      List<BehaviorPoint> childBehavior = [];
-      List<AttendanceRecord> childAttendance = [];
-      int behaviorScore = 0;
-
-      final match =
-          allStudents.where((s) => s.name == childInfo.childName).toList();
-      if (match.isNotEmpty) {
-        childUid = match.first.uid;
-        childGrades = await _gradeSvc.getStudentGrades(childUid);
-        childBehavior = await _behaviorSvc.getStudentPoints(childUid);
-        behaviorScore = _behaviorSvc.computeScore(childBehavior);
-        childAttendance = await _attendanceSvc.getStudentAttendance(childUid);
-      }
-
-      childrenData.add(ChildDashboardData(
-        info: childInfo,
-        childUid: childUid,
-        childClass: childClass,
-        grades: childGrades,
-        behaviorPoints: childBehavior,
-        behaviorScore: behaviorScore,
-        attendance: childAttendance,
-      ));
+    // Fetch all students once (not per child) to resolve names → UIDs
+    List<UserModel>? allStudents;
+    if (user.children.isNotEmpty) {
+      allStudents = await _userRepo.getAllByRole(UserRole.student);
     }
 
-    final announcements =
-        await _announcementSvc.fetchForAudience(Audience.parents);
-    final votes = await _voteSvc.fetchActive();
-    final storyPosts =
-        await _storySvc.getStoriesForClasses(classIds.toList());
-    final activityFeed = childrenData.isNotEmpty && childrenData.first.childUid.isNotEmpty
-        ? await _activitySvc.getUserFeed(childrenData.first.childUid)
-        : <ActivityEvent>[];
-    final contentItems = await _contentSvc.fetchAll();
+    // For each child, fire grades + behavior + attendance in parallel
+    for (int i = 0; i < user.children.length; i++) {
+      final childInfo = user.children[i];
+      final childClass = childClasses[i];
+      String childUid = '';
 
-    return ParentDashboardData(
+      if (allStudents != null) {
+        final match = allStudents.where((s) => s.name == childInfo.childName);
+        if (match.isNotEmpty) childUid = match.first.uid;
+      }
+
+      if (childUid.isNotEmpty) {
+        final childResults = await Future.wait([
+          _gradeSvc.getStudentGrades(childUid),
+          _behaviorSvc.getStudentPoints(childUid),
+          _attendanceSvc.getStudentAttendance(childUid),
+        ]);
+        final bp = childResults[1] as List<BehaviorPoint>;
+        childrenData.add(ChildDashboardData(
+          info: childInfo,
+          childUid: childUid,
+          childClass: childClass,
+          grades: childResults[0] as List<GradeModel>,
+          behaviorPoints: bp,
+          behaviorScore: _behaviorSvc.computeScore(bp),
+          attendance: childResults[2] as List<AttendanceRecord>,
+        ));
+      } else {
+        childrenData.add(ChildDashboardData(
+          info: childInfo,
+          childClass: childClass,
+        ));
+      }
+    }
+
+    // Shared data — all in parallel
+    final sharedResults = await Future.wait([
+      _announcementSvc.fetchForAudience(Audience.parents),
+      _voteSvc.fetchActive(),
+      _storySvc.getStoriesForClasses(classIds.toList()),
+      childrenData.isNotEmpty && childrenData.first.childUid.isNotEmpty
+          ? _activitySvc.getUserFeed(childrenData.first.childUid, limit: 10)
+          : Future.value(<ActivityEvent>[]),
+      _contentSvc.fetchAll(),
+    ]);
+
+    final data = ParentDashboardData(
       user: user,
       childrenData: childrenData,
-      announcements: announcements,
-      activeVotes: votes,
-      storyPosts: storyPosts,
-      activityFeed: activityFeed,
-      contentItems: contentItems,
+      announcements: sharedResults[0] as List<AnnouncementModel>,
+      activeVotes: sharedResults[1] as List<VoteModel>,
+      storyPosts: sharedResults[2] as List<StoryPost>,
+      activityFeed: sharedResults[3] as List<ActivityEvent>,
+      contentItems: sharedResults[4] as List<ContentItem>,
     );
+
+    _cachedParentData = data;
+    return data;
   }
 
   Future<PrincipalDashboardData> loadPrincipalDashboard({
     String? overrideUid,
+    bool forceRefresh = false,
   }) async {
+    if (!forceRefresh && _cachedPrincipalData != null) {
+      return _cachedPrincipalData!;
+    }
+
     final uid = overrideUid ?? _uid;
     if (uid.isEmpty) {
       return PrincipalDashboardData(
@@ -403,30 +478,39 @@ class DashboardService {
               uid: uid, name: '', email: '', role: UserRole.principal));
     }
 
-    final teacherCount = await _userRepo.countByRole(UserRole.teacher);
-    final studentCount = await _userRepo.countByRole(UserRole.student);
-    final allClasses = await _classRepo.getAllClasses();
-    final teachers = await _userRepo.getAllByRole(UserRole.teacher);
-    final parents = await _userRepo.getAllByRole(UserRole.parent);
-    final allGrades = await _gradeSvc.getAllGrades();
-    final subjectAverages = _gradeSvc.computeSubjectAverages(allGrades);
-    final announcements = await _announcementSvc.fetchAll();
-    final votes = await _voteSvc.fetchActive();
-    final activityFeed = await _activitySvc.getSchoolFeed();
+    // All independent queries in parallel
+    final results = await Future.wait([
+      _userRepo.getAllByRole(UserRole.teacher),    // 0 - also gives count
+      _userRepo.getAllByRole(UserRole.student),     // 1 - also gives count
+      _classRepo.getAllClasses(),                   // 2
+      _userRepo.getAllByRole(UserRole.parent),      // 3
+      _gradeSvc.getAllGrades(),                     // 4
+      _announcementSvc.fetchAll(),                  // 5
+      _voteSvc.fetchActive(),                       // 6
+      _activitySvc.getSchoolFeed(limit: 20),        // 7
+    ]);
 
-    return PrincipalDashboardData(
+    final teachers = results[0] as List<UserModel>;
+    final students = results[1] as List<UserModel>;
+    final allClasses = results[2] as List<ClassModel>;
+    final allGrades = results[4] as List<GradeModel>;
+
+    final data = PrincipalDashboardData(
       user: user,
-      teacherCount: teacherCount,
-      studentCount: studentCount,
+      teacherCount: teachers.length,
+      studentCount: students.length,
       classCount: allClasses.length,
       teachers: teachers,
       allClasses: allClasses,
-      parents: parents,
+      parents: results[3] as List<UserModel>,
       allGrades: allGrades,
-      subjectAverages: subjectAverages,
-      announcements: announcements,
-      activeVotes: votes,
-      activityFeed: activityFeed,
+      subjectAverages: _gradeSvc.computeSubjectAverages(allGrades),
+      announcements: results[5] as List<AnnouncementModel>,
+      activeVotes: results[6] as List<VoteModel>,
+      activityFeed: results[7] as List<ActivityEvent>,
     );
+
+    _cachedPrincipalData = data;
+    return data;
   }
 }

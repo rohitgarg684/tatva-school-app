@@ -19,13 +19,9 @@ class HomeworkService {
     return _repo.getByTeacher(teacherUid);
   }
 
-  /// Loads homework across multiple classes (for students enrolled in several).
-  Future<List<HomeworkModel>> getForClasses(List<String> classIds) async {
-    final all = <HomeworkModel>[];
-    for (final cid in classIds) {
-      all.addAll(await _repo.getByClass(cid));
-    }
-    return all;
+  /// Loads homework across multiple classes in a single Firestore query.
+  Future<List<HomeworkModel>> getForClasses(List<String> classIds) {
+    return _repo.getByClasses(classIds);
   }
 
   Future<void> markSubmitted({

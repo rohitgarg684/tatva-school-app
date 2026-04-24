@@ -121,7 +121,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
     setState(() => isLoading = true);
     try {
       _uid = AuthRepository().currentUid ?? 'principal_anjali';
-      final data = await _dashSvc.loadPrincipalDashboard(overrideUid: _uid);
+      final data = await _dashSvc.loadPrincipalDashboard(overrideUid: _uid, forceRefresh: true);
       _user = data.user;
       _teacherCount = data.teacherCount;
       _studentCount = data.studentCount;
