@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/announcement_model.dart';
 import '../../models/class_model.dart';
+import '../../models/grade_model.dart';
 import '../../models/student_model.dart';
 import '../../models/user_model.dart';
 import '../../models/vote_model.dart';
@@ -69,6 +70,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
   List<ClassModel> _allClasses = [];
   List<UserModel> _parents = [];
   Map<String, double> _subjectAverages = {};
+  List<GradeModel> _allGrades = [];
   List<AnnouncementModel> _announcementModels = [];
   List<VoteModel> _voteModels = [];
   List<ActivityEvent> _activityFeed = [];
@@ -125,6 +127,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
       _allClasses = data.allClasses;
       _parents = data.parents;
       _subjectAverages = data.subjectAverages;
+      _allGrades = data.allGrades;
       _announcementModels = data.announcements;
       _voteModels = data.activeVotes;
       _activityFeed = data.activityFeed;
@@ -634,6 +637,140 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
       buf.writeln('${b['categoryId']},${b['points']},${b['note'] ?? ''}');
     }
     return buf.toString();
+  }
+
+  void _showSubjectGradeDetail(String subject, Color color) {
+    final subjectGrades =
+        _allGrades.where((g) => g.subject == subject).toList()
+          ..sort((a, b) => b.percentage.compareTo(a.percentage));
+
+    final avg = subjectGrades.isEmpty
+        ? 0.0
+        : subjectGrades.map((g) => g.percentage).reduce((a, b) => a + b) /
+            subjectGrades.length;
+
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.75),
+        decoration: BoxDecoration(
+          color: bgCard,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(height: 12),
+            Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2))),
+            SizedBox(height: 16),
+            Text(subject,
+                style: TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: textDark)),
+            SizedBox(height: 4),
+            Text(
+                '${subjectGrades.length} grades • ${avg.toStringAsFixed(1)}% average',
+                style: TextStyle(
+                    fontFamily: 'Raleway', fontSize: 13, color: textLight)),
+            SizedBox(height: 16),
+            Expanded(
+              child: subjectGrades.isEmpty
+                  ? Center(
+                      child: Text('No grades recorded for $subject',
+                          style: TextStyle(
+                              fontFamily: 'Raleway', color: textLight)))
+                  : ListView.builder(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: subjectGrades.length,
+                      itemBuilder: (_, i) {
+                        final g = subjectGrades[i];
+                        final pct = g.percentage;
+                        final pctColor = pct >= 80
+                            ? success
+                            : pct >= 60
+                                ? accent
+                                : danger;
+                        return Container(
+                          margin: EdgeInsets.only(bottom: 8),
+                          padding: EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                              color: bg,
+                              borderRadius: BorderRadius.circular(12)),
+                          child: Row(children: [
+                            CircleAvatar(
+                              radius: 18,
+                              backgroundColor: color.withOpacity(0.1),
+                              child: Text(
+                                  g.studentName.isNotEmpty
+                                      ? g.studentName[0].toUpperCase()
+                                      : '?',
+                                  style: TextStyle(
+                                      fontFamily: 'Raleway',
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: color)),
+                            ),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                        g.studentName.isNotEmpty
+                                            ? g.studentName
+                                            : g.studentUid,
+                                        style: TextStyle(
+                                            fontFamily: 'Raleway',
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                            color: textDark)),
+                                    SizedBox(height: 2),
+                                    Text(g.assessmentName,
+                                        style: TextStyle(
+                                            fontFamily: 'Raleway',
+                                            fontSize: 12,
+                                            color: textLight)),
+                                  ]),
+                            ),
+                            Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                      '${g.score.toInt()}/${g.total.toInt()}',
+                                      style: TextStyle(
+                                          fontFamily: 'Raleway',
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                          color: pctColor)),
+                                  Text('${pct.toStringAsFixed(0)}%',
+                                      style: TextStyle(
+                                          fontFamily: 'Raleway',
+                                          fontSize: 11,
+                                          color: textLight)),
+                                ]),
+                          ]),
+                        );
+                      },
+                    ),
+            ),
+            SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showCreateVote() {
@@ -1352,6 +1489,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                   margin: EdgeInsets.fromLTRB(20, 0, 20, 10),
                   child: RippleTap(
                     rippleColor: c,
+                    onTap: () => _showSubjectGradeDetail(entry.key, c),
                     child: Container(
                       padding: EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -1374,6 +1512,9 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600,
                                       color: textDark))),
+                          Icon(Icons.arrow_forward_ios_rounded,
+                              color: textLight, size: 12),
+                          SizedBox(width: 8),
                           SlotNumber(
                               value: entry.value,
                               decimals: 1,
