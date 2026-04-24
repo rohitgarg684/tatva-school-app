@@ -62,6 +62,15 @@ class ClassRepository extends BaseRepository {
     }
   }
 
+  Future<List<ClassModel>> getAllClasses() async {
+    try {
+      final snap = await _classes.orderBy('name').get();
+      return snap.docs.map((d) => ClassModel.fromFirestore(d)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<List<ClassModel>> getClassesByIds(List<String> classIds) async {
     if (classIds.isEmpty) return [];
     try {

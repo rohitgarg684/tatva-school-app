@@ -75,5 +75,21 @@ service cloud.firestore {
       allow update: if isSignedIn();
       allow delete: if isPrincipal();
     }
+
+    // ── Homework ─────────────────────────────────────────────────────
+    match /homework/{homeworkId} {
+      allow read: if isSignedIn();
+      allow create: if isTeacherOrPrincipal();
+      allow update: if isSignedIn();
+      allow delete: if isTeacherOrPrincipal();
+    }
+
+    // ── Messages ─────────────────────────────────────────────────────
+    match /messages/{messageId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if false;
+      allow delete: if false;
+    }
   }
 }

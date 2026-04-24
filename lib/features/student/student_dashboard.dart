@@ -5,6 +5,19 @@ import '../../shared/theme/colors.dart';
 import '../../shared/widgets/logout_sheet.dart';
 import '../../core/router/app_router.dart';
 import '../auth/welcome_screen.dart';
+import '../../repositories/auth_repository.dart';
+import '../../repositories/user_repository.dart';
+import '../../repositories/class_repository.dart';
+import '../../repositories/grade_repository.dart';
+import '../../repositories/announcement_repository.dart';
+import '../../repositories/homework_repository.dart';
+import '../../repositories/vote_repository.dart';
+import '../../models/user_model.dart';
+import '../../models/grade_model.dart';
+import '../../models/announcement_model.dart';
+import '../../models/homework_model.dart';
+import '../../models/vote_model.dart';
+import '../../models/class_model.dart';
 
 class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
@@ -30,89 +43,19 @@ class _StudentDashboardState extends State<StudentDashboard>
   static const Color info = TatvaColors.info;
   static const Color purple = TatvaColors.purple;
 
-  // ── FAKE DATA ──────────────────────────────────────────────────────────────
-  final String userName = 'Arjun Mehta';
-  final String userEmail = 'arjun.mehta@student.tatva.edu';
-  final String className = 'Grade 8 — Section A';
-  final String subject = 'Mathematics';
-  final String teacherName = 'Mrs. Priya Sharma';
-  final String teacherEmail = 'priya.sharma@tatva.edu';
-  final String classCode = 'MATH312';
+  String userName = '';
+  String userEmail = '';
+  String className = '';
+  String subject = '';
+  String teacherName = '';
+  String teacherEmail = '';
+  String classCode = '';
 
-  final List<Map<String, dynamic>> _grades = [
-    {
-      'subject': 'Mathematics',
-      'assessmentName': 'Unit Test 3',
-      'score': 46.0,
-      'total': 50.0
-    },
-    {
-      'subject': 'Mathematics',
-      'assessmentName': 'Worksheet 5',
-      'score': 38.0,
-      'total': 40.0
-    },
-    {
-      'subject': 'Mathematics',
-      'assessmentName': 'Unit Test 2',
-      'score': 42.0,
-      'total': 50.0
-    },
-    {
-      'subject': 'Science',
-      'assessmentName': 'Lab Report',
-      'score': 39.0,
-      'total': 50.0
-    },
-    {
-      'subject': 'Science',
-      'assessmentName': 'Unit Test 2',
-      'score': 44.0,
-      'total': 50.0
-    },
-    {
-      'subject': 'English',
-      'assessmentName': 'Essay — Nature',
-      'score': 44.0,
-      'total': 50.0
-    },
-    {
-      'subject': 'English',
-      'assessmentName': 'Grammar Test',
-      'score': 36.0,
-      'total': 40.0
-    },
-    {
-      'subject': 'History',
-      'assessmentName': 'Chapter Test 4',
-      'score': 36.0,
-      'total': 50.0
-    },
-  ];
+  List<Map<String, dynamic>> _grades = [];
 
-  final List<Map<String, dynamic>> _announcements = [
-    {
-      'title': 'Term 2 Exam Schedule Released',
-      'body':
-          'Final examinations begin December 10. Timetable is now available on the school portal.',
-      'createdByName': 'Mrs. Priya Sharma',
-      'audience': 'Everyone'
-    },
-    {
-      'title': '🏆 Math Olympiad Results',
-      'body':
-          'Congratulations to Grade 8-A for achieving the highest district score in the Mathematics Olympiad!',
-      'createdByName': 'Principal',
-      'audience': 'Students'
-    },
-    {
-      'title': 'Sports Day — Dec 15',
-      'body':
-          'Annual Sports Day will be held on December 15. All students must wear sports uniform.',
-      'createdByName': 'School Admin',
-      'audience': 'Everyone'
-    },
-  ];
+  List<Map<String, dynamic>> _announcements = [];
+
+  List<Map<String, dynamic>> _activeVotes = [];
 
   // ── HOMEWORK DATA ──────────────────────────────────────────────────────────
   late List<Map<String, dynamic>> _homework;
@@ -134,46 +77,7 @@ class _StudentDashboardState extends State<StudentDashboard>
   void initState() {
     super.initState();
 
-    _homework = [
-      {
-        'id': 'hw1',
-        'title': 'Algebra Practice — Chapter 6',
-        'description':
-            'Complete exercises 6.1 to 6.5 from the textbook. Show all working clearly.',
-        'dueDate': 'Dec 12, 2024',
-        'totalMarks': 20,
-        'subject': 'Mathematics',
-        'teacherName': 'Mrs. Priya Sharma',
-        'isSubmitted': false,
-      },
-      {
-        'id': 'hw2',
-        'title': 'Geometry Worksheet — Triangles',
-        'description':
-            'Solve all problems on the printed worksheet and bring it to class.',
-        'dueDate': 'Dec 9, 2024',
-        'totalMarks': 15,
-        'subject': 'Mathematics',
-        'teacherName': 'Mrs. Priya Sharma',
-        'isSubmitted': true,
-      },
-      {
-        'id': 'hw3',
-        'title': 'Holiday Revision Pack',
-        'description':
-            'Revise chapters 4 and 5. Focus on word problems and graphs. Bring notes to class.',
-        'dueDate': 'Dec 20, 2024',
-        'totalMarks': 10,
-        'subject': 'Mathematics',
-        'teacherName': 'Mrs. Priya Sharma',
-        'isSubmitted': false,
-      },
-    ];
-
-    // Pre-mark already-submitted ones
-    for (final hw in _homework) {
-      if (hw['isSubmitted'] == true) _completedIds.add(hw['id'] as String);
-    }
+    _homework = [];
 
     _shimmerController = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 1200))
@@ -213,7 +117,82 @@ class _StudentDashboardState extends State<StudentDashboard>
 
   Future<void> _loadUser() async {
     setState(() => isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 800));
+    try {
+      final uid = AuthRepository().currentUid ?? 'student_arjun';
+
+      final user = await UserRepository().getUser(uid);
+      if (user != null) {
+        userName = user.name;
+        userEmail = user.email;
+      }
+
+      if (user != null && user.classIds.isNotEmpty) {
+        final cls = await ClassRepository().getClass(user.classIds.first);
+        if (cls != null) {
+          className = cls.name;
+          subject = cls.subject;
+          teacherName = cls.teacherName;
+          teacherEmail = cls.teacherEmail;
+          classCode = cls.classCode;
+        }
+      }
+
+      final gradeModels = await GradeRepository().fetchStudentGrades(uid);
+      _grades = gradeModels
+          .map((g) => {
+                'subject': g.subject,
+                'assessmentName': g.assessmentName,
+                'score': g.score,
+                'total': g.total,
+              })
+          .toList();
+
+      final annModels =
+          await AnnouncementRepository().getForAudience('Students');
+      _announcements = annModels
+          .map((a) => {
+                'title': a.title,
+                'body': a.body,
+                'createdByName': a.createdByName,
+                'audience': a.audience,
+              })
+          .toList();
+
+      if (user != null && user.classIds.isNotEmpty) {
+        final allHw = <HomeworkModel>[];
+        for (final cid in user.classIds) {
+          allHw.addAll(await HomeworkRepository().getByClass(cid));
+        }
+        _homework = allHw
+            .map((h) => {
+                  'id': h.id,
+                  'title': h.title,
+                  'description': h.description,
+                  'dueDate': h.dueDate,
+                  'totalMarks': 0,
+                  'subject': h.subject,
+                  'teacherName': h.teacherName,
+                  'isSubmitted': h.isSubmittedBy(uid),
+                })
+            .toList();
+        _completedIds.clear();
+        for (final hw in _homework) {
+          if (hw['isSubmitted'] == true) _completedIds.add(hw['id'] as String);
+        }
+      }
+
+      final voteModels = await VoteRepository().fetchActive();
+      _activeVotes = voteModels
+          .map((v) => {
+                'question': v.question,
+                'type': v.type,
+                'school': v.votes.school,
+                'noSchool': v.votes.noSchool,
+                'undecided': v.votes.undecided,
+                'total': v.votes.total,
+              })
+          .toList();
+    } catch (_) {}
     if (!mounted) return;
     setState(() => isLoading = false);
     _greetingController.forward();
@@ -658,6 +637,9 @@ class _StudentDashboardState extends State<StudentDashboard>
   }
 
   Widget _buildVoteResults() {
+    if (_activeVotes.isEmpty) {
+      return const SizedBox.shrink();
+    }
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -675,55 +657,60 @@ class _StudentDashboardState extends State<StudentDashboard>
               style: TextStyle(
                   fontFamily: 'Raleway', fontSize: 12, color: textLight))),
       const SizedBox(height: 12),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-              color: bgCard,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: info.withOpacity(0.2), width: 1.5)),
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                      color: info.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(8)),
-                  child: const Text('Weather Day',
-                      style: TextStyle(
-                          fontFamily: 'Raleway',
-                          fontSize: 11,
-                          color: info,
-                          fontWeight: FontWeight.w700))),
-              const Spacer(),
-              const Icon(Icons.how_to_vote_outlined,
-                  color: textLight, size: 13),
-              const SizedBox(width: 4),
-              const Text('23 votes',
-                  style: TextStyle(
-                      fontFamily: 'Raleway', fontSize: 11, color: textLight)),
+      ...List.generate(_activeVotes.length, (i) {
+        final v = _activeVotes[i];
+        final total = v['total'] as int;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+                color: bgCard,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: info.withOpacity(0.2), width: 1.5)),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                        color: info.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(8)),
+                    child: Text(v['type'] as String,
+                        style: const TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 11,
+                            color: info,
+                            fontWeight: FontWeight.w700))),
+                const Spacer(),
+                const Icon(Icons.how_to_vote_outlined,
+                    color: textLight, size: 13),
+                const SizedBox(width: 4),
+                Text('$total votes',
+                    style: const TextStyle(
+                        fontFamily: 'Raleway', fontSize: 11, color: textLight)),
+              ]),
+              const SizedBox(height: 10),
+              Text(v['question'] as String,
+                  style: const TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: textDark,
+                      height: 1.4)),
+              const SizedBox(height: 12),
+              _simpleVoteBar('🏫 School', v['school'] as int, total, success),
+              const SizedBox(height: 6),
+              _simpleVoteBar(
+                  '🏠 No School', v['noSchool'] as int, total, danger),
+              const SizedBox(height: 6),
+              _simpleVoteBar(
+                  '🤷 Undecided', v['undecided'] as int, total, accent),
             ]),
-            const SizedBox(height: 10),
-            const Text(
-                'Should we cancel school tomorrow due to heavy rainfall forecast?',
-                style: TextStyle(
-                    fontFamily: 'Raleway',
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: textDark,
-                    height: 1.4)),
-            const SizedBox(height: 12),
-            _simpleVoteBar('🏫 School', 15, 23, success),
-            const SizedBox(height: 6),
-            _simpleVoteBar('🏠 No School', 6, 23, danger),
-            const SizedBox(height: 6),
-            _simpleVoteBar('🤷 Undecided', 2, 23, accent),
-          ]),
-        ),
-      ),
+          ),
+        );
+      }),
     ]);
   }
 

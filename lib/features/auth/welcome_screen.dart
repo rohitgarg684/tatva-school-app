@@ -4,6 +4,7 @@ import '../student/student_dashboard.dart';
 import '../teacher/teacher_dashboard.dart';
 import '../parent/parent_dashboard.dart';
 import '../principal/principal_dashboard.dart';
+import '../../services/seed_service.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -12,6 +13,47 @@ class WelcomeScreen extends StatelessWidget {
   static const Color accent = Color(0xFFE8A020);
   static const Color textW = Color(0xFFF5F0E8);
   static const Color textMut = Color(0xFF8FAF8F);
+
+  void _seedData(BuildContext ctx) async {
+    final seed = SeedService();
+    final already = await seed.isAlreadySeeded();
+    if (!ctx.mounted) return;
+    if (already) {
+      ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+        content: Text('Demo data already exists in Firestore.',
+            style: TextStyle(fontFamily: 'Raleway')),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    showDialog(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    try {
+      await seed.seedAll();
+      if (ctx.mounted) {
+        Navigator.pop(ctx);
+        ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+          content: Text('Demo data seeded successfully!',
+              style: TextStyle(fontFamily: 'Raleway')),
+          backgroundColor: Color(0xFF43A047),
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    } catch (e) {
+      if (ctx.mounted) {
+        Navigator.pop(ctx);
+        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+          content: Text('Seed failed: $e',
+              style: const TextStyle(fontFamily: 'Raleway')),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    }
+  }
 
   void _go(BuildContext ctx, Widget screen) {
     HapticFeedback.lightImpact();
@@ -140,6 +182,19 @@ class WelcomeScreen extends StatelessWidget {
                   const Color(0xFFE8A020),
                   const PrincipalDashboard()),
               const Spacer(),
+              Center(
+                child: TextButton.icon(
+                  onPressed: () => _seedData(context),
+                  icon: const Icon(Icons.cloud_upload_outlined,
+                      color: accent, size: 16),
+                  label: const Text('Seed Demo Data',
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 12,
+                          color: accent)),
+                ),
+              ),
+              const SizedBox(height: 4),
               Center(
                   child: Text('Swipe back anytime to switch roles',
                       style: TextStyle(

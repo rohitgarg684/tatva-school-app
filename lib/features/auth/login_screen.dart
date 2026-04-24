@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../student/student_dashboard.dart';
 import '../teacher/teacher_dashboard.dart';
 import '../parent/parent_dashboard.dart';
@@ -87,53 +85,53 @@ class _LoginScreenState extends State<LoginScreen>
     return valid;
   }
 
+  final _authService = AuthService();
+
   Future<void> login() async {
     if (!_validate()) return;
     HapticFeedback.lightImpact();
     setState(() => isLoading = true);
 
     try {
-      UserCredential cred =
-          await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final result = await _authService.signIn(
         email: emailController.text.trim(),
         password: passwordController.text,
       );
 
-      if (!cred.user!.emailVerified) {
-        await FirebaseAuth.instance.signOut();
-        if (!mounted) return;
-        setState(() {
-          generalError = 'Please verify your email first. Check your inbox.';
-          isLoading = false;
-        });
-        return;
-      }
-
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(cred.user!.uid)
-          .get();
-      final role = doc.data()?['role'] ?? 'Student';
+      if (result == null) throw UserNotFoundException();
 
       HapticFeedback.mediumImpact();
       setState(() => _showConfetti = true);
       await Future.delayed(Duration(milliseconds: 900));
 
       if (mounted) {
-        if (role == 'Teacher') {
-          Navigator.pushReplacement(
-              context, TatvaPageRoute.slideUp(TeacherDashboard()));
-        } else if (role == 'Parent') {
-          Navigator.pushReplacement(
-              context, TatvaPageRoute.slideUp(ParentDashboard()));
-        } else if (role == 'Principal') {
-          Navigator.pushReplacement(
-              context, TatvaPageRoute.slideUp(PrincipalDashboard()));
-        } else {
-          Navigator.pushReplacement(
-              context, TatvaPageRoute.slideUp(StudentDashboard()));
+        final Widget dashboard;
+        switch (result.role) {
+          case UserRole.teacher:
+            dashboard = TeacherDashboard();
+            break;
+          case UserRole.parent:
+            dashboard = ParentDashboard();
+            break;
+          case UserRole.principal:
+            dashboard = PrincipalDashboard();
+            break;
+          default:
+            dashboard = StudentDashboard();
         }
+        Navigator.pushReplacement(
+            context, TatvaPageRoute.slideUp(dashboard));
       }
+    } on UnverifiedEmailException {
+      if (!mounted) return;
+      setState(() {
+        generalError = 'Please verify your email first. Check your inbox.';
+      });
+    } on UserNotFoundException {
+      if (!mounted) return;
+      setState(() {
+        generalError = 'User profile not found. Please register first.';
+      });
     } catch (e) {
       String msg = e.toString();
       if (!mounted) return;
@@ -161,8 +159,8 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
     try {
-      await FirebaseAuth.instance
-          .sendPasswordResetEmail(email: emailController.text.trim());
+      await _authService.sendPasswordReset(
+          email: emailController.text.trim());
       if (mounted) {
         showModalBottomSheet(
           context: context,

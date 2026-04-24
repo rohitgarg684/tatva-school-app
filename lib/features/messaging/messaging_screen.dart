@@ -1,5 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../models/message_model.dart';
+import '../../repositories/auth_repository.dart';
+import '../../repositories/message_repository.dart';
 import '../../shared/animations/animations.dart';
 
 class MessagingScreen extends StatefulWidget {
@@ -34,47 +39,29 @@ class _MessagingScreenState extends State<MessagingScreen>
   static const Color textDark = Color(0xFF1A2E22);
   static const Color textLight = Color(0xFF8FAF8F);
 
-  // Fake pre-loaded messages
-  late List<Map<String, dynamic>> _messages;
+  List<MessageModel> _messages = [];
+  StreamSubscription? _msgSubscription;
+  late String _myUid;
+  late String _conversationId;
 
   @override
   void initState() {
     super.initState();
-    _messages = [
-      {
-        'text':
-            'Hello! I wanted to discuss Arjun\'s progress in the upcoming exams.',
-        'isMe': false,
-        'time': '9:41 AM'
-      },
-      {
-        'text': 'Hi! Yes of course. He\'s been studying hard at home.',
-        'isMe': true,
-        'time': '9:43 AM'
-      },
-      {
-        'text':
-            'That\'s great to hear! His essay scores have improved significantly. With a bit more focus on comprehension he could score 90+.',
-        'isMe': false,
-        'time': '9:44 AM'
-      },
-      {
-        'text':
-            'Thank you for the feedback! Could you share some practice resources?',
-        'isMe': true,
-        'time': '9:46 AM'
-      },
-      {
-        'text':
-            'Absolutely! I\'ll upload a worksheet on the class board by this evening. 📄',
-        'isMe': false,
-        'time': '9:47 AM'
-      },
-    ];
+    _myUid = AuthRepository().currentUid ?? 'parent_suresh';
+    _conversationId =
+        MessageModel.makeConversationId(_myUid, widget.otherUserId);
+    _msgSubscription =
+        MessageRepository().getMessages(_conversationId).listen((msgs) {
+      if (mounted) {
+        setState(() => _messages = msgs);
+        _scrollToBottom();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _msgSubscription?.cancel();
     _msgController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -87,27 +74,22 @@ class _MessagingScreenState extends State<MessagingScreen>
     _msgController.clear();
     HapticFeedback.lightImpact();
 
-    final now = TimeOfDay.now();
-    final time =
-        '${now.hourOfPeriod}:${now.minute.toString().padLeft(2, '0')} ${now.period.name.toUpperCase()}';
+    await MessageRepository().send(MessageModel(
+      text: text,
+      senderUid: _myUid,
+      receiverUid: widget.otherUserId,
+      conversationId: _conversationId,
+    ));
 
-    setState(() {
-      _messages.add({'text': text, 'isMe': true, 'time': time});
-      _sending = false;
-    });
-    _scrollToBottom();
+    if (mounted) setState(() => _sending = false);
+  }
 
-    // Auto-reply after short delay
-    await Future.delayed(const Duration(milliseconds: 1200));
-    if (!mounted) return;
-    setState(() {
-      _messages.add({
-        'text': 'Thank you for your message! I\'ll get back to you shortly. 😊',
-        'isMe': false,
-        'time': time
-      });
-    });
-    _scrollToBottom();
+  String _formatTime(DateTime? dt) {
+    if (dt == null) return '';
+    final h = dt.hour > 12 ? dt.hour - 12 : dt.hour;
+    final m = dt.minute.toString().padLeft(2, '0');
+    final period = dt.hour >= 12 ? 'PM' : 'AM';
+    return '$h:$m $period';
   }
 
   void _scrollToBottom() {
@@ -188,7 +170,7 @@ class _MessagingScreenState extends State<MessagingScreen>
             itemCount: _messages.length,
             itemBuilder: (context, index) {
               final msg = _messages[index];
-              final isMe = msg['isMe'] as bool;
+              final isMe = msg.senderUid == _myUid;
               return StaggeredItem(
                 index: index % 10,
                 delayMs: 30,
@@ -241,14 +223,14 @@ class _MessagingScreenState extends State<MessagingScreen>
                           child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(msg['text'],
+                                Text(msg.text,
                                     style: TextStyle(
                                         fontFamily: 'Raleway',
                                         fontSize: 14,
                                         color: isMe ? Colors.white : textDark,
                                         height: 1.4)),
                                 const SizedBox(height: 4),
-                                Text(msg['time'],
+                                Text(_formatTime(msg.createdAt),
                                     style: TextStyle(
                                         fontFamily: 'Raleway',
                                         fontSize: 10,

@@ -42,4 +42,40 @@ class GradeRepository extends BaseRepository {
         .orderBy('createdAt', descending: false)
         .snapshots();
   }
+
+  Future<List<GradeModel>> fetchStudentGrades(String studentUid) async {
+    try {
+      final snap = await _grades
+          .where('studentUid', isEqualTo: studentUid)
+          .orderBy('createdAt', descending: false)
+          .get();
+      return snap.docs.map((d) => GradeModel.fromFirestore(d)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<List<GradeModel>> fetchClassGrades(String classId) async {
+    try {
+      final snap = await _grades
+          .where('classId', isEqualTo: classId)
+          .orderBy('createdAt', descending: false)
+          .get();
+      return snap.docs.map((d) => GradeModel.fromFirestore(d)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<List<GradeModel>> fetchAll() async {
+    try {
+      final snap = await _grades
+          .orderBy('createdAt', descending: true)
+          .limit(500)
+          .get();
+      return snap.docs.map((d) => GradeModel.fromFirestore(d)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
 }

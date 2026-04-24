@@ -45,4 +45,24 @@ class UserRepository extends BaseRepository {
       return [];
     }
   }
+
+  Future<List<UserModel>> getAllByRole(UserRole role) async {
+    try {
+      final snap =
+          await _users.where('role', isEqualTo: role.label).get();
+      return snap.docs.map((d) => UserModel.fromFirestore(d)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<int> countByRole(UserRole role) async {
+    try {
+      final snap =
+          await _users.where('role', isEqualTo: role.label).get();
+      return snap.docs.length;
+    } catch (_) {
+      return 0;
+    }
+  }
 }

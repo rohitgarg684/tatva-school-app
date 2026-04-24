@@ -45,4 +45,16 @@ class VoteRepository extends BaseRepository {
         .orderBy('createdAt', descending: true)
         .snapshots();
   }
+
+  Future<List<VoteModel>> fetchActive() async {
+    try {
+      final snap = await _votes
+          .where('active', isEqualTo: true)
+          .orderBy('createdAt', descending: true)
+          .get();
+      return snap.docs.map((d) => VoteModel.fromFirestore(d)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
 }

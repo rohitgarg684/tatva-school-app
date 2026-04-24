@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'login_screen.dart';
 import '../../services/auth_service.dart';
-import '../../services/class_service.dart';
+import '../../models/user_role.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -141,56 +140,29 @@ class _RegisterScreenState extends State<RegisterScreen>
     });
 
     try {
-      // 1. Create Firebase Auth user
-      final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      final role = UserRole.fromString(_selectedRole);
+      final warning = await AuthService().register(
+        name: name,
         email: email,
         password: password,
+        role: role,
+        classCode: classCode.isNotEmpty ? classCode : null,
+        childName: childName.isNotEmpty ? childName : null,
       );
-      final uid = cred.user!.uid;
 
-      // 2. Send email verification
-      await cred.user!.sendEmailVerification();
-
-      // 3. Save user to Firestore
-      await FirebaseFirestore.instance.collection('users').doc(uid).set({
-        'name': name,
-        'email': email,
-        'role': _selectedRole,
-        'uid': uid,
-        'createdAt': FieldValue.serverTimestamp(),
-        'classIds': [],
-        if (_selectedRole == 'Parent') 'children': [],
-      });
-
-      // 4. Join class (Student or Parent)
-      if (_selectedRole == 'Student' || _selectedRole == 'Parent') {
-        final cs = ClassService();
-        final error = await cs.joinClassByCode(
-          classCode: classCode,
-          role: _selectedRole,
-          childName: _selectedRole == 'Parent' ? childName : null,
-        );
-
-        if (error != null) {
-          // Class code failed — still registered but not in a class
-          // Show warning but continue to dashboard
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text(
-                  'Registered! But class code invalid: $error You can add a class later.',
-                  style: TextStyle(fontFamily: 'Raleway')),
-              backgroundColor: accent,
-              duration: Duration(seconds: 5),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ));
-          }
-        }
+      if (warning != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              'Registered! But: $warning You can add a class later.',
+              style: TextStyle(fontFamily: 'Raleway')),
+          backgroundColor: accent,
+          duration: Duration(seconds: 5),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
       }
 
-      // 5. Sign out and redirect to login — user must verify email first
-      await FirebaseAuth.instance.signOut();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(

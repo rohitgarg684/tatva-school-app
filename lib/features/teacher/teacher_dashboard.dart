@@ -9,6 +9,12 @@ import '../../shared/widgets/logout_sheet.dart';
 import '../../shared/widgets/pick_student_sheet.dart';
 import '../../core/router/app_router.dart';
 import '../../services/class_service.dart';
+import '../../repositories/auth_repository.dart';
+import '../../repositories/user_repository.dart';
+import '../../repositories/class_repository.dart';
+import '../../repositories/grade_repository.dart';
+import '../../repositories/announcement_repository.dart';
+import '../../repositories/homework_repository.dart';
 
 class TeacherDashboard extends StatefulWidget {
   const TeacherDashboard({super.key});
@@ -34,237 +40,18 @@ class _TeacherDashboardState extends State<TeacherDashboard>
   static const Color info = TatvaColors.info;
   static const Color purple = TatvaColors.purple;
 
-  // ── FAKE DATA ──────────────────────────────────────────────────────────────
-  final String userName = 'Mrs. Priya Sharma';
-  final String userEmail = 'priya.sharma@tatva.edu';
-
-  final List<Map<String, dynamic>> _classes = [
-    {
-      'classId': 'c1',
-      'name': 'Grade 8 — Section A',
-      'subject': 'Mathematics',
-      'classCode': 'MATH312',
-      'studentUids': ['s1', 's2', 's3', 's4', 's5'],
-      'parentUids': ['p1', 'p2', 'p3', 'p4'],
-    },
-    {
-      'classId': 'c2',
-      'name': 'Grade 8 — Section B',
-      'subject': 'Mathematics',
-      'classCode': 'MATH498',
-      'studentUids': ['s6', 's7', 's8', 's9', 's10', 's11'],
-      'parentUids': ['p5', 'p6', 'p7'],
-    },
-    {
-      'classId': 'c3',
-      'name': 'Grade 7 — Section A',
-      'subject': 'Mathematics',
-      'classCode': 'MATH201',
-      'studentUids': ['s12', 's13', 's14', 's15'],
-      'parentUids': ['p8', 'p9'],
-    },
-  ];
-
-  final List<Map<String, dynamic>> _students = [
-    {
-      'uid': 's1',
-      'name': 'Arjun Mehta',
-      'email': 'arjun@tatva.edu',
-      'classId': 'c1'
-    },
-    {
-      'uid': 's2',
-      'name': 'Sneha Agarwal',
-      'email': 'sneha@tatva.edu',
-      'classId': 'c1'
-    },
-    {
-      'uid': 's3',
-      'name': 'Ravi Kumar',
-      'email': 'ravi@tatva.edu',
-      'classId': 'c1'
-    },
-    {
-      'uid': 's4',
-      'name': 'Divya Pillai',
-      'email': 'divya@tatva.edu',
-      'classId': 'c1'
-    },
-    {
-      'uid': 's5',
-      'name': 'Karan Singh',
-      'email': 'karan@tatva.edu',
-      'classId': 'c1'
-    },
-  ];
-
-  final List<Map<String, dynamic>> _grades = [
-    {
-      'studentUid': 's1',
-      'studentName': 'Arjun Mehta',
-      'assessmentName': 'Unit Test 3',
-      'subject': 'Mathematics',
-      'score': 46.0,
-      'total': 50.0,
-      'classId': 'c1'
-    },
-    {
-      'studentUid': 's2',
-      'studentName': 'Sneha Agarwal',
-      'assessmentName': 'Unit Test 3',
-      'subject': 'Mathematics',
-      'score': 42.0,
-      'total': 50.0,
-      'classId': 'c1'
-    },
-    {
-      'studentUid': 's3',
-      'studentName': 'Ravi Kumar',
-      'assessmentName': 'Unit Test 3',
-      'subject': 'Mathematics',
-      'score': 34.0,
-      'total': 50.0,
-      'classId': 'c1'
-    },
-    {
-      'studentUid': 's4',
-      'studentName': 'Divya Pillai',
-      'assessmentName': 'Unit Test 3',
-      'subject': 'Mathematics',
-      'score': 45.0,
-      'total': 50.0,
-      'classId': 'c1'
-    },
-    {
-      'studentUid': 's5',
-      'studentName': 'Karan Singh',
-      'assessmentName': 'Unit Test 3',
-      'subject': 'Mathematics',
-      'score': 37.0,
-      'total': 50.0,
-      'classId': 'c1'
-    },
-  ];
-
-  final List<Map<String, dynamic>> _announcements = [
-    {
-      'title': 'Term 2 Exam Timetable',
-      'body':
-          'Final exams begin December 10. Please ensure students are prepared.',
-      'audience': 'Students',
-      'createdByName': 'Mrs. Priya Sharma'
-    },
-    {
-      'title': 'PTM — December 5',
-      'body':
-          'Parent-Teacher Meeting scheduled 10 AM – 1 PM. Confirm slots via the app.',
-      'audience': 'Parents',
-      'createdByName': 'Mrs. Priya Sharma'
-    },
-    {
-      'title': 'Holiday Homework Uploaded',
-      'body': 'Winter break assignments are now live on the class board.',
-      'audience': 'Everyone',
-      'createdByName': 'Mrs. Priya Sharma'
-    },
-  ];
-
-  final List<Map<String, dynamic>> _parents = [
-    {
-      'uid': 'p1',
-      'name': 'Mr. Suresh Mehta',
-      'email': 'suresh@gmail.com',
-      'childName': 'Arjun Mehta',
-      'role': 'Parent'
-    },
-    {
-      'uid': 'p2',
-      'name': 'Mrs. Lata Agarwal',
-      'email': 'lata@gmail.com',
-      'childName': 'Sneha Agarwal',
-      'role': 'Parent'
-    },
-    {
-      'uid': 'p3',
-      'name': 'Mr. Vijay Kumar',
-      'email': 'vijay@gmail.com',
-      'childName': 'Ravi Kumar',
-      'role': 'Parent'
-    },
-    {
-      'uid': 'p4',
-      'name': 'Mrs. Asha Pillai',
-      'email': 'asha@gmail.com',
-      'childName': 'Divya Pillai',
-      'role': 'Parent'
-    },
-  ];
-
-  // ── HOMEWORK DATA ──────────────────────────────────────────────────────────
-  late List<Map<String, dynamic>> _homework;
+  String userName = '';
+  String userEmail = '';
+  List<Map<String, dynamic>> _classes = [];
+  List<Map<String, dynamic>> _students = [];
+  List<Map<String, dynamic>> _grades = [];
+  List<Map<String, dynamic>> _announcements = [];
+  List<Map<String, dynamic>> _parents = [];
+  List<Map<String, dynamic>> _homework = [];
 
   @override
   void initState() {
     super.initState();
-    _homework = [
-      {
-        'id': 'hw1',
-        'title': 'Algebra Practice — Chapter 6',
-        'description':
-            'Complete exercises 6.1 to 6.5 from the textbook. Show all working clearly.',
-        'classId': 'c1',
-        'className': 'Grade 8 — Section A',
-        'dueDate': 'Dec 12, 2024',
-        'totalMarks': 20,
-        'subject': 'Mathematics',
-        'submissions': ['s1', 's3'],
-        'totalStudents': 5,
-        'status': 'active',
-      },
-      {
-        'id': 'hw2',
-        'title': 'Geometry Worksheet — Triangles',
-        'description':
-            'Solve all problems on the printed worksheet and bring it to class.',
-        'classId': 'c1',
-        'className': 'Grade 8 — Section A',
-        'dueDate': 'Dec 9, 2024',
-        'totalMarks': 15,
-        'subject': 'Mathematics',
-        'submissions': ['s1', 's2', 's4', 's5'],
-        'totalStudents': 5,
-        'status': 'active',
-      },
-      {
-        'id': 'hw3',
-        'title': 'Fractions — Mixed Numbers',
-        'description':
-            'Practice adding and subtracting mixed fractions. Pages 44–46.',
-        'classId': 'c2',
-        'className': 'Grade 8 — Section B',
-        'dueDate': 'Dec 10, 2024',
-        'totalMarks': 10,
-        'subject': 'Mathematics',
-        'submissions': ['s6', 's7', 's8', 's9'],
-        'totalStudents': 6,
-        'status': 'active',
-      },
-      {
-        'id': 'hw4',
-        'title': 'Unit Test 2 Revision',
-        'description':
-            'Revise chapters 4 and 5. Focus on word problems and graphs.',
-        'classId': 'c3',
-        'className': 'Grade 7 — Section A',
-        'dueDate': 'Dec 8, 2024',
-        'totalMarks': 25,
-        'subject': 'Mathematics',
-        'submissions': ['s12', 's13', 's14', 's15'],
-        'totalStudents': 4,
-        'status': 'completed',
-      },
-    ];
-
     _shimmerController = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 1200))
       ..repeat();
@@ -317,7 +104,100 @@ class _TeacherDashboardState extends State<TeacherDashboard>
 
   Future<void> _loadUser() async {
     setState(() => isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 800));
+    try {
+      final uid = AuthRepository().currentUid ?? 'teacher_priya';
+
+      final user = await UserRepository().getUser(uid);
+      if (user != null) {
+        userName = user.name;
+        userEmail = user.email;
+      }
+
+      final classIds = user?.classIds ?? [];
+      if (classIds.isNotEmpty) {
+        final classModels = await ClassRepository().getClassesByIds(classIds);
+        _classes = classModels.map((c) => <String, dynamic>{
+          'classId': c.id,
+          'name': c.name,
+          'classCode': c.classCode,
+          'subject': c.subject,
+          'studentUids': c.studentUids,
+          'parentUids': c.parentUids,
+        }).toList();
+      }
+
+      if (_classes.isNotEmpty) {
+        final firstClassStudentUids =
+            List<String>.from(_classes.first['studentUids'] ?? []);
+        if (firstClassStudentUids.isNotEmpty) {
+          final studentModels =
+              await UserRepository().getUsersByIds(firstClassStudentUids);
+          _students = studentModels.map((s) => <String, dynamic>{
+            'uid': s.uid,
+            'name': s.name,
+            'email': s.email,
+          }).toList();
+        }
+      }
+
+      if (_classes.isNotEmpty) {
+        final gradeModels = await GradeRepository()
+            .fetchClassGrades(_classes.first['classId'] as String);
+        _grades = gradeModels.map((g) => <String, dynamic>{
+          'studentName': g.studentName,
+          'assessmentName': g.assessmentName,
+          'subject': g.subject,
+          'score': g.score,
+          'total': g.total,
+        }).toList();
+      }
+
+      final annModels = await AnnouncementRepository().fetchAll();
+      _announcements = annModels.map((a) => <String, dynamic>{
+        'title': a.title,
+        'body': a.body,
+        'audience': a.audience,
+        'createdByName': a.createdByName,
+      }).toList();
+
+      if (_classes.isNotEmpty) {
+        final firstClassParentUids =
+            List<String>.from(_classes.first['parentUids'] ?? []);
+        if (firstClassParentUids.isNotEmpty) {
+          final parentModels =
+              await UserRepository().getUsersByIds(firstClassParentUids);
+          _parents = parentModels.map((p) => <String, dynamic>{
+            'uid': p.uid,
+            'name': p.name,
+            'email': p.email,
+            'childName': p.children.isNotEmpty
+                ? (p.children.first['childName'] ?? '')
+                : '',
+          }).toList();
+        }
+      }
+
+      final hwModels = await HomeworkRepository().getByTeacher(uid);
+      _homework = hwModels.map((h) {
+        final classMatch = _classes.where((c) => c['classId'] == h.classId);
+        final totalStudents = classMatch.isNotEmpty
+            ? (classMatch.first['studentUids'] as List).length
+            : 0;
+        return <String, dynamic>{
+          'id': h.id,
+          'title': h.title,
+          'description': h.description,
+          'subject': h.subject,
+          'classId': h.classId,
+          'className': h.className,
+          'dueDate': h.dueDate,
+          'totalMarks': 0,
+          'submissions': h.submittedBy,
+          'totalStudents': totalStudents,
+          'status': 'active',
+        };
+      }).toList();
+    } catch (_) {}
     if (!mounted) return;
     setState(() => isLoading = false);
     _greetingController.forward();

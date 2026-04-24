@@ -1,8 +1,19 @@
 import 'dart:math' show min, max;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../models/announcement_model.dart';
+import '../../models/class_model.dart';
+import '../../models/grade_model.dart';
 import '../../models/student_model.dart';
+import '../../models/user_model.dart';
+import '../../models/user_role.dart';
+import '../../models/vote_model.dart';
+import '../../repositories/announcement_repository.dart';
 import '../../repositories/auth_repository.dart';
+import '../../repositories/class_repository.dart';
+import '../../repositories/grade_repository.dart';
+import '../../repositories/user_repository.dart';
+import '../../repositories/vote_repository.dart';
 import '../../services/class_service.dart';
 import '../../shared/theme/colors.dart';
 import '../../shared/widgets/add_student_sheet.dart';
@@ -53,128 +64,23 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
   late Animation<double> _greetingScale;
   late Animation<double> _tabFade;
 
-  final List<Map<String, dynamic>> gradesTrend = [
-    {'month': 'Aug', 'avg': 78.0},
-    {'month': 'Sep', 'avg': 81.0},
-    {'month': 'Oct', 'avg': 79.5},
-    {'month': 'Nov', 'avg': 85.0},
-    {'month': 'Dec', 'avg': 87.5},
-  ];
+  List<Map<String, dynamic>> gradesTrend = [];
 
-  final List<Map<String, dynamic>> teacherWorkload = [
-    {
-      'name': 'Mrs. Priya Sharma',
-      'subject': 'Mathematics',
-      'classes': 3,
-      'students': 95,
-      'submitted': 28,
-      'graded': 16,
-      'avatar': 'P',
-      'color': success
-    },
-    {
-      'name': 'Mr. Rahul Verma',
-      'subject': 'English',
-      'classes': 2,
-      'students': 60,
-      'submitted': 18,
-      'graded': 18,
-      'avatar': 'R',
-      'color': info
-    },
-    {
-      'name': 'Mrs. Kavita Nair',
-      'subject': 'Science',
-      'classes': 3,
-      'students': 90,
-      'submitted': 32,
-      'graded': 10,
-      'avatar': 'K',
-      'color': accent
-    },
-    {
-      'name': 'Mr. Suresh Pillai',
-      'subject': 'History',
-      'classes': 2,
-      'students': 55,
-      'submitted': 14,
-      'graded': 14,
-      'avatar': 'S',
-      'color': purple
-    },
-  ];
+  List<Map<String, dynamic>> teacherWorkload = [];
 
-  final List<Map<String, dynamic>> assignmentCompletion = [
-    {'class': 'Grade 7 - A', 'completed': 88, 'total': 100, 'color': success},
-    {'class': 'Grade 7 - B', 'completed': 72, 'total': 100, 'color': accent},
-    {'class': 'Grade 8 - A', 'completed': 91, 'total': 100, 'color': info},
-    {'class': 'Grade 8 - B', 'completed': 65, 'total': 100, 'color': danger},
-    {'class': 'Grade 9 - A', 'completed': 84, 'total': 100, 'color': purple},
-  ];
+  List<Map<String, dynamic>> assignmentCompletion = [];
 
-  final List<Map<String, dynamic>> attendanceTrend = [
-    {'month': 'Aug', 'rate': 94},
-    {'month': 'Sep', 'rate': 91},
-    {'month': 'Oct', 'rate': 88},
-    {'month': 'Nov', 'rate': 93},
-    {'month': 'Dec', 'rate': 90},
-  ];
+  List<Map<String, dynamic>> attendanceTrend = [];
 
-  final List<Map<String, dynamic>> subjectGrades = [
-    {'subject': 'Mathematics', 'avg': 87.0, 'color': success},
-    {'subject': 'English', 'avg': 82.5, 'color': info},
-    {'subject': 'Science', 'avg': 91.0, 'color': accent},
-    {'subject': 'History', 'avg': 78.5, 'color': purple},
-    {'subject': 'Sanskrit', 'avg': 85.0, 'color': danger},
-  ];
+  List<Map<String, dynamic>> subjectGrades = [];
 
-  final List<Map<String, dynamic>> parents = [
-    {
-      'name': 'Mr. Sharma',
-      'child': 'Arjun Sharma',
-      'class': 'Grade 8 - A',
-      'avatar': 'S',
-      'color': success,
-      'uid': 'parent_1',
-      'email': 'sharma@tatva.com'
-    },
-    {
-      'name': 'Mrs. Nair',
-      'child': 'Priya Nair',
-      'class': 'Grade 7 - B',
-      'avatar': 'N',
-      'color': info,
-      'uid': 'parent_2',
-      'email': 'nair@tatva.com'
-    },
-    {
-      'name': 'Mr. Mehta',
-      'child': 'Rohan Mehta',
-      'class': 'Grade 8 - A',
-      'avatar': 'M',
-      'color': purple,
-      'uid': 'parent_3',
-      'email': 'mehta@tatva.com'
-    },
-    {
-      'name': 'Mrs. Singh',
-      'child': 'Ananya Singh',
-      'class': 'Grade 9 - A',
-      'avatar': 'S',
-      'color': accent,
-      'uid': 'parent_4',
-      'email': 'singh@tatva.com'
-    },
-    {
-      'name': 'Mr. Patel',
-      'child': 'Vikram Patel',
-      'class': 'Grade 7 - B',
-      'avatar': 'P',
-      'color': danger,
-      'uid': 'parent_5',
-      'email': 'patel@tatva.com'
-    },
-  ];
+  List<Map<String, dynamic>> parents = [];
+  List<Map<String, dynamic>> demoVotes = [];
+
+  int _teacherCount = 0;
+  int _studentCount = 0;
+  int _classCount = 0;
+  List<AnnouncementModel> _announcementModels = [];
 
   @override
   void initState() {
@@ -217,13 +123,102 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
 
   Future<void> _loadUser() async {
     setState(() => isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 800));
+    try {
+      final uid = AuthRepository().currentUid ?? 'principal_anjali';
+
+      final user = await UserRepository().getUser(uid);
+      if (user != null) {
+        userName = user.name;
+        userEmail = user.email;
+      }
+
+      _teacherCount = await UserRepository().countByRole(UserRole.teacher);
+      _studentCount = await UserRepository().countByRole(UserRole.student);
+      final allClasses = await ClassRepository().getAllClasses();
+      _classCount = allClasses.length;
+
+      final teacherModels =
+          await UserRepository().getAllByRole(UserRole.teacher);
+      final _colors = [success, info, accent, purple, danger, primary];
+      teacherWorkload = teacherModels.asMap().entries.map((entry) {
+        final t = entry.value;
+        final teacherClasses =
+            allClasses.where((c) => c.teacherUid == t.uid).toList();
+        final studentCount = teacherClasses.fold<int>(
+            0, (sum, c) => sum + c.studentUids.length);
+        return {
+          'name': t.name,
+          'subject': teacherClasses.isNotEmpty
+              ? teacherClasses.first.subject
+              : 'N/A',
+          'classes': teacherClasses.length,
+          'students': studentCount,
+          'submitted': 0,
+          'graded': 0,
+          'avatar': t.name.isNotEmpty ? t.name[0] : '?',
+          'color': _colors[entry.key % _colors.length],
+        };
+      }).toList();
+
+      final parentModels =
+          await UserRepository().getAllByRole(UserRole.parent);
+      parents = parentModels.asMap().entries.map((entry) {
+        final p = entry.value;
+        return {
+          'name': p.name,
+          'email': p.email,
+          'child': p.children.isNotEmpty
+              ? p.children.first['childName'] ?? ''
+              : '',
+          'class': p.children.isNotEmpty
+              ? p.children.first['className'] ?? ''
+              : '',
+          'avatar': p.name.isNotEmpty ? p.name[0] : '?',
+          'color': _colors[entry.key % _colors.length],
+          'uid': p.uid,
+        };
+      }).toList();
+
+      final allGrades = await GradeRepository().fetchAll();
+      final subjectMap = <String, List<double>>{};
+      for (final g in allGrades) {
+        subjectMap.putIfAbsent(g.subject, () => []).add(g.percentage);
+      }
+      int colorIdx = 0;
+      subjectGrades = subjectMap.entries.map((e) {
+        final c = _colors[colorIdx % _colors.length];
+        colorIdx++;
+        return {
+          'subject': e.key,
+          'avg': e.value.isEmpty
+              ? 0.0
+              : e.value.reduce((a, b) => a + b) / e.value.length,
+          'color': c,
+        };
+      }).toList();
+
+      final annModels = await AnnouncementRepository().fetchAll();
+      _announcementModels = annModels;
+
+      final voteModels = await VoteRepository().fetchActive();
+      demoVotes = voteModels.map((v) {
+        return {
+          'id': v.id,
+          'question': v.question,
+          'type': v.type,
+          'votes': {
+            'school': v.votes.school,
+            'no_school': v.votes.noSchool,
+            'undecided': v.votes.undecided,
+          },
+          'total': v.votes.total,
+          'voters': v.voters,
+          'active': v.active,
+        };
+      }).toList();
+    } catch (_) {}
     if (!mounted) return;
-    setState(() {
-      userName = 'Dr. Anjali Nair';
-      userEmail = 'principal@tatva.edu';
-      isLoading = false;
-    });
+    setState(() => isLoading = false);
     _greetingController.forward();
     _tabController.forward();
   }
@@ -427,8 +422,19 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                 BouncyTap(
                   onTap: () async {
                     if (questionController.text.trim().isEmpty) return;
-                    // Demo: just show confirmation
+                    final uid =
+                        AuthRepository().currentUid ?? 'principal_anjali';
+                    await VoteRepository().create(VoteModel(
+                      id: '',
+                      question: questionController.text.trim(),
+                      type: selectedType.toLowerCase().replaceAll(' ', '_'),
+                      createdBy: uid,
+                      createdByName: userName,
+                      createdByRole: 'Principal',
+                    ));
+                    if (!context.mounted) return;
                     Navigator.pop(context);
+                    _loadUser();
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text('Vote sent to all parents!',
                           style: TextStyle(fontFamily: 'Raleway')),
@@ -623,8 +629,20 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                 BouncyTap(
                   onTap: () async {
                     if (titleController.text.trim().isEmpty) return;
-                    // Demo: just show confirmation
+                    final uid =
+                        AuthRepository().currentUid ?? 'principal_anjali';
+                    await AnnouncementRepository().post(AnnouncementModel(
+                      id: '',
+                      title: titleController.text.trim(),
+                      body: bodyController.text.trim(),
+                      audience: selectedAudience,
+                      createdBy: uid,
+                      createdByName: userName,
+                      createdByRole: 'Principal',
+                    ));
+                    if (!context.mounted) return;
                     Navigator.pop(context);
+                    _loadUser();
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text('Announcement sent to $selectedAudience!',
                           style: TextStyle(fontFamily: 'Raleway')),
@@ -845,9 +863,10 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
 
   // ─── OVERVIEW TAB ────────────────────────────────────────────────────────────
   Widget _buildOverviewTab() {
-    final schoolAvg =
-        subjectGrades.map((s) => s['avg'] as double).reduce((a, b) => a + b) /
-            subjectGrades.length;
+    final schoolAvg = subjectGrades.isNotEmpty
+        ? subjectGrades.map((s) => s['avg'] as double).reduce((a, b) => a + b) /
+            subjectGrades.length
+        : 0.0;
     return RefreshIndicator(
       color: purple,
       onRefresh: _loadUser,
@@ -872,13 +891,13 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                     child: FlipCard(
                         delayMs: 0,
                         child: _statCard(
-                            '4', 'Teachers', Icons.people_outline, primary))),
+                            '$_teacherCount', 'Teachers', Icons.people_outline, primary))),
                 SizedBox(width: 10),
                 Expanded(
                     child: FlipCard(
                         delayMs: 100,
                         child: _statCard(
-                            '260', 'Students', Icons.school_outlined, info))),
+                            '$_studentCount', 'Students', Icons.school_outlined, info))),
                 SizedBox(width: 10),
                 Expanded(
                     child: FlipCard(
@@ -894,20 +913,20 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                 Expanded(
                     child: FlipCard(
                         delayMs: 300,
-                        child: _statCard('91%', 'Attendance',
+                        child: _statCard('—', 'Attendance',
                             Icons.check_circle_outline, accent))),
                 SizedBox(width: 10),
                 Expanded(
                     child: FlipCard(
                         delayMs: 400,
                         child: _statCard(
-                            '10', 'Classes', Icons.class_outlined, purple))),
+                            '$_classCount', 'Classes', Icons.class_outlined, purple))),
                 SizedBox(width: 10),
                 Expanded(
                     child: FlipCard(
                         delayMs: 500,
                         child: _statCard(
-                            '41', 'Tasks', Icons.assignment_outlined, danger))),
+                            '—', 'Tasks', Icons.assignment_outlined, danger))),
               ]),
             ),
             SizedBox(height: 28),
@@ -1196,11 +1215,11 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
           FadeSlideIn(
             delayMs: 100,
             child: Row(children: [
-              Expanded(child: _miniStatCard('4', 'Teachers', primary)),
+              Expanded(child: _miniStatCard('$_teacherCount', 'Teachers', primary)),
               SizedBox(width: 10),
-              Expanded(child: _miniStatCard('10', 'Classes', info)),
+              Expanded(child: _miniStatCard('$_classCount', 'Classes', info)),
               SizedBox(width: 10),
-              Expanded(child: _miniStatCard('92', 'Submissions', accent)),
+              Expanded(child: _miniStatCard('—', 'Submissions', accent)),
             ]),
           ),
           SizedBox(height: 24),
@@ -1723,21 +1742,6 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
             delayMs: 100,
             child: Builder(
               builder: (context) {
-                // Demo vote data
-                final demoVotes = [
-                  {
-                    'type': 'Attendance',
-                    'question':
-                        'Should school remain open on Dec 24th (Christmas Eve)?',
-                    'votes': {'school': 14, 'no_school': 22, 'undecided': 6},
-                  },
-                  {
-                    'type': 'Event',
-                    'question':
-                        'Should we hold the Annual Sports Day on a weekend?',
-                    'votes': {'school': 31, 'no_school': 8, 'undecided': 3},
-                  },
-                ];
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -2082,7 +2086,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
           ...List.generate(4, (index) {
             final items = [
               [Icons.school_outlined, 'School', 'Tatva Academy'],
-              [Icons.people_outline, 'Staff', '4 Teachers'],
+              [Icons.people_outline, 'Staff', '$_teacherCount Teachers'],
               [
                 Icons.email_outlined,
                 'Email',
@@ -2254,11 +2258,11 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                   Container(height: 1, color: Colors.white.withOpacity(0.1)),
                   SizedBox(height: 16),
                   Row(children: [
-                    _greetingStatItem('4', 'Teachers'),
+                    _greetingStatItem('$_teacherCount', 'Teachers'),
                     _greetingDivider(),
-                    _greetingStatItem('260', 'Students'),
+                    _greetingStatItem('$_studentCount', 'Students'),
                     _greetingDivider(),
-                    _greetingStatItem('91%', 'Attendance'),
+                    _greetingStatItem('$_classCount', 'Classes'),
                   ]),
                 ],
               ),
@@ -2322,29 +2326,39 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
         ]),
       );
 
-  Widget _miniStatCard(String value, String label, Color color) => Container(
-        padding: EdgeInsets.all(14),
-        decoration: BoxDecoration(
-            color: color.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: color.withOpacity(0.15))),
-        child: Column(children: [
-          SlotNumber(
-              value: double.parse(value),
-              style: TextStyle(
-                  fontFamily: 'Raleway',
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: color)),
-          SizedBox(height: 2),
-          Text(label,
-              style: TextStyle(
-                  fontFamily: 'Raleway',
-                  fontSize: 11,
-                  color: color.withOpacity(0.7),
-                  fontWeight: FontWeight.w600)),
-        ]),
-      );
+  Widget _miniStatCard(String value, String label, Color color) {
+    final numValue = double.tryParse(value);
+    return Container(
+      padding: EdgeInsets.all(14),
+      decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withOpacity(0.15))),
+      child: Column(children: [
+        numValue != null
+            ? SlotNumber(
+                value: numValue,
+                style: TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: color))
+            : Text(value,
+                style: TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: color)),
+        SizedBox(height: 2),
+        Text(label,
+            style: TextStyle(
+                fontFamily: 'Raleway',
+                fontSize: 11,
+                color: color.withOpacity(0.7),
+                fontWeight: FontWeight.w600)),
+      ]),
+    );
+  }
 
   Widget _workloadStat(String value, String label, Color color) =>
       Column(children: [

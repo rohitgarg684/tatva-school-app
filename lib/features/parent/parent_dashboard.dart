@@ -6,6 +6,13 @@ import '../auth/welcome_screen.dart';
 import '../../shared/theme/colors.dart';
 import '../../shared/widgets/logout_sheet.dart';
 import '../../core/router/app_router.dart';
+import '../../repositories/auth_repository.dart';
+import '../../repositories/user_repository.dart';
+import '../../repositories/class_repository.dart';
+import '../../repositories/grade_repository.dart';
+import '../../repositories/announcement_repository.dart';
+import '../../repositories/vote_repository.dart';
+import '../../models/user_role.dart';
 
 class ParentDashboard extends StatefulWidget {
   const ParentDashboard({super.key});
@@ -31,89 +38,20 @@ class _ParentDashboardState extends State<ParentDashboard>
   static const Color info = TatvaColors.info;
   static const Color purple = TatvaColors.purple;
 
-  // ── FAKE DATA ──────────────────────────────────────────────────────────────
-  final String userName = 'Mr. Suresh Mehta';
-  final String userEmail = 'suresh.mehta@gmail.com';
-  final String childName = 'Arjun Mehta';
-  final String className = 'Grade 8 — Section A';
-  final String subject = 'Mathematics';
-  final String teacherName = 'Mrs. Priya Sharma';
-  final String teacherEmail = 'priya.sharma@tatva.edu';
-  final String classCode = 'MATH312';
+  String _currentUid = '';
+  String userName = '';
+  String userEmail = '';
+  String childName = '';
+  String className = '';
+  String subject = '';
+  String teacherName = '';
+  String teacherEmail = '';
+  String teacherUid = '';
+  String classCode = '';
 
-  final List<Map<String, dynamic>> _grades = [
-    {
-      'subject': 'Mathematics',
-      'assessmentName': 'Unit Test 3',
-      'score': 46.0,
-      'total': 50.0
-    },
-    {
-      'subject': 'Mathematics',
-      'assessmentName': 'Worksheet 5',
-      'score': 38.0,
-      'total': 40.0
-    },
-    {
-      'subject': 'Mathematics',
-      'assessmentName': 'Unit Test 2',
-      'score': 42.0,
-      'total': 50.0
-    },
-    {
-      'subject': 'Science',
-      'assessmentName': 'Lab Report',
-      'score': 39.0,
-      'total': 50.0
-    },
-    {
-      'subject': 'Science',
-      'assessmentName': 'Unit Test 2',
-      'score': 44.0,
-      'total': 50.0
-    },
-    {
-      'subject': 'English',
-      'assessmentName': 'Essay — Nature',
-      'score': 44.0,
-      'total': 50.0
-    },
-    {
-      'subject': 'English',
-      'assessmentName': 'Grammar Test',
-      'score': 36.0,
-      'total': 40.0
-    },
-  ];
-
-  final List<Map<String, dynamic>> _announcements = [
-    {
-      'title': 'Parent-Teacher Meeting — Dec 5',
-      'body':
-          'PTM scheduled from 10 AM – 1 PM. Please confirm your slot through the app.',
-      'by': 'Principal'
-    },
-    {
-      'title': 'Holiday Homework Uploaded',
-      'body':
-          'Winter break assignments are now live. Please ensure Arjun completes them before Jan 6.',
-      'by': 'Mrs. Priya Sharma'
-    },
-    {
-      'title': 'Sports Day — Dec 15',
-      'body':
-          'Annual Sports Day. Students must wear sports uniform. Water bottles are mandatory.',
-      'by': 'School Admin'
-    },
-  ];
-
-  final Map<String, dynamic> _vote = {
-    'question':
-        'Should we cancel school tomorrow due to heavy rainfall forecast?',
-    'type': 'Weather Day',
-    'votes': {'school': 15, 'no_school': 6, 'undecided': 2},
-    'myVote': null,
-  };
+  List<Map<String, dynamic>> _grades = [];
+  List<Map<String, dynamic>> _announcements = [];
+  List<Map<String, dynamic>> _activeVotes = [];
 
   late AnimationController _shimmerController;
   late AnimationController _greetingController;
@@ -162,7 +100,79 @@ class _ParentDashboardState extends State<ParentDashboard>
 
   Future<void> _loadData() async {
     setState(() => isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 800));
+    try {
+      final uid = AuthRepository().currentUid ?? 'parent_suresh';
+      _currentUid = uid;
+
+      final user = await UserRepository().getUser(uid);
+      if (user != null) {
+        userName = user.name;
+        userEmail = user.email;
+      }
+
+      if (user != null && user.children.isNotEmpty) {
+        final child = user.children.first;
+        childName = child['childName'] ?? '';
+        final classId = child['classId'] ?? '';
+        className = child['className'] ?? '';
+        subject = child['subject'] ?? '';
+        teacherName = child['teacherName'] ?? '';
+        teacherEmail = child['teacherEmail'] ?? '';
+        teacherUid = child['teacherUid'] ?? '';
+
+        if (classId.isNotEmpty) {
+          final cls = await ClassRepository().getClass(classId);
+          if (cls != null) {
+            classCode = cls.classCode;
+          }
+        }
+
+        final childUsers = await UserRepository().getAllByRole(UserRole.student);
+        final childUser = childUsers.where((u) => u.name == childName).toList();
+        String childUid = '';
+        if (childUser.isNotEmpty) {
+          childUid = childUser.first.uid;
+        }
+
+        if (childUid.isNotEmpty) {
+          final gradeModels =
+              await GradeRepository().fetchStudentGrades(childUid);
+          _grades = gradeModels
+              .map((g) => {
+                    'subject': g.subject,
+                    'assessmentName': g.assessmentName,
+                    'score': g.score,
+                    'total': g.total,
+                  })
+              .toList();
+        }
+      }
+
+      final annModels = await AnnouncementRepository().getForAudience('Parents');
+      _announcements = annModels
+          .map((a) => {
+                'title': a.title,
+                'body': a.body,
+                'by': a.createdByName,
+                'audience': a.audience,
+              })
+          .toList();
+
+      final voteModels = await VoteRepository().fetchActive();
+      _activeVotes = voteModels
+          .map((v) => {
+                'id': v.id,
+                'question': v.question,
+                'type': v.type,
+                'votes': {
+                  'school': v.votes.school,
+                  'no_school': v.votes.noSchool,
+                  'undecided': v.votes.undecided,
+                },
+                'myVote': v.voters.contains(uid) ? 'voted' : null,
+              })
+          .toList();
+    } catch (_) {}
     if (!mounted) return;
     setState(() => isLoading = false);
     _greetingController.forward();
@@ -191,14 +201,21 @@ class _ParentDashboardState extends State<ParentDashboard>
     _tabController.forward();
   }
 
-  void _castVote(String option) {
-    if (_vote['myVote'] != null) return;
+  void _castVote(int index, String option) async {
+    if (_activeVotes[index]['myVote'] != null) return;
+    final voteId = _activeVotes[index]['id'] as String;
     setState(() {
-      _vote['votes'][option] = (_vote['votes'][option] as int) + 1;
-      _vote['myVote'] = option;
+      (_activeVotes[index]['votes'] as Map<String, dynamic>)[option] =
+          ((_activeVotes[index]['votes'] as Map<String, dynamic>)[option]
+                  as int) +
+              1;
+      _activeVotes[index]['myVote'] = option;
     });
+    await VoteRepository()
+        .castVote(voteId: voteId, option: option, voterUid: _currentUid);
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: const Text('Vote submitted! ✅',
+      content: const Text('Vote submitted!',
           style: TextStyle(fontFamily: 'Raleway')),
       backgroundColor: success,
       behavior: SnackBarBehavior.floating,
@@ -231,7 +248,7 @@ class _ParentDashboardState extends State<ParentDashboard>
           CircleAvatar(
               radius: 36,
               backgroundColor: primary.withOpacity(0.1),
-              child: Text(teacherName[0],
+              child: Text(teacherName.isNotEmpty ? teacherName[0] : '?',
                   style: const TextStyle(
                       fontFamily: 'Raleway',
                       fontSize: 28,
@@ -330,7 +347,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                   context,
                   MaterialPageRoute(
                       builder: (_) => MessagingScreen(
-                            otherUserId: 'teacher1',
+                            otherUserId: teacherUid,
                             otherUserName: teacherName,
                             otherUserRole: 'Teacher',
                             otherUserEmail: teacherEmail,
@@ -524,7 +541,7 @@ class _ParentDashboardState extends State<ParentDashboard>
   Widget _homeTab() {
     double total = _grades.fold(0.0,
         (s, g) => s + (g['score'] as double) / (g['total'] as double) * 100);
-    final avg = total / _grades.length;
+    final avg = _grades.isEmpty ? 0.0 : total / _grades.length;
     return RefreshIndicator(
         color: purple,
         onRefresh: _loadData,
@@ -770,7 +787,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                           ])),
                       HeroAvatar(
                           heroTag: 'parent_avatar',
-                          initial: userName[0],
+                          initial: userName.isNotEmpty ? userName[0] : '?',
                           radius: 26,
                           bgColor: Colors.white.withOpacity(0.15),
                           textColor: Colors.white,
@@ -783,7 +800,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                       const SizedBox(width: 20),
                       _miniStat('${_grades.length}', 'Tests', Colors.white),
                       const SizedBox(width: 20),
-                      _miniStat('3', 'Subjects', Colors.white),
+                      _miniStat('${_grades.map((g) => g['subject']).toSet().length}', 'Subjects', Colors.white),
                     ]),
                   ])),
         ]),
@@ -813,7 +830,7 @@ class _ParentDashboardState extends State<ParentDashboard>
       bySubject.putIfAbsent(g['subject'], () => []).add(g);
     double total = _grades.fold(0.0,
         (s, g) => s + (g['score'] as double) / (g['total'] as double) * 100);
-    final overallAvg = total / _grades.length;
+    final overallAvg = _grades.isEmpty ? 0.0 : total / _grades.length;
     final colors = [info, success, accent, purple, danger];
 
     return SingleChildScrollView(
@@ -1037,12 +1054,6 @@ class _ParentDashboardState extends State<ParentDashboard>
 
   // ─── VOTE ──────────────────────────────────────────────────────────────────
   Widget _voteTab() {
-    final votes = _vote['votes'] as Map<String, dynamic>;
-    final total = (votes['school'] as int) +
-        (votes['no_school'] as int) +
-        (votes['undecided'] as int);
-    final myVote = _vote['myVote'] as String?;
-
     return SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1061,146 +1072,184 @@ class _ParentDashboardState extends State<ParentDashboard>
                   style: TextStyle(
                       fontFamily: 'Raleway', fontSize: 13, color: textLight))),
           const SizedBox(height: 24),
-          FadeSlideIn(
-              delayMs: 80,
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                    color: bgCard,
-                    borderRadius: BorderRadius.circular(18),
-                    border:
-                        Border.all(color: info.withOpacity(0.2), width: 1.5)),
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [
-                        Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                                color: info.withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(8)),
-                            child: Text(_vote['type'],
+          if (_activeVotes.isEmpty)
+            FadeSlideIn(
+                delayMs: 80,
+                child: Container(
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                      color: bgCard,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: Colors.grey.shade100)),
+                  child: Center(
+                      child: Column(children: [
+                    Icon(Icons.how_to_vote_outlined,
+                        color: textLight, size: 40),
+                    const SizedBox(height: 12),
+                    const Text('No active votes right now',
+                        style: TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 14,
+                            color: textLight)),
+                  ])),
+                ))
+          else
+            ..._activeVotes.asMap().entries.map((entry) {
+              final i = entry.key;
+              final voteData = entry.value;
+              final votes = voteData['votes'] as Map<String, dynamic>;
+              final total = (votes['school'] as int) +
+                  (votes['no_school'] as int) +
+                  (votes['undecided'] as int);
+              final myVote = voteData['myVote'] as String?;
+              return FadeSlideIn(
+                  delayMs: 80 + i * 60,
+                  child: Container(
+                    margin: EdgeInsets.only(
+                        bottom: i < _activeVotes.length - 1 ? 16 : 0),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                        color: bgCard,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                            color: info.withOpacity(0.2), width: 1.5)),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(children: [
+                            Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                    color: info.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(8)),
+                                child: Text(voteData['type'],
+                                    style: const TextStyle(
+                                        fontFamily: 'Raleway',
+                                        fontSize: 11,
+                                        color: info,
+                                        fontWeight: FontWeight.w700))),
+                            const Spacer(),
+                            Text('$total votes',
                                 style: const TextStyle(
                                     fontFamily: 'Raleway',
-                                    fontSize: 11,
-                                    color: info,
-                                    fontWeight: FontWeight.w700))),
-                        const Spacer(),
-                        Text('$total votes',
-                            style: const TextStyle(
-                                fontFamily: 'Raleway',
-                                fontSize: 12,
-                                color: textLight)),
-                      ]),
-                      const SizedBox(height: 14),
-                      Text(_vote['question'],
-                          style: const TextStyle(
-                              fontFamily: 'Raleway',
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: textDark,
-                              height: 1.4)),
-                      const SizedBox(height: 20),
-                      if (myVote == null)
-                        ...[
-                          'school',
-                          'no_school',
-                          'undecided'
-                        ].map((opt) => Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: GestureDetector(
-                                onTap: () => _castVote(opt),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 14, horizontal: 16),
-                                  decoration: BoxDecoration(
-                                      color: info.withOpacity(0.06),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                          color: info.withOpacity(0.2))),
-                                  child: Row(children: [
-                                    Icon(
-                                        opt == 'school'
-                                            ? Icons.school_outlined
-                                            : opt == 'no_school'
-                                                ? Icons.home_outlined
-                                                : Icons.help_outline_rounded,
-                                        color: info,
-                                        size: 18),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                        opt == 'school'
-                                            ? '🏫 School as usual'
-                                            : opt == 'no_school'
-                                                ? '🏠 No school tomorrow'
-                                                : '🤷 Undecided',
-                                        style: const TextStyle(
-                                            fontFamily: 'Raleway',
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                            color: textDark)),
-                                  ]),
-                                ))))
-                      else
-                        ...{
-                          '🏫 School': votes['school'] as int,
-                          '🏠 No School': votes['no_school'] as int,
-                          '🤷 Undecided': votes['undecided'] as int,
-                        }.entries.map((e) {
-                          final pct = total > 0 ? e.value / total : 0.0;
-                          final c =
-                              e.key.contains('School') && !e.key.contains('No')
+                                    fontSize: 12,
+                                    color: textLight)),
+                          ]),
+                          const SizedBox(height: 14),
+                          Text(voteData['question'],
+                              style: const TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: textDark,
+                                  height: 1.4)),
+                          const SizedBox(height: 20),
+                          if (myVote == null)
+                            ...[
+                              'school',
+                              'no_school',
+                              'undecided'
+                            ].map((opt) => Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: GestureDetector(
+                                    onTap: () => _castVote(i, opt),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 14, horizontal: 16),
+                                      decoration: BoxDecoration(
+                                          color: info.withOpacity(0.06),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          border: Border.all(
+                                              color: info.withOpacity(0.2))),
+                                      child: Row(children: [
+                                        Icon(
+                                            opt == 'school'
+                                                ? Icons.school_outlined
+                                                : opt == 'no_school'
+                                                    ? Icons.home_outlined
+                                                    : Icons
+                                                        .help_outline_rounded,
+                                            color: info,
+                                            size: 18),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                            opt == 'school'
+                                                ? '🏫 School as usual'
+                                                : opt == 'no_school'
+                                                    ? '🏠 No school tomorrow'
+                                                    : '🤷 Undecided',
+                                            style: const TextStyle(
+                                                fontFamily: 'Raleway',
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color: textDark)),
+                                      ]),
+                                    ))))
+                          else
+                            ...{
+                              '🏫 School': votes['school'] as int,
+                              '🏠 No School': votes['no_school'] as int,
+                              '🤷 Undecided': votes['undecided'] as int,
+                            }.entries.map((e) {
+                              final pct =
+                                  total > 0 ? e.value / total : 0.0;
+                              final c = e.key.contains('School') &&
+                                      !e.key.contains('No')
                                   ? success
                                   : e.key.contains('No')
                                       ? danger
                                       : accent;
-                          return Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: Row(children: [
-                                SizedBox(
-                                    width: 110,
-                                    child: Text(e.key,
-                                        style: const TextStyle(
+                              return Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: Row(children: [
+                                    SizedBox(
+                                        width: 110,
+                                        child: Text(e.key,
+                                            style: const TextStyle(
+                                                fontFamily: 'Raleway',
+                                                fontSize: 12,
+                                                color: textLight))),
+                                    Expanded(
+                                        child: AnimatedProgressBar(
+                                            value: pct,
+                                            color: c,
+                                            height: 6,
+                                            delayMs: 0)),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                        '${(pct * 100).toStringAsFixed(0)}%',
+                                        style: TextStyle(
                                             fontFamily: 'Raleway',
                                             fontSize: 12,
-                                            color: textLight))),
-                                Expanded(
-                                    child: AnimatedProgressBar(
-                                        value: pct,
-                                        color: c,
-                                        height: 6,
-                                        delayMs: 0)),
-                                const SizedBox(width: 8),
-                                Text('${(pct * 100).toStringAsFixed(0)}%',
+                                            color: c,
+                                            fontWeight: FontWeight.bold)),
+                                  ]));
+                            }),
+                          if (myVote != null)
+                            Container(
+                              margin: const EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                  color: success.withOpacity(0.08),
+                                  borderRadius: BorderRadius.circular(8)),
+                              child:
+                                  Row(mainAxisSize: MainAxisSize.min, children: [
+                                Icon(Icons.check_circle_outline,
+                                    color: success, size: 14),
+                                const SizedBox(width: 6),
+                                const Text('Your vote has been submitted',
                                     style: TextStyle(
                                         fontFamily: 'Raleway',
                                         fontSize: 12,
-                                        color: c,
-                                        fontWeight: FontWeight.bold)),
-                              ]));
-                        }),
-                      if (myVote != null)
-                        Container(
-                          margin: const EdgeInsets.only(top: 8),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                              color: success.withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(8)),
-                          child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            Icon(Icons.check_circle_outline,
-                                color: success, size: 14),
-                            const SizedBox(width: 6),
-                            const Text('Your vote has been submitted',
-                                style: TextStyle(
-                                    fontFamily: 'Raleway',
-                                    fontSize: 12,
-                                    color: success))
-                          ]),
-                        ),
-                    ]),
-              )),
+                                        color: success))
+                              ]),
+                            ),
+                        ]),
+                  ));
+            }),
         ]));
   }
 
@@ -1213,7 +1262,7 @@ class _ParentDashboardState extends State<ParentDashboard>
           FadeSlideIn(
               child: HeroAvatar(
                   heroTag: 'parent_avatar',
-                  initial: userName[0],
+                  initial: userName.isNotEmpty ? userName[0] : '?',
                   radius: 46,
                   bgColor: purple.withOpacity(0.1),
                   textColor: purple,
@@ -1267,7 +1316,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                     CircleAvatar(
                         radius: 22,
                         backgroundColor: primary.withOpacity(0.1),
-                        child: Text(teacherName[0],
+                        child: Text(teacherName.isNotEmpty ? teacherName[0] : '?',
                             style: const TextStyle(
                                 fontFamily: 'Raleway',
                                 fontSize: 16,

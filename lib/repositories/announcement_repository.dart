@@ -20,4 +20,33 @@ class AnnouncementRepository extends BaseRepository {
         .limit(limit)
         .snapshots();
   }
+
+  Future<List<AnnouncementModel>> fetchAll({int limit = 20}) async {
+    try {
+      final snap = await _announcements
+          .orderBy('createdAt', descending: true)
+          .limit(limit)
+          .get();
+      return snap.docs
+          .map((d) => AnnouncementModel.fromFirestore(d))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<List<AnnouncementModel>> getForAudience(String audience,
+      {int limit = 20}) async {
+    try {
+      final all = await fetchAll(limit: 50);
+      return all
+          .where((a) =>
+              a.audience == 'Everyone' ||
+              a.audience == audience)
+          .take(limit)
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
 }
