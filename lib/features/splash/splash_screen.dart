@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../shared/animations/animations.dart';
-import '../auth/welcome_screen.dart';
+import '../../models/user_role.dart';
+import '../../repositories/user_repository.dart';
+import '../../core/router/app_router.dart';
+import '../auth/login_screen.dart';
 import '../onboarding/onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -94,10 +98,26 @@ class _SplashScreenState extends State<SplashScreen>
     final onboardingDone = prefs.getBool('onboarding_done') ?? false;
     if (!mounted) return;
 
-    final destination = onboardingDone
-        ? const WelcomeScreen()
-        : const OnboardingScreen();
+    if (!onboardingDone) {
+      _pushFade(const OnboardingScreen());
+      return;
+    }
 
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser != null) {
+      try {
+        final userDoc = await UserRepository().getUser(firebaseUser.uid);
+        if (userDoc != null && mounted) {
+          AppRouter.toDashboardAndClearStack(context, userDoc.role);
+          return;
+        }
+      } catch (_) {}
+    }
+
+    if (mounted) _pushFade(const LoginScreen());
+  }
+
+  void _pushFade(Widget destination) {
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(

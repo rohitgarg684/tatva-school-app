@@ -395,6 +395,28 @@ class _LoginScreenState extends State<LoginScreen>
                         ],
                       ),
                       SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text("Don't have an account?",
+                              style: TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 13,
+                                  color: textMuted)),
+                          TextButton(
+                            onPressed: () => AppRouter.toRegisterReplacement(context),
+                            style: TextButton.styleFrom(
+                                padding: EdgeInsets.only(left: 4)),
+                            child: Text('Register',
+                                style: TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 13,
+                                    color: accentLight,
+                                    fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 8),
                       Center(
                           child: Text('v1.0.0',
                               style: TextStyle(

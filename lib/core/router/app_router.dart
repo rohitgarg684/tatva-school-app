@@ -3,7 +3,6 @@ import '../../models/user_role.dart';
 import '../../shared/animations/animations.dart';
 import '../factory/dashboard_factory.dart';
 import '../../features/splash/splash_screen.dart';
-import '../../features/auth/welcome_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/register_screen.dart';
 import '../../features/messaging/messaging_screen.dart';
@@ -21,7 +20,7 @@ class AppRouter {
   static void toWelcomeAndClearStack(BuildContext context) {
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
       (route) => false,
     );
   }

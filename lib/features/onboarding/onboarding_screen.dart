@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../auth/welcome_screen.dart';
+import '../auth/login_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -76,7 +76,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('onboarding_done', true);
     Navigator.pushReplacement(
-        context, MaterialPageRoute(builder: (_) => WelcomeScreen()));
+        context, MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
   @override
