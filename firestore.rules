@@ -20,10 +20,6 @@ service cloud.firestore {
       return isSignedIn() && userRole() == 'Principal';
     }
 
-    function isTeacher() {
-      return isSignedIn() && userRole() == 'Teacher';
-    }
-
     function isTeacherOrPrincipal() {
       return isSignedIn() && userRole() in ['Teacher', 'Principal'];
     }
@@ -34,6 +30,14 @@ service cloud.firestore {
       allow create: if isOwner(userId);
       allow update: if isOwner(userId) || isPrincipal();
       allow delete: if isPrincipal();
+
+      // Notifications sub-collection
+      match /notifications/{notifId} {
+        allow read: if isOwner(userId);
+        allow create: if isSignedIn();
+        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
     }
 
     // ── Students (record-only, no auth) ─────────────────────────────
@@ -84,12 +88,67 @@ service cloud.firestore {
       allow delete: if isTeacherOrPrincipal();
     }
 
-    // ── Messages ─────────────────────────────────────────────────────
+    // ── Messages (1:1) ──────────────────────────────────────────────
     match /messages/{messageId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if false;
       allow delete: if false;
+    }
+
+    // ── Behavior Points ─────────────────────────────────────────────
+    match /behavior_points/{pointId} {
+      allow read: if isSignedIn();
+      allow create: if isTeacherOrPrincipal();
+      allow update: if false;
+      allow delete: if isTeacherOrPrincipal();
+    }
+
+    // ── Attendance ──────────────────────────────────────────────────
+    match /attendance/{recordId} {
+      allow read: if isSignedIn();
+      allow create: if isTeacherOrPrincipal();
+      allow update: if isTeacherOrPrincipal();
+      allow delete: if isPrincipal();
+    }
+
+    // ── Stories (Class Story / Photo Sharing) ───────────────────────
+    match /stories/{storyId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isTeacherOrPrincipal();
+    }
+
+    // ── Activity Feed ───────────────────────────────────────────────
+    match /activities/{eventId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if false;
+      allow delete: if isPrincipal();
+    }
+
+    // ── Group Conversations ─────────────────────────────────────────
+    match /group_conversations/{groupId} {
+      allow read: if isSignedIn();
+      allow create: if isTeacherOrPrincipal();
+      allow update: if isSignedIn();
+      allow delete: if isPrincipal();
+
+      match /messages/{msgId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update: if false;
+        allow delete: if false;
+      }
+    }
+
+    // ── Beyond School Content ───────────────────────────────────────
+    match /content/{itemId} {
+      allow read: if isSignedIn();
+      allow create: if isPrincipal();
+      allow update: if isSignedIn();
+      allow delete: if isPrincipal();
     }
   }
 }

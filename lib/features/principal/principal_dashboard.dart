@@ -10,6 +10,8 @@ import '../../repositories/auth_repository.dart';
 import '../../services/dashboard_service.dart';
 import '../../services/announcement_service.dart';
 import '../../services/vote_service.dart';
+import '../../models/activity_event.dart';
+import '../../services/report_service.dart';
 import '../../models/audience.dart';
 import '../../services/class_service.dart';
 import '../../shared/theme/colors.dart';
@@ -74,6 +76,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
   Map<String, double> _subjectAverages = {};
   List<AnnouncementModel> _announcementModels = [];
   List<VoteModel> _voteModels = [];
+  List<ActivityEvent> _activityFeed = [];
 
   @override
   void initState() {
@@ -129,6 +132,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
       _subjectAverages = data.subjectAverages;
       _announcementModels = data.announcements;
       _voteModels = data.activeVotes;
+      _activityFeed = data.activityFeed;
     } catch (_) {}
     if (!mounted) return;
     setState(() => isLoading = false);
@@ -657,6 +661,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
           index: _currentTab,
           children: [
             _buildOverviewTab(),
+            _buildActivityTab(),
             _buildGradeTrendsTab(),
             _buildTeacherWorkloadTab(),
             _buildStudentsTab(),
@@ -674,6 +679,11 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
         'icon': Icons.dashboard_outlined,
         'activeIcon': Icons.dashboard_rounded,
         'label': 'Overview'
+      },
+      {
+        'icon': Icons.timeline_outlined,
+        'activeIcon': Icons.timeline_rounded,
+        'label': 'Activity'
       },
       {
         'icon': Icons.show_chart_outlined,
@@ -823,8 +833,13 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                 Expanded(
                     child: FlipCard(
                         delayMs: 300,
-                        child: _statCard('—', 'Attendance',
-                            Icons.check_circle_outline, accent))),
+                        child: GestureDetector(
+                            onTap: () => _switchTab(1),
+                            child: _statCard(
+                                '${_activityFeed.length}',
+                                'Activity',
+                                Icons.timeline_rounded,
+                                accent)))),
                 SizedBox(width: 10),
                 Expanded(
                     child: FlipCard(
@@ -935,10 +950,331 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                 ),
               );
             }),
+            SizedBox(height: 28),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Text('School Reports',
+                  style: TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: textDark,
+                      letterSpacing: -0.3)),
+            ),
+            SizedBox(height: 12),
+            FadeSlideIn(
+              delayMs: 300,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: BouncyTap(
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(
+                          'Reports feature ready — select a student to generate.',
+                          style: TextStyle(fontFamily: 'Raleway')),
+                      backgroundColor: purple,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ));
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                        color: bgCard,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: purple.withOpacity(0.2))),
+                    child: Row(children: [
+                      Container(
+                          padding: EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                              color: purple.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12)),
+                          child: Icon(Icons.summarize_rounded,
+                              color: purple, size: 22)),
+                      SizedBox(width: 16),
+                      Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                            Text('Generate Reports',
+                                style: TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: textDark)),
+                            SizedBox(height: 2),
+                            Text(
+                                'Weekly student reports with CSV export',
+                                style: TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 12,
+                                    color: textLight)),
+                          ])),
+                      Icon(Icons.arrow_forward_ios_rounded,
+                          color: textLight, size: 16),
+                    ]),
+                  ),
+                ),
+              ),
+            ),
             SizedBox(height: 24),
           ],
         ),
       ),
+    );
+  }
+
+  // ─── ACTIVITY TAB ────────────────────────────────────────────────────────────
+  String _timeAgo(DateTime? dt) {
+    if (dt == null) return '';
+    final diff = DateTime.now().difference(dt);
+    if (diff.inSeconds < 60) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${(diff.inDays / 7).floor()}w ago';
+  }
+
+  IconData _activityIcon(ActivityType type) {
+    switch (type) {
+      case ActivityType.behaviorPoint:
+        return Icons.star_rounded;
+      case ActivityType.attendance:
+        return Icons.check_circle_rounded;
+      case ActivityType.homeworkAssigned:
+      case ActivityType.homeworkSubmitted:
+        return Icons.assignment_rounded;
+      case ActivityType.gradeEntered:
+        return Icons.grade_rounded;
+      case ActivityType.announcement:
+        return Icons.campaign_rounded;
+      case ActivityType.storyPost:
+        return Icons.photo_camera_rounded;
+      case ActivityType.voteCreated:
+        return Icons.how_to_vote_rounded;
+      case ActivityType.studentEnrolled:
+        return Icons.person_add_rounded;
+    }
+  }
+
+  Color _activityColor(ActivityType type) {
+    switch (type) {
+      case ActivityType.behaviorPoint:
+        return success;
+      case ActivityType.attendance:
+        return info;
+      case ActivityType.homeworkAssigned:
+      case ActivityType.homeworkSubmitted:
+        return purple;
+      case ActivityType.gradeEntered:
+        return accent;
+      case ActivityType.announcement:
+        return primary;
+      case ActivityType.storyPost:
+        return Color(0xFF00897B);
+      case ActivityType.voteCreated:
+        return purple;
+      case ActivityType.studentEnrolled:
+        return info;
+    }
+  }
+
+  Widget _buildActivityTab() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(20, 24, 20, 0),
+          child: FadeSlideIn(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Activity Feed',
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: textDark,
+                        letterSpacing: -0.8)),
+                SizedBox(height: 4),
+                Text('School-wide events and updates',
+                    style: TextStyle(
+                        fontFamily: 'Raleway', fontSize: 13, color: textLight)),
+              ],
+            ),
+          ),
+        ),
+        SizedBox(height: 20),
+        Expanded(
+          child: _activityFeed.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(40),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.timeline_outlined,
+                            color: textLight, size: 48),
+                        SizedBox(height: 12),
+                        Text('No recent activity',
+                            style: TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 15,
+                                color: textLight)),
+                        SizedBox(height: 6),
+                        Text('Events will appear here as they happen',
+                            style: TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 12,
+                                color: textLight)),
+                      ],
+                    ),
+                  ),
+                )
+              : RefreshIndicator(
+                  color: purple,
+                  onRefresh: _loadUser,
+                  child: ListView.builder(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: _activityFeed.length,
+                    itemBuilder: (_, index) {
+                      final event = _activityFeed[index];
+                      final color = _activityColor(event.type);
+                      final icon = _activityIcon(event.type);
+                      final isLast = index == _activityFeed.length - 1;
+                      return StaggeredItem(
+                        index: index,
+                        child: IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(
+                                width: 40,
+                                child: Column(
+                                  children: [
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                          color: color.withOpacity(0.12),
+                                          borderRadius:
+                                              BorderRadius.circular(10)),
+                                      child:
+                                          Icon(icon, color: color, size: 18),
+                                    ),
+                                    if (!isLast)
+                                      Expanded(
+                                        child: Container(
+                                          width: 2,
+                                          margin:
+                                              EdgeInsets.symmetric(vertical: 4),
+                                          color: Colors.grey.shade200,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Container(
+                                  margin: EdgeInsets.only(bottom: 16),
+                                  padding: EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                      color: bgCard,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                          color: Colors.grey.shade100)),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(children: [
+                                        Expanded(
+                                          child: Row(children: [
+                                            Text(event.actorName,
+                                                style: TextStyle(
+                                                    fontFamily: 'Raleway',
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: textDark)),
+                                            SizedBox(width: 6),
+                                            if (event.actorRole.isNotEmpty)
+                                              Container(
+                                                padding: EdgeInsets.symmetric(
+                                                    horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                    color:
+                                                        color.withOpacity(0.1),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            4)),
+                                                child: Text(event.actorRole,
+                                                    style: TextStyle(
+                                                        fontFamily: 'Raleway',
+                                                        fontSize: 9,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        color: color)),
+                                              ),
+                                          ]),
+                                        ),
+                                        Text(_timeAgo(event.createdAt),
+                                            style: TextStyle(
+                                                fontFamily: 'Raleway',
+                                                fontSize: 10,
+                                                color: textLight)),
+                                      ]),
+                                      SizedBox(height: 4),
+                                      Row(children: [
+                                        Container(
+                                          padding: EdgeInsets.symmetric(
+                                              horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                              color: color.withOpacity(0.08),
+                                              borderRadius:
+                                                  BorderRadius.circular(4)),
+                                          child: Text(event.type.label,
+                                              style: TextStyle(
+                                                  fontFamily: 'Raleway',
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: color)),
+                                        ),
+                                      ]),
+                                      SizedBox(height: 6),
+                                      Text(event.title,
+                                          style: TextStyle(
+                                              fontFamily: 'Raleway',
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: textDark,
+                                              height: 1.3)),
+                                      if (event.body.isNotEmpty) ...[
+                                        SizedBox(height: 4),
+                                        Text(event.body,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                                fontFamily: 'Raleway',
+                                                fontSize: 12,
+                                                color: textMid,
+                                                height: 1.4)),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+        ),
+      ],
     );
   }
 

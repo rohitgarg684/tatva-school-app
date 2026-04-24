@@ -15,6 +15,13 @@ import '../../models/announcement_model.dart';
 import '../../models/homework_model.dart';
 import '../../models/vote_model.dart';
 import '../../models/class_model.dart';
+import '../../models/behavior_point.dart';
+import '../../models/behavior_category.dart';
+import '../../models/attendance_record.dart';
+import '../../models/attendance_status.dart';
+import '../../models/story_post.dart';
+import '../../models/activity_event.dart';
+import '../../models/content_item.dart';
 
 class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
@@ -51,6 +58,12 @@ class _StudentDashboardState extends State<StudentDashboard>
   List<HomeworkModel> _homework = [];
   List<VoteModel> _activeVotes = [];
   final Set<String> _completedIds = {};
+  List<BehaviorPoint> _behaviorPoints = [];
+  int _behaviorScore = 0;
+  List<AttendanceRecord> _attendance = [];
+  List<StoryPost> _storyPosts = [];
+  List<ActivityEvent> _activityFeed = [];
+  List<ContentItem> _contentItems = [];
 
   // ── ANIMATIONS ─────────────────────────────────────────────────────────────
   late AnimationController _shimmerController;
@@ -113,6 +126,12 @@ class _StudentDashboardState extends State<StudentDashboard>
       _announcements = data.announcements;
       _homework = data.homework;
       _activeVotes = data.activeVotes;
+      _behaviorPoints = data.behaviorPoints;
+      _behaviorScore = data.behaviorScore;
+      _attendance = data.attendance;
+      _storyPosts = data.storyPosts;
+      _activityFeed = data.activityFeed;
+      _contentItems = data.contentItems;
       _completedIds.clear();
       for (final hw in _homework) {
         if (hw.isSubmittedBy(_uid)) _completedIds.add(hw.id);
@@ -239,6 +258,8 @@ class _StudentDashboardState extends State<StudentDashboard>
         _buildHomeTab(),
         _buildHomeworkTab(),
         _buildGradesTab(),
+        _buildStoryTab(),
+        _buildLearnTab(),
         _buildProfileTab(),
       ]),
     ));
@@ -260,6 +281,16 @@ class _StudentDashboardState extends State<StudentDashboard>
         'icon': Icons.bar_chart_outlined,
         'activeIcon': Icons.bar_chart_rounded,
         'label': 'Grades'
+      },
+      {
+        'icon': Icons.auto_stories_outlined,
+        'activeIcon': Icons.auto_stories_rounded,
+        'label': 'Story'
+      },
+      {
+        'icon': Icons.lightbulb_outline_rounded,
+        'activeIcon': Icons.lightbulb_rounded,
+        'label': 'Learn'
       },
       {
         'icon': Icons.person_outline_rounded,
@@ -430,6 +461,163 @@ class _StudentDashboardState extends State<StudentDashboard>
                 )),
             const SizedBox(height: 20),
           ],
+          // ── Behavior Points ──
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                  color: bgCard,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: accent.withOpacity(0.2))),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                          color: accent.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10)),
+                      child: const Icon(Icons.star_rounded, color: accent, size: 18)),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                      child: Text('Behavior Points',
+                          style: TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: textDark))),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                        color: _behaviorScore >= 0
+                            ? success.withOpacity(0.1)
+                            : danger.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.star_rounded,
+                          size: 14,
+                          color: _behaviorScore >= 0 ? success : danger),
+                      const SizedBox(width: 4),
+                      Text('$_behaviorScore pts',
+                          style: TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: _behaviorScore >= 0 ? success : danger)),
+                    ]),
+                  ),
+                ]),
+                if (_behaviorPoints.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  ...(_behaviorPoints.length > 3
+                          ? _behaviorPoints.sublist(0, 3)
+                          : _behaviorPoints)
+                      .map((bp) {
+                    final cat = BehaviorCategory.fromId(bp.categoryId);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(children: [
+                        Text(cat.icon, style: const TextStyle(fontSize: 14)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                              Text(cat.name,
+                                  style: const TextStyle(
+                                      fontFamily: 'Raleway',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: textDark)),
+                              if (bp.note.isNotEmpty)
+                                Text(bp.note,
+                                    style: const TextStyle(
+                                        fontFamily: 'Raleway',
+                                        fontSize: 11,
+                                        color: textLight)),
+                            ])),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                              color: bp.isPositive
+                                  ? success.withOpacity(0.1)
+                                  : danger.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8)),
+                          child: Text(
+                              '${bp.isPositive ? '+' : '-'}${bp.points}',
+                              style: TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: bp.isPositive ? success : danger)),
+                        ),
+                      ]),
+                    );
+                  }),
+                ],
+              ]),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // ── Attendance Summary ──
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                  color: bgCard,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: info.withOpacity(0.2))),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                          color: info.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10)),
+                      child: const Icon(Icons.calendar_today_rounded,
+                          color: info, size: 16)),
+                  const SizedBox(width: 10),
+                  const Text('Attendance',
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: textDark)),
+                ]),
+                const SizedBox(height: 14),
+                Builder(builder: (_) {
+                  final presentCount = _attendance
+                      .where((r) => r.status == AttendanceStatus.present)
+                      .length;
+                  final absentCount = _attendance
+                      .where((r) => r.status == AttendanceStatus.absent)
+                      .length;
+                  final tardyCount = _attendance
+                      .where((r) => r.status == AttendanceStatus.tardy)
+                      .length;
+                  return Row(children: [
+                    _attendanceStat(
+                        '${AttendanceStatus.present.emoji} Present',
+                        '$presentCount',
+                        success),
+                    const SizedBox(width: 10),
+                    _attendanceStat(
+                        '${AttendanceStatus.absent.emoji} Absent',
+                        '$absentCount',
+                        danger),
+                    const SizedBox(width: 10),
+                    _attendanceStat(
+                        '${AttendanceStatus.tardy.emoji} Tardy',
+                        '$tardyCount',
+                        accent),
+                  ]);
+                }),
+              ]),
+            ),
+          ),
+          const SizedBox(height: 24),
           Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: const Text('Announcements',
@@ -478,6 +666,27 @@ class _StudentDashboardState extends State<StudentDashboard>
                   fontSize: 10,
                   color: textLight,
                   height: 1.3)),
+        ]),
+      ));
+
+  Widget _attendanceStat(String label, String value, Color color) => Expanded(
+          child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+            color: color.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(12)),
+        child: Column(children: [
+          Text(value,
+              style: TextStyle(
+                  fontFamily: 'Raleway',
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: color)),
+          const SizedBox(height: 4),
+          Text(label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  fontFamily: 'Raleway', fontSize: 11, color: textMid)),
         ]),
       ));
 
@@ -1353,6 +1562,329 @@ class _StudentDashboardState extends State<StudentDashboard>
         const SizedBox(height: 24),
       ]),
     );
+  }
+
+  // ─── STORY TAB ─────────────────────────────────────────────────────────────
+  Widget _buildStoryTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const SizedBox(height: 8),
+        FadeSlideIn(
+            child: const Text('Class Story',
+                style: TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: textDark,
+                    letterSpacing: -0.8))),
+        const SizedBox(height: 4),
+        FadeSlideIn(
+            delayMs: 60,
+            child: Text('${_storyPosts.length} posts from your class',
+                style: const TextStyle(
+                    fontFamily: 'Raleway', fontSize: 13, color: textLight))),
+        const SizedBox(height: 20),
+        if (_storyPosts.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              child: Column(children: [
+                Icon(Icons.auto_stories_outlined,
+                    size: 48, color: textLight.withOpacity(0.4)),
+                const SizedBox(height: 12),
+                const Text('No stories yet',
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: textLight)),
+              ]),
+            ),
+          )
+        else
+          ...List.generate(_storyPosts.length, (i) {
+            final post = _storyPosts[i];
+            final timeAgo = _formatTimeAgo(post.createdAt);
+            return StaggeredItem(
+              index: i,
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                    color: bgCard,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade100)),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        CircleAvatar(
+                            radius: 18,
+                            backgroundColor: info.withOpacity(0.1),
+                            child: Text(
+                                post.authorName.isNotEmpty
+                                    ? post.authorName[0]
+                                    : '?',
+                                style: const TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: info))),
+                        const SizedBox(width: 10),
+                        Expanded(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                              Text(post.authorName,
+                                  style: const TextStyle(
+                                      fontFamily: 'Raleway',
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: textDark)),
+                              Row(children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                      color: purple.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(4)),
+                                  child: Text(post.authorRole,
+                                      style: const TextStyle(
+                                          fontFamily: 'Raleway',
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          color: purple)),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(timeAgo,
+                                    style: const TextStyle(
+                                        fontFamily: 'Raleway',
+                                        fontSize: 10,
+                                        color: textLight)),
+                              ]),
+                            ])),
+                      ]),
+                      const SizedBox(height: 12),
+                      Text(post.text,
+                          style: const TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 13,
+                              color: textMid,
+                              height: 1.5)),
+                      if (post.mediaUrls.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          height: 140,
+                          decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(12)),
+                          child: Center(
+                              child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                const Icon(Icons.photo_library_outlined,
+                                    color: textLight, size: 18),
+                                const SizedBox(width: 6),
+                                Text('${post.mediaUrls.length} photo${post.mediaUrls.length > 1 ? 's' : ''}',
+                                    style: const TextStyle(
+                                        fontFamily: 'Raleway',
+                                        fontSize: 12,
+                                        color: textLight)),
+                              ])),
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      Row(children: [
+                        Icon(
+                            post.isLikedBy(_uid)
+                                ? Icons.favorite_rounded
+                                : Icons.favorite_border_rounded,
+                            size: 16,
+                            color: post.isLikedBy(_uid) ? danger : textLight),
+                        const SizedBox(width: 4),
+                        Text('${post.likeCount}',
+                            style: const TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: textMid)),
+                      ]),
+                    ]),
+              ),
+            );
+          }),
+        const SizedBox(height: 24),
+      ]),
+    );
+  }
+
+  // ─── LEARN TAB ────────────────────────────────────────────────────────────
+  Widget _buildLearnTab() {
+    final Map<String, List<ContentItem>> byCategory = {};
+    for (final item in _contentItems) {
+      final key = '${item.category.emoji} ${item.category.label}';
+      byCategory.putIfAbsent(key, () => []).add(item);
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const SizedBox(height: 8),
+        FadeSlideIn(
+            child: const Text('Beyond School',
+                style: TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: textDark,
+                    letterSpacing: -0.8))),
+        const SizedBox(height: 4),
+        FadeSlideIn(
+            delayMs: 60,
+            child: const Text('Big ideas & extra learning',
+                style: TextStyle(
+                    fontFamily: 'Raleway', fontSize: 13, color: textLight))),
+        const SizedBox(height: 20),
+        if (_contentItems.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              child: Column(children: [
+                Icon(Icons.lightbulb_outline_rounded,
+                    size: 48, color: textLight.withOpacity(0.4)),
+                const SizedBox(height: 12),
+                const Text('No content yet',
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: textLight)),
+              ]),
+            ),
+          )
+        else
+          ...byCategory.entries.toList().asMap().entries.map((entry) {
+            final catIdx = entry.key;
+            final catLabel = entry.value.key;
+            final items = entry.value.value;
+            return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (catIdx > 0) const SizedBox(height: 20),
+                  StaggeredItem(
+                    index: catIdx,
+                    child: Text(catLabel,
+                        style: const TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: textDark)),
+                  ),
+                  const SizedBox(height: 10),
+                  ...items.asMap().entries.map((itemEntry) {
+                    final ci = itemEntry.value;
+                    final completed = ci.isCompletedBy(_uid);
+                    return StaggeredItem(
+                      index: catIdx * 10 + itemEntry.key,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                            color: bgCard,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                                color: completed
+                                    ? success.withOpacity(0.2)
+                                    : Colors.grey.shade100)),
+                        child: Row(children: [
+                          Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                  color: completed
+                                      ? success.withOpacity(0.08)
+                                      : info.withOpacity(0.08),
+                                  borderRadius: BorderRadius.circular(10)),
+                              child: Icon(
+                                  completed
+                                      ? Icons.check_circle_rounded
+                                      : Icons.play_circle_outline_rounded,
+                                  color: completed ? success : info,
+                                  size: 20)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                Text(ci.title,
+                                    style: TextStyle(
+                                        fontFamily: 'Raleway',
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: textDark,
+                                        decoration: completed
+                                            ? TextDecoration.lineThrough
+                                            : null,
+                                        decorationColor: textLight)),
+                                if (ci.description.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 3),
+                                    child: Text(ci.description,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                            fontFamily: 'Raleway',
+                                            fontSize: 11,
+                                            color: textMid,
+                                            height: 1.4)),
+                                  ),
+                                const SizedBox(height: 4),
+                                Row(children: [
+                                  const Icon(Icons.schedule_rounded,
+                                      size: 11, color: textLight),
+                                  const SizedBox(width: 4),
+                                  Text(ci.duration,
+                                      style: const TextStyle(
+                                          fontFamily: 'Raleway',
+                                          fontSize: 10,
+                                          color: textLight)),
+                                  if (completed) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                          color: success.withOpacity(0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(4)),
+                                      child: const Text('Completed',
+                                          style: TextStyle(
+                                              fontFamily: 'Raleway',
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w700,
+                                              color: success)),
+                                    ),
+                                  ],
+                                ]),
+                              ])),
+                        ]),
+                      ),
+                    );
+                  }),
+                ]);
+          }),
+        const SizedBox(height: 24),
+      ]),
+    );
+  }
+
+  String _formatTimeAgo(DateTime dateTime) {
+    final diff = DateTime.now().difference(dateTime);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${(diff.inDays / 7).floor()}w ago';
   }
 
   // ─── GREETING CARD ─────────────────────────────────────────────────────────

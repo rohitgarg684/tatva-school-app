@@ -19,6 +19,11 @@ class SeedService {
     await _seedAnnouncements();
     await _seedVotes();
     await _seedMessages();
+    await _seedBehaviorPoints();
+    await _seedAttendance();
+    await _seedStoryPosts();
+    await _seedActivityFeed();
+    await _seedContent();
   }
 
   // ─── USERS ─────────────────────────────────────────────────────────────────
@@ -615,6 +620,136 @@ class SeedService {
           DateTime(2026, 4, 23, 9, 0 + i * 2),
         ),
       });
+    }
+    await batch.commit();
+  }
+
+  // ─── BEHAVIOR POINTS ───────────────────────────────────────────────────────
+
+  Future<void> _seedBehaviorPoints() async {
+    final col = _db.collection('behavior_points');
+    final snap = await col.limit(1).get();
+    if (snap.docs.isNotEmpty) return;
+
+    final points = [
+      {'studentUid': 'student_arjun', 'studentName': 'Arjun Mehta', 'classId': 'class_math_5a', 'categoryId': 'teamwork', 'points': 1, 'awardedBy': 'teacher_priya', 'awardedByName': 'Priya Sharma', 'note': 'Great collaboration on group project'},
+      {'studentUid': 'student_arjun', 'studentName': 'Arjun Mehta', 'classId': 'class_math_5a', 'categoryId': 'hard_work', 'points': 1, 'awardedBy': 'teacher_priya', 'awardedByName': 'Priya Sharma', 'note': 'Extra practice problems completed'},
+      {'studentUid': 'student_arjun', 'studentName': 'Arjun Mehta', 'classId': 'class_math_5a', 'categoryId': 'participation', 'points': 1, 'awardedBy': 'teacher_priya', 'awardedByName': 'Priya Sharma', 'note': ''},
+      {'studentUid': 'student_arjun', 'studentName': 'Arjun Mehta', 'classId': 'class_math_5a', 'categoryId': 'off_task', 'points': -1, 'awardedBy': 'teacher_priya', 'awardedByName': 'Priya Sharma', 'note': 'Using phone during class'},
+      {'studentUid': 'student_neha', 'studentName': 'Neha Patel', 'classId': 'class_math_5a', 'categoryId': 'helping', 'points': 1, 'awardedBy': 'teacher_priya', 'awardedByName': 'Priya Sharma', 'note': 'Helped classmate with homework'},
+      {'studentUid': 'student_neha', 'studentName': 'Neha Patel', 'classId': 'class_math_5a', 'categoryId': 'respect', 'points': 1, 'awardedBy': 'teacher_priya', 'awardedByName': 'Priya Sharma', 'note': ''},
+      {'studentUid': 'student_neha', 'studentName': 'Neha Patel', 'classId': 'class_math_5a', 'categoryId': 'creativity', 'points': 1, 'awardedBy': 'teacher_priya', 'awardedByName': 'Priya Sharma', 'note': 'Creative approach to math problem'},
+      {'studentUid': 'student_ravi', 'studentName': 'Ravi Kumar', 'classId': 'class_sci_5a', 'categoryId': 'leadership', 'points': 1, 'awardedBy': 'teacher_amit', 'awardedByName': 'Amit Verma', 'note': 'Led the science experiment group'},
+      {'studentUid': 'student_ravi', 'studentName': 'Ravi Kumar', 'classId': 'class_sci_5a', 'categoryId': 'participation', 'points': 1, 'awardedBy': 'teacher_amit', 'awardedByName': 'Amit Verma', 'note': ''},
+      {'studentUid': 'student_ananya', 'studentName': 'Ananya Reddy', 'classId': 'class_eng_5a', 'categoryId': 'kindness', 'points': 1, 'awardedBy': 'teacher_sneha', 'awardedByName': 'Sneha Reddy', 'note': 'Shared supplies with new student'},
+    ];
+
+    final batch = _db.batch();
+    for (final p in points) {
+      batch.set(col.doc(), {...p, 'createdAt': FieldValue.serverTimestamp()});
+    }
+    await batch.commit();
+  }
+
+  // ─── ATTENDANCE ────────────────────────────────────────────────────────────
+
+  Future<void> _seedAttendance() async {
+    final col = _db.collection('attendance');
+    final snap = await col.limit(1).get();
+    if (snap.docs.isNotEmpty) return;
+
+    final today = DateTime.now();
+    final students = ['student_arjun', 'student_neha', 'student_ravi', 'student_ananya', 'student_vikram'];
+    final names = ['Arjun Mehta', 'Neha Patel', 'Ravi Kumar', 'Ananya Reddy', 'Vikram Singh'];
+    final statuses = ['Present', 'Present', 'Present', 'Tardy', 'Absent'];
+
+    for (int day = 0; day < 5; day++) {
+      final date = today.subtract(Duration(days: day));
+      final dateStr = date.toIso8601String().substring(0, 10);
+      final batch = _db.batch();
+      for (int i = 0; i < students.length; i++) {
+        final docId = '${students[i]}_$dateStr';
+        final status = day == 0 ? statuses[i] : 'Present';
+        batch.set(col.doc(docId), {
+          'studentUid': students[i],
+          'studentName': names[i],
+          'classId': 'class_math_5a',
+          'date': dateStr,
+          'status': status,
+          'markedBy': 'teacher_priya',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+      await batch.commit();
+    }
+  }
+
+  // ─── STORY POSTS ──────────────────────────────────────────────────────────
+
+  Future<void> _seedStoryPosts() async {
+    final col = _db.collection('stories');
+    final snap = await col.limit(1).get();
+    if (snap.docs.isNotEmpty) return;
+
+    final posts = [
+      {'authorUid': 'teacher_priya', 'authorName': 'Priya Sharma', 'authorRole': 'Teacher', 'classId': 'class_math_5a', 'className': 'Mathematics 5A', 'text': 'Our class did an amazing job on the fractions project today! So proud of everyone\'s teamwork. 🎉', 'mediaUrls': <String>[], 'mediaType': 'none', 'likedBy': ['parent_suresh', 'parent_meena'], 'commentCount': 3},
+      {'authorUid': 'teacher_amit', 'authorName': 'Amit Verma', 'authorRole': 'Teacher', 'classId': 'class_sci_5a', 'className': 'Science 5A', 'text': 'Science experiment day! Students explored chemical reactions with baking soda and vinegar. The excitement was contagious! 🧪', 'mediaUrls': <String>[], 'mediaType': 'none', 'likedBy': ['parent_geeta', 'parent_rajesh'], 'commentCount': 5},
+      {'authorUid': 'teacher_sneha', 'authorName': 'Sneha Reddy', 'authorRole': 'Teacher', 'classId': 'class_eng_5a', 'className': 'English 5A', 'text': 'Creative writing showcase! Students wrote their own short stories. Some truly talented authors in our class. 📚✨', 'mediaUrls': <String>[], 'mediaType': 'none', 'likedBy': ['parent_suresh'], 'commentCount': 2},
+      {'authorUid': 'student_arjun', 'authorName': 'Arjun Mehta', 'authorRole': 'Student', 'classId': 'class_math_5a', 'className': 'Mathematics 5A', 'text': 'Finished my math project! Learned how fractions work in real life when cooking. 🍳', 'mediaUrls': <String>[], 'mediaType': 'none', 'likedBy': ['teacher_priya', 'student_neha'], 'commentCount': 1},
+    ];
+
+    final batch = _db.batch();
+    for (final p in posts) {
+      batch.set(col.doc(), {...p, 'createdAt': FieldValue.serverTimestamp()});
+    }
+    await batch.commit();
+  }
+
+  // ─── ACTIVITY FEED ────────────────────────────────────────────────────────
+
+  Future<void> _seedActivityFeed() async {
+    final col = _db.collection('activities');
+    final snap = await col.limit(1).get();
+    if (snap.docs.isNotEmpty) return;
+
+    final events = [
+      {'type': 'behaviorPoint', 'actorUid': 'teacher_priya', 'actorName': 'Priya Sharma', 'actorRole': 'Teacher', 'targetUid': 'student_arjun', 'classId': 'class_math_5a', 'title': '+1 Teamwork', 'body': 'Priya Sharma gave Arjun Mehta a point for Teamwork', 'metadata': {}},
+      {'type': 'attendance', 'actorUid': 'teacher_priya', 'actorName': 'Priya Sharma', 'actorRole': 'Teacher', 'targetUid': '', 'classId': 'class_math_5a', 'title': 'Attendance marked: 4/5 present', 'body': 'Priya Sharma marked attendance for today', 'metadata': {}},
+      {'type': 'homeworkAssigned', 'actorUid': 'teacher_priya', 'actorName': 'Priya Sharma', 'actorRole': 'Teacher', 'targetUid': '', 'classId': 'class_math_5a', 'title': 'New homework: Fractions Worksheet', 'body': 'Due Dec 20, 2024', 'metadata': {}},
+      {'type': 'storyPost', 'actorUid': 'teacher_priya', 'actorName': 'Priya Sharma', 'actorRole': 'Teacher', 'targetUid': '', 'classId': 'class_math_5a', 'title': 'New story post in Mathematics 5A', 'body': 'Our class did an amazing job on the fractions project today!', 'metadata': {}},
+      {'type': 'gradeEntered', 'actorUid': 'teacher_priya', 'actorName': 'Priya Sharma', 'actorRole': 'Teacher', 'targetUid': 'student_arjun', 'classId': 'class_math_5a', 'title': 'Grade entered: Mid Term Exam', 'body': 'Arjun Mehta scored 85/100 in Mathematics', 'metadata': {}},
+      {'type': 'announcement', 'actorUid': 'principal_anjali', 'actorName': 'Dr. Anjali Desai', 'actorRole': 'Principal', 'targetUid': '', 'classId': '', 'title': 'Annual Day Celebration', 'body': 'Mark your calendars for the Annual Day celebration!', 'metadata': {}},
+      {'type': 'studentEnrolled', 'actorUid': 'teacher_priya', 'actorName': 'Priya Sharma', 'actorRole': 'Teacher', 'targetUid': 'student_vikram', 'classId': 'class_math_5a', 'title': 'New student enrolled', 'body': 'Vikram Singh joined Mathematics 5A', 'metadata': {}},
+    ];
+
+    final batch = _db.batch();
+    for (final e in events) {
+      batch.set(col.doc(), {...e, 'createdAt': FieldValue.serverTimestamp()});
+    }
+    await batch.commit();
+  }
+
+  // ─── BEYOND SCHOOL CONTENT ────────────────────────────────────────────────
+
+  Future<void> _seedContent() async {
+    final col = _db.collection('content');
+    final snap = await col.limit(1).get();
+    if (snap.docs.isNotEmpty) return;
+
+    final items = [
+      {'title': 'Breathing Buddies', 'description': 'Learn a simple breathing exercise to help you feel calm and focused before tests or when you feel stressed.', 'category': 'mindfulness', 'videoUrl': '', 'thumbnailUrl': '', 'duration': '5 min', 'ageGroup': 'All', 'viewCount': 45, 'completedBy': ['student_arjun']},
+      {'title': 'The Power of Yet', 'description': 'Discover how adding the word "yet" can change your mindset. You can\'t do it... yet!', 'category': 'growthMindset', 'videoUrl': '', 'thumbnailUrl': '', 'duration': '7 min', 'ageGroup': 'All', 'viewCount': 62, 'completedBy': ['student_arjun', 'student_neha']},
+      {'title': 'Walking in Someone Else\'s Shoes', 'description': 'An interactive story that helps you understand how others feel and why empathy matters.', 'category': 'empathy', 'videoUrl': '', 'thumbnailUrl': '', 'duration': '8 min', 'ageGroup': 'All', 'viewCount': 38, 'completedBy': []},
+      {'title': 'Gratitude Journal', 'description': 'Start a daily gratitude practice. Write down three things you are thankful for each day.', 'category': 'gratitude', 'videoUrl': '', 'thumbnailUrl': '', 'duration': '4 min', 'ageGroup': 'All', 'viewCount': 51, 'completedBy': ['student_neha']},
+      {'title': 'The Marshmallow Challenge', 'description': 'Can you wait for a bigger reward? Learn about patience and perseverance through fun experiments.', 'category': 'perseverance', 'videoUrl': '', 'thumbnailUrl': '', 'duration': '6 min', 'ageGroup': 'All', 'viewCount': 29, 'completedBy': []},
+      {'title': 'Team Tower Building', 'description': 'Work together to build the tallest tower! Learn what makes teams successful.', 'category': 'teamwork', 'videoUrl': '', 'thumbnailUrl': '', 'duration': '10 min', 'ageGroup': 'All', 'viewCount': 73, 'completedBy': ['student_arjun', 'student_ravi']},
+      {'title': 'Imagine & Create', 'description': 'Let your imagination run wild! Draw, write, or build something that doesn\'t exist yet.', 'category': 'creativity', 'videoUrl': '', 'thumbnailUrl': '', 'duration': '12 min', 'ageGroup': 'All', 'viewCount': 41, 'completedBy': ['student_ananya']},
+      {'title': 'Being a Good Citizen', 'description': 'Learn about responsibility at home, in school, and in your community.', 'category': 'responsibility', 'videoUrl': '', 'thumbnailUrl': '', 'duration': '6 min', 'ageGroup': 'All', 'viewCount': 33, 'completedBy': []},
+    ];
+
+    final batch = _db.batch();
+    for (final item in items) {
+      batch.set(col.doc(), {...item, 'createdAt': FieldValue.serverTimestamp()});
     }
     await batch.commit();
   }

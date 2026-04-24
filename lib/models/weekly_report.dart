@@ -1,0 +1,43 @@
+/// In-memory model for weekly parent reports (not stored in Firestore).
+/// Generated on-demand by ReportService.
+class WeeklyReport {
+  final String studentName;
+  final String className;
+  final String weekLabel;
+  final int behaviorPointsTotal;
+  final int positivePoints;
+  final int negativePoints;
+  final Map<String, int> topCategories;
+  final int daysPresent;
+  final int daysAbsent;
+  final int daysTardy;
+  final int totalSchoolDays;
+  final int homeworkCompleted;
+  final int homeworkTotal;
+  final double gradeAverage;
+  final List<String> teacherNotes;
+
+  const WeeklyReport({
+    required this.studentName,
+    required this.className,
+    required this.weekLabel,
+    this.behaviorPointsTotal = 0,
+    this.positivePoints = 0,
+    this.negativePoints = 0,
+    this.topCategories = const {},
+    this.daysPresent = 0,
+    this.daysAbsent = 0,
+    this.daysTardy = 0,
+    this.totalSchoolDays = 5,
+    this.homeworkCompleted = 0,
+    this.homeworkTotal = 0,
+    this.gradeAverage = 0.0,
+    this.teacherNotes = const [],
+  });
+
+  double get attendanceRate =>
+      totalSchoolDays > 0 ? daysPresent / totalSchoolDays * 100 : 0;
+
+  double get homeworkCompletionRate =>
+      homeworkTotal > 0 ? homeworkCompleted / homeworkTotal * 100 : 0;
+}

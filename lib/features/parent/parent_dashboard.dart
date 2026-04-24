@@ -9,12 +9,22 @@ import '../../core/router/app_router.dart';
 import '../../repositories/auth_repository.dart';
 import '../../services/dashboard_service.dart';
 import '../../services/vote_service.dart';
+import '../../services/attendance_service.dart';
+import '../../services/report_service.dart';
 import '../../models/user_model.dart';
 import '../../models/class_model.dart';
 import '../../models/grade_model.dart';
 import '../../models/announcement_model.dart';
 import '../../models/vote_model.dart';
 import '../../models/child_info.dart';
+import '../../models/behavior_point.dart';
+import '../../models/behavior_category.dart';
+import '../../models/attendance_record.dart';
+import '../../models/attendance_status.dart';
+import '../../models/story_post.dart';
+import '../../models/activity_event.dart';
+import '../../models/content_item.dart';
+import '../../models/weekly_report.dart';
 
 class ParentDashboard extends StatefulWidget {
   const ParentDashboard({super.key});
@@ -45,10 +55,11 @@ class _ParentDashboardState extends State<ParentDashboard>
   String _uid = '';
 
   UserModel? _user;
-  ChildInfo? _childInfo;
-  ClassModel? _childClass;
-  String _childUid = '';
-  List<GradeModel> _grades = [];
+  int _selectedChildIndex = 0;
+  List<ChildDashboardData> _childrenData = [];
+  List<StoryPost> _storyPosts = [];
+  List<ActivityEvent> _activityFeed = [];
+  List<ContentItem> _contentItems = [];
   List<AnnouncementModel> _announcements = [];
   List<VoteModel> _activeVotes = [];
 
@@ -103,13 +114,14 @@ class _ParentDashboardState extends State<ParentDashboard>
       _uid = AuthRepository().currentUid ?? 'parent_suresh';
       final data = await _dashSvc.loadParentDashboard(overrideUid: _uid);
       _user = data.user;
-      _childClass = data.childClass;
-      _childUid = data.childUid;
-      _grades = data.childGrades;
+      _childrenData = data.childrenData;
       _announcements = data.announcements;
       _activeVotes = data.activeVotes;
-      if (_user != null && _user!.children.isNotEmpty) {
-        _childInfo = _user!.children.first;
+      _storyPosts = data.storyPosts;
+      _activityFeed = data.activityFeed;
+      _contentItems = data.contentItems;
+      if (_selectedChildIndex >= _childrenData.length) {
+        _selectedChildIndex = 0;
       }
     } catch (_) {}
     if (!mounted) return;
@@ -155,14 +167,18 @@ class _ParentDashboardState extends State<ParentDashboard>
     ));
   }
 
+  ChildDashboardData? get _currentChild =>
+      _childrenData.isNotEmpty ? _childrenData[_selectedChildIndex] : null;
+
   // ── TEACHER PROFILE SHEET ──────────────────────────────────────────────────
   void _showTeacherProfile() {
-    final tName = _childInfo?.teacherName ?? '';
-    final tEmail = _childInfo?.teacherEmail ?? '';
-    final tUid = _childInfo?.teacherUid ?? '';
-    final subj = _childInfo?.subject ?? '';
-    final cls = _childInfo?.className ?? '';
-    final code = _childClass?.classCode ?? '';
+    final child = _currentChild;
+    final tName = child?.info.teacherName ?? '';
+    final tEmail = child?.info.teacherEmail ?? '';
+    final tUid = child?.info.teacherUid ?? '';
+    final subj = child?.info.subject ?? '';
+    final cls = child?.info.className ?? '';
+    final code = child?.childClass?.classCode ?? '';
     HapticFeedback.lightImpact();
     showModalBottomSheet(
       context: context,
@@ -386,6 +402,8 @@ class _ParentDashboardState extends State<ParentDashboard>
           child: IndexedStack(index: _currentTab, children: [
             _homeTab(),
             _progressTab(),
+            _buildBehaviorTab(),
+            _storyTab(),
             _voteTab(),
             _profileTab(),
           ])));
@@ -401,6 +419,16 @@ class _ParentDashboardState extends State<ParentDashboard>
         'icon': Icons.bar_chart_outlined,
         'active': Icons.bar_chart_rounded,
         'label': 'Progress'
+      },
+      {
+        'icon': Icons.emoji_events_outlined,
+        'active': Icons.emoji_events_rounded,
+        'label': 'Behavior'
+      },
+      {
+        'icon': Icons.auto_stories_outlined,
+        'active': Icons.auto_stories_rounded,
+        'label': 'Story'
       },
       {
         'icon': Icons.how_to_vote_outlined,
@@ -475,11 +503,56 @@ class _ParentDashboardState extends State<ParentDashboard>
                 })))));
   }
 
+  Widget _childSwitcher() {
+    if (_childrenData.length <= 1) return const SizedBox.shrink();
+    return Container(
+      height: 48,
+      margin: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _childrenData.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, i) {
+          final isActive = i == _selectedChildIndex;
+          final name = _childrenData[i].info.childName;
+          return GestureDetector(
+            onTap: () {
+              if (i == _selectedChildIndex) return;
+              HapticFeedback.selectionClick();
+              setState(() => _selectedChildIndex = i);
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              decoration: BoxDecoration(
+                color: isActive ? purple : bgCard,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                    color: isActive ? purple : Colors.grey.shade200),
+              ),
+              child: Text(name,
+                  style: TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: isActive ? Colors.white : textMid)),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   // ─── HOME ──────────────────────────────────────────────────────────────────
   Widget _homeTab() {
-    double total = _grades.fold(
+    final child = _currentChild;
+    final grades = child?.grades ?? [];
+    double total = grades.fold(
         0.0, (s, g) => s + (g.total > 0 ? g.score / g.total * 100 : 0.0));
-    final avg = _grades.isEmpty ? 0.0 : total / _grades.length;
+    final avg = grades.isEmpty ? 0.0 : total / grades.length;
+    final attSummary = child != null
+        ? AttendanceService().computeSummary(child.attendance)
+        : (present: 0, absent: 0, tardy: 0, total: 0);
     return RefreshIndicator(
         color: purple,
         onRefresh: _loadData,
@@ -493,8 +566,8 @@ class _ParentDashboardState extends State<ParentDashboard>
                     position: _greetingSlide,
                     child: ScaleTransition(
                         scale: _greetingScale, child: _greetingCard(avg)))),
+            _childSwitcher(),
             const SizedBox(height: 20),
-            // Class card with tappable teacher name
             Container(
                 margin: const EdgeInsets.symmetric(horizontal: 20),
                 padding: const EdgeInsets.all(16),
@@ -508,7 +581,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                       Row(children: [
                         Icon(Icons.class_outlined, color: purple, size: 15),
                         const SizedBox(width: 6),
-                        Text("${_childInfo?.childName ?? ''}'s Class",
+                        Text("${child?.info.childName ?? ''}'s Class",
                             style: const TextStyle(
                                 fontFamily: 'Raleway',
                                 fontSize: 12,
@@ -521,25 +594,24 @@ class _ParentDashboardState extends State<ParentDashboard>
                             child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                              Text(_childInfo?.className ?? '',
+                              Text(child?.info.className ?? '',
                                   style: const TextStyle(
                                       fontFamily: 'Raleway',
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                       color: textDark)),
                               const SizedBox(height: 4),
-                              // Tappable teacher name
                               GestureDetector(
                                 onTap: _showTeacherProfile,
                                 child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Text('${_childInfo?.subject ?? ''} · ',
+                                      Text('${child?.info.subject ?? ''} · ',
                                           style: const TextStyle(
                                               fontFamily: 'Raleway',
                                               fontSize: 12,
                                               color: textLight)),
-                                      Text(_childInfo?.teacherName ?? '',
+                                      Text(child?.info.teacherName ?? '',
                                           style: const TextStyle(
                                               fontFamily: 'Raleway',
                                               fontSize: 12,
@@ -562,7 +634,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                                 borderRadius: BorderRadius.circular(10),
                                 border:
                                     Border.all(color: accent.withOpacity(0.3))),
-                            child: Text(_childClass?.classCode ?? '',
+                            child: Text(child?.childClass?.classCode ?? '',
                                 style: const TextStyle(
                                     fontFamily: 'Raleway',
                                     fontSize: 13,
@@ -572,7 +644,104 @@ class _ParentDashboardState extends State<ParentDashboard>
                       ]),
                     ])),
             const SizedBox(height: 16),
-            // Quick actions
+            // Attendance summary
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                    color: bgCard,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade100)),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        Icon(Icons.calendar_today_rounded,
+                            color: info, size: 15),
+                        const SizedBox(width: 6),
+                        const Text('Attendance',
+                            style: TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 12,
+                                color: info,
+                                fontWeight: FontWeight.w700)),
+                      ]),
+                      const SizedBox(height: 12),
+                      Row(children: [
+                        _attChip('${attSummary.present}', 'Present', success),
+                        const SizedBox(width: 10),
+                        _attChip('${attSummary.absent}', 'Absent', danger),
+                        const SizedBox(width: 10),
+                        _attChip('${attSummary.tardy}', 'Tardy', accent),
+                        const Spacer(),
+                        if (attSummary.total > 0)
+                          Text(
+                              '${(attSummary.present / attSummary.total * 100).toStringAsFixed(0)}%',
+                              style: const TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: success)),
+                      ]),
+                    ]),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Behavior score
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                    color: bgCard,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade100)),
+                child: Row(children: [
+                  Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                          color: purple.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12)),
+                      child: const Icon(Icons.star_rounded,
+                          color: purple, size: 22)),
+                  const SizedBox(width: 14),
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        const Text('Behavior Score',
+                            style: TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 12,
+                                color: textLight)),
+                        const SizedBox(height: 2),
+                        Text('${child?.behaviorScore ?? 0} points',
+                            style: const TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: textDark)),
+                      ])),
+                  GestureDetector(
+                    onTap: () => _switchTab(2),
+                    child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                            color: purple.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(10)),
+                        child: const Text('Details',
+                            style: TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 12,
+                                color: purple,
+                                fontWeight: FontWeight.w600))),
+                  ),
+                ]),
+              ),
+            ),
+            const SizedBox(height: 16),
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(children: [
@@ -583,7 +752,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                       () => _switchTab(1)),
                   const SizedBox(width: 8),
                   _qaBtn('Cast\nVote', Icons.how_to_vote_outlined, accent,
-                      () => _switchTab(2)),
+                      () => _switchTab(4)),
                 ])),
             const SizedBox(height: 24),
             Padding(
@@ -651,7 +820,25 @@ class _ParentDashboardState extends State<ParentDashboard>
         ));
   }
 
+  Widget _attChip(String val, String label, Color color) => Column(children: [
+        Text(val,
+            style: TextStyle(
+                fontFamily: 'Raleway',
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: color)),
+        Text(label,
+            style: const TextStyle(
+                fontFamily: 'Raleway', fontSize: 10, color: textLight)),
+      ]);
+
   Widget _greetingCard(double avg) {
+    final child = _currentChild;
+    final grades = child?.grades ?? [];
+    final childNames = _childrenData.map((c) => c.info.childName).toList();
+    final parentOfLabel = childNames.length <= 1
+        ? 'Parent of ${childNames.isNotEmpty ? childNames.first : ''}'
+        : 'Parent of ${childNames.join(' & ')}';
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       child: WaveCard(
@@ -717,7 +904,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                                     letterSpacing: -0.5,
                                     height: 1.1)),
                             const SizedBox(height: 4),
-                            Text('Parent of ${_childInfo?.childName ?? ''}',
+                            Text(parentOfLabel,
                                 style: TextStyle(
                                     fontFamily: 'Raleway',
                                     fontSize: 12,
@@ -736,9 +923,9 @@ class _ParentDashboardState extends State<ParentDashboard>
                       _miniStat(
                           '${avg.toStringAsFixed(0)}%', 'Avg Grade', accent),
                       const SizedBox(width: 20),
-                      _miniStat('${_grades.length}', 'Tests', Colors.white),
+                      _miniStat('${grades.length}', 'Tests', Colors.white),
                       const SizedBox(width: 20),
-                      _miniStat('${_grades.map((g) => g.subject).toSet().length}', 'Subjects', Colors.white),
+                      _miniStat('${grades.map((g) => g.subject).toSet().length}', 'Subjects', Colors.white),
                     ]),
                   ])),
         ]),
@@ -763,12 +950,14 @@ class _ParentDashboardState extends State<ParentDashboard>
 
   // ─── PROGRESS ──────────────────────────────────────────────────────────────
   Widget _progressTab() {
+    final child = _currentChild;
+    final grades = child?.grades ?? [];
     final bySubject = <String, List<GradeModel>>{};
-    for (final g in _grades)
+    for (final g in grades)
       bySubject.putIfAbsent(g.subject, () => []).add(g);
-    double total = _grades.fold(
+    double total = grades.fold(
         0.0, (s, g) => s + (g.total > 0 ? g.score / g.total * 100 : 0.0));
-    final overallAvg = _grades.isEmpty ? 0.0 : total / _grades.length;
+    final overallAvg = grades.isEmpty ? 0.0 : total / grades.length;
     final colors = [info, success, accent, purple, danger];
 
     return SingleChildScrollView(
@@ -776,7 +965,7 @@ class _ParentDashboardState extends State<ParentDashboard>
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const SizedBox(height: 8),
           FadeSlideIn(
-              child: Text("${_childInfo?.childName ?? ''}'s Progress",
+              child: Text("${child?.info.childName ?? ''}'s Progress",
                   style: const TextStyle(
                       fontFamily: 'Raleway',
                       fontSize: 28,
@@ -845,7 +1034,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                           ]),
                       const Spacer(),
                       Column(children: [
-                        Text('${_grades.length}',
+                        Text('${grades.length}',
                             style: const TextStyle(
                                 fontFamily: 'Raleway',
                                 fontSize: 28,
@@ -985,6 +1174,400 @@ class _ParentDashboardState extends State<ParentDashboard>
                   ]),
                 ));
           }),
+        ]));
+  }
+
+  // ─── BEHAVIOR ────────────────────────────────────────────────────────────
+  Widget _buildBehaviorTab() {
+    final child = _currentChild;
+    final points = child?.behaviorPoints ?? [];
+    final score = child?.behaviorScore ?? 0;
+
+    final catSummary = <String, int>{};
+    for (final p in points) {
+      catSummary[p.categoryId] = (catSummary[p.categoryId] ?? 0) + p.points;
+    }
+    final sortedCats = catSummary.entries.toList()
+      ..sort((a, b) => b.value.abs().compareTo(a.value.abs()));
+
+    return SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const SizedBox(height: 8),
+          FadeSlideIn(
+              child: Text("${child?.info.childName ?? ''}'s Behavior",
+                  style: const TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: textDark,
+                      letterSpacing: -0.8))),
+          FadeSlideIn(
+              delayMs: 60,
+              child: const Text('Tracking positive & constructive moments',
+                  style: TextStyle(
+                      fontFamily: 'Raleway', fontSize: 13, color: textLight))),
+          const SizedBox(height: 20),
+          FadeSlideIn(
+              delayMs: 80,
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                        colors: score >= 0
+                            ? [const Color(0xFF6A1B9A), const Color(0xFFAB47BC)]
+                            : [danger.withOpacity(0.8), danger]),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                          color: (score >= 0 ? purple : danger).withOpacity(0.3),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8))
+                    ]),
+                child: Row(children: [
+                  const Icon(Icons.star_rounded,
+                      color: Colors.white, size: 40),
+                  const SizedBox(width: 16),
+                  Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Net Score',
+                            style: TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 13,
+                                color: Colors.white.withOpacity(0.7))),
+                        Text('$score',
+                            style: const TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 36,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white)),
+                      ]),
+                  const Spacer(),
+                  Column(children: [
+                    Text('${points.where((p) => p.isPositive).length}',
+                        style: const TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white)),
+                    Text('Positive',
+                        style: TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 11,
+                            color: Colors.white.withOpacity(0.6))),
+                    const SizedBox(height: 6),
+                    Text('${points.where((p) => !p.isPositive).length}',
+                        style: const TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white)),
+                    Text('Needs Work',
+                        style: TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 11,
+                            color: Colors.white.withOpacity(0.6))),
+                  ]),
+                ]),
+              )),
+          if (sortedCats.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            const Text('Top Categories',
+                style: TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: textDark)),
+            const SizedBox(height: 12),
+            ...sortedCats.take(5).map((e) {
+              final cat = BehaviorCategory.fromId(e.key);
+              final isPos = e.value >= 0;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                    color: bgCard,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade100)),
+                child: Row(children: [
+                  Icon(cat.icon,
+                      color: isPos ? success : danger, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                      child: Text(cat.name,
+                          style: const TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: textDark))),
+                  Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                          color: (isPos ? success : danger).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8)),
+                      child: Text(
+                          '${isPos ? '+' : ''}${e.value}',
+                          style: TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: isPos ? success : danger))),
+                ]),
+              );
+            }),
+          ],
+          const SizedBox(height: 24),
+          const Text('Recent Activity',
+              style: TextStyle(
+                  fontFamily: 'Raleway',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: textDark)),
+          const SizedBox(height: 12),
+          if (points.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                  color: bgCard,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: Colors.grey.shade100)),
+              child: Center(
+                  child: Column(children: [
+                Icon(Icons.emoji_events_outlined, color: textLight, size: 40),
+                const SizedBox(height: 12),
+                const Text('No behavior points yet',
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 14,
+                        color: textLight)),
+              ])),
+            )
+          else
+            ...points.take(20).toList().asMap().entries.map((entry) {
+              final i = entry.key;
+              final p = entry.value;
+              final cat = BehaviorCategory.fromId(p.categoryId);
+              final timeAgo = p.createdAt != null
+                  ? _formatTimeAgo(p.createdAt!)
+                  : '';
+              return StaggeredItem(
+                  index: i,
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                        color: bgCard,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.grey.shade100)),
+                    child: Row(children: [
+                      Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                              color: (p.isPositive ? success : danger)
+                                  .withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10)),
+                          child: Icon(cat.icon,
+                              color: p.isPositive ? success : danger,
+                              size: 18)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                            Text(cat.name,
+                                style: const TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: textDark)),
+                            Text('By ${p.awardedByName}',
+                                style: const TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 11,
+                                    color: textLight)),
+                          ])),
+                      Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                        Text(p.isPositive ? '+1' : '-1',
+                            style: TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: p.isPositive ? success : danger)),
+                        if (timeAgo.isNotEmpty)
+                          Text(timeAgo,
+                              style: const TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 10,
+                                  color: textLight)),
+                      ]),
+                    ]),
+                  ));
+            }),
+          const SizedBox(height: 24),
+        ]));
+  }
+
+  String _formatTimeAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${dt.day}/${dt.month}';
+  }
+
+  // ─── STORY ──────────────────────────────────────────────────────────────────
+  Widget _storyTab() {
+    return SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const SizedBox(height: 8),
+          FadeSlideIn(
+              child: const Text('Class Story',
+                  style: TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: textDark,
+                      letterSpacing: -0.8))),
+          FadeSlideIn(
+              delayMs: 60,
+              child: const Text('Updates from the classroom',
+                  style: TextStyle(
+                      fontFamily: 'Raleway', fontSize: 13, color: textLight))),
+          const SizedBox(height: 24),
+          if (_storyPosts.isEmpty)
+            FadeSlideIn(
+                delayMs: 80,
+                child: Container(
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                      color: bgCard,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: Colors.grey.shade100)),
+                  child: Center(
+                      child: Column(children: [
+                    Icon(Icons.auto_stories_outlined,
+                        color: textLight, size: 40),
+                    const SizedBox(height: 12),
+                    const Text('No story posts yet',
+                        style: TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 14,
+                            color: textLight)),
+                  ])),
+                ))
+          else
+            ..._storyPosts.asMap().entries.map((entry) {
+              final i = entry.key;
+              final post = entry.value;
+              final timeAgo = post.createdAt != null
+                  ? _formatTimeAgo(post.createdAt!)
+                  : '';
+              return FadeSlideIn(
+                  delayMs: 80 + i * 60,
+                  child: Container(
+                    margin: EdgeInsets.only(
+                        bottom: i < _storyPosts.length - 1 ? 14 : 0),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                        color: bgCard,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey.shade100)),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(children: [
+                            CircleAvatar(
+                                radius: 18,
+                                backgroundColor: purple.withOpacity(0.1),
+                                child: Text(
+                                    post.authorName.isNotEmpty
+                                        ? post.authorName[0]
+                                        : '?',
+                                    style: const TextStyle(
+                                        fontFamily: 'Raleway',
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: purple))),
+                            const SizedBox(width: 10),
+                            Expanded(
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                  Text(post.authorName,
+                                      style: const TextStyle(
+                                          fontFamily: 'Raleway',
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: textDark)),
+                                  Text(
+                                      '${post.authorRole}${post.className.isNotEmpty ? ' · ${post.className}' : ''}',
+                                      style: const TextStyle(
+                                          fontFamily: 'Raleway',
+                                          fontSize: 11,
+                                          color: textLight)),
+                                ])),
+                            if (timeAgo.isNotEmpty)
+                              Text(timeAgo,
+                                  style: const TextStyle(
+                                      fontFamily: 'Raleway',
+                                      fontSize: 11,
+                                      color: textLight)),
+                          ]),
+                          if (post.text.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Text(post.text,
+                                style: const TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 13,
+                                    color: textMid,
+                                    height: 1.5)),
+                          ],
+                          if (post.mediaUrls.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                                height: 160,
+                                decoration: BoxDecoration(
+                                    color: Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(12)),
+                                child: Center(
+                                    child: Icon(
+                                        post.mediaType == StoryMediaType.video
+                                            ? Icons.play_circle_outline
+                                            : Icons.image_outlined,
+                                        color: textLight,
+                                        size: 36))),
+                          ],
+                          const SizedBox(height: 10),
+                          Row(children: [
+                            Icon(Icons.favorite_border_rounded,
+                                color: textLight, size: 16),
+                            const SizedBox(width: 4),
+                            Text('${post.likeCount}',
+                                style: const TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 12,
+                                    color: textLight)),
+                            const SizedBox(width: 16),
+                            Icon(Icons.chat_bubble_outline_rounded,
+                                color: textLight, size: 15),
+                            const SizedBox(width: 4),
+                            Text('${post.commentCount}',
+                                style: const TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 12,
+                                    color: textLight)),
+                          ]),
+                        ]),
+                  ));
+            }),
+          const SizedBox(height: 24),
         ]));
   }
 
@@ -1188,6 +1771,7 @@ class _ParentDashboardState extends State<ParentDashboard>
 
   // ─── PROFILE ───────────────────────────────────────────────────────────────
   Widget _profileTab() {
+    final child = _currentChild;
     return SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(children: [
@@ -1232,7 +1816,6 @@ class _ParentDashboardState extends State<ParentDashboard>
                           color: purple,
                           fontWeight: FontWeight.w700)))),
           const SizedBox(height: 28),
-          // Teacher contact card
           FadeSlideIn(
               delayMs: 130,
               child: GestureDetector(
@@ -1249,7 +1832,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                     CircleAvatar(
                         radius: 22,
                         backgroundColor: primary.withOpacity(0.1),
-                        child: Text((_childInfo?.teacherName ?? '').isNotEmpty ? _childInfo!.teacherName[0] : '?',
+                        child: Text((child?.info.teacherName ?? '').isNotEmpty ? child!.info.teacherName[0] : '?',
                             style: const TextStyle(
                                 fontFamily: 'Raleway',
                                 fontSize: 16,
@@ -1260,13 +1843,13 @@ class _ParentDashboardState extends State<ParentDashboard>
                         child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                          Text(_childInfo?.teacherName ?? '',
+                          Text(child?.info.teacherName ?? '',
                               style: const TextStyle(
                                   fontFamily: 'Raleway',
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
                                   color: textDark)),
-                          Text("${_childInfo?.childName ?? ''}'s Teacher · ${_childInfo?.subject ?? ''}",
+                          Text("${child?.info.childName ?? ''}'s Teacher · ${child?.info.subject ?? ''}",
                               style: const TextStyle(
                                   fontFamily: 'Raleway',
                                   fontSize: 12,
@@ -1276,7 +1859,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                             const Icon(Icons.email_outlined,
                                 size: 11, color: info),
                             const SizedBox(width: 4),
-                            Text(_childInfo?.teacherEmail ?? '',
+                            Text(child?.info.teacherEmail ?? '',
                                 style: const TextStyle(
                                     fontFamily: 'Raleway',
                                     fontSize: 10,
@@ -1295,9 +1878,9 @@ class _ParentDashboardState extends State<ParentDashboard>
               )),
           ...List.generate(4, (i) {
             final items = [
-              [Icons.child_care_outlined, 'Child', _childInfo?.childName ?? ''],
+              [Icons.child_care_outlined, 'Child', child?.info.childName ?? ''],
               [Icons.school_outlined, 'School', 'Tatva Academy'],
-              [Icons.class_outlined, 'Class', _childInfo?.className ?? ''],
+              [Icons.class_outlined, 'Class', child?.info.className ?? ''],
               [Icons.verified_outlined, 'Status', 'Verified'],
             ];
             return StaggeredItem(
@@ -1332,7 +1915,33 @@ class _ParentDashboardState extends State<ParentDashboard>
                           ]),
                         ))));
           }),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          FadeSlideIn(
+              delayMs: 180,
+              child: BouncyTap(
+                  onTap: _generateWeeklyReport,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                        color: info.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: info.withOpacity(0.15))),
+                    child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.assessment_outlined,
+                              color: info, size: 18),
+                          const SizedBox(width: 8),
+                          const Text('Weekly Report',
+                              style: TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: info)),
+                        ]),
+                  ))),
+          const SizedBox(height: 12),
           FadeSlideIn(
               delayMs: 200,
               child: BouncyTap(
@@ -1364,6 +1973,147 @@ class _ParentDashboardState extends State<ParentDashboard>
           const SizedBox(height: 24),
         ]));
   }
+
+  Future<void> _generateWeeklyReport() async {
+    final child = _currentChild;
+    if (child == null) return;
+    HapticFeedback.lightImpact();
+
+    final now = DateTime.now();
+    final weekStart =
+        now.subtract(Duration(days: now.weekday - 1));
+    final weekEnd = weekStart.add(const Duration(days: 6));
+    final fmt = (DateTime d) =>
+        '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final reportSvc = ReportService();
+      final report = await reportSvc.generateWeeklyReport(
+        studentUid: child.childUid,
+        studentName: child.info.childName,
+        className: child.info.className,
+        classIds: child.info.classId.isNotEmpty ? [child.info.classId] : [],
+        weekStart: fmt(weekStart),
+        weekEnd: fmt(weekEnd),
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+      _showReportSheet(report, reportSvc);
+    } catch (_) {
+      if (mounted) Navigator.pop(context);
+    }
+  }
+
+  void _showReportSheet(WeeklyReport report, ReportService reportSvc) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.75),
+        decoration: const BoxDecoration(
+            color: bgCard,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        child: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Center(
+                child: Container(
+                    width: 36,
+                    height: 3,
+                    decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 20),
+            Text('📊 Weekly Report',
+                style: const TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: textDark)),
+            const SizedBox(height: 4),
+            Text('${report.studentName} · ${report.weekLabel}',
+                style: const TextStyle(
+                    fontFamily: 'Raleway', fontSize: 12, color: textLight)),
+            const SizedBox(height: 20),
+            _reportRow('📚 Grade Average',
+                '${report.gradeAverage.toStringAsFixed(1)}%'),
+            _reportRow('✅ Attendance Rate',
+                '${report.attendanceRate.toStringAsFixed(0)}%'),
+            _reportRow('📅 Present / Absent / Tardy',
+                '${report.daysPresent} / ${report.daysAbsent} / ${report.daysTardy}'),
+            _reportRow('⭐ Behavior Points', '${report.behaviorPointsTotal}'),
+            _reportRow('👍 Positive', '${report.positivePoints}'),
+            _reportRow('👎 Needs Work', '${report.negativePoints}'),
+            _reportRow('📝 Homework',
+                '${report.homeworkCompleted}/${report.homeworkTotal}'),
+            const SizedBox(height: 20),
+            GestureDetector(
+              onTap: () {
+                final csv = reportSvc.exportToCsv(report);
+                Clipboard.setData(ClipboardData(text: csv));
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: const Text('Report copied to clipboard',
+                      style: TextStyle(fontFamily: 'Raleway')),
+                  backgroundColor: success,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ));
+              },
+              child: Container(
+                width: double.infinity,
+                height: 50,
+                decoration: BoxDecoration(
+                    color: info,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                          color: info.withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4))
+                    ]),
+                child:
+                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  const Icon(Icons.copy_rounded, color: Colors.white, size: 18),
+                  const SizedBox(width: 8),
+                  const Text('Export CSV to Clipboard',
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white)),
+                ]),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _reportRow(String label, String value) => Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(children: [
+        Expanded(
+            child: Text(label,
+                style: const TextStyle(
+                    fontFamily: 'Raleway', fontSize: 13, color: textMid))),
+        Text(value,
+            style: const TextStyle(
+                fontFamily: 'Raleway',
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: textDark)),
+      ]));
 
   Widget _qaBtn(String label, IconData icon, Color color, VoidCallback onTap) =>
       Expanded(

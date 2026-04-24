@@ -17,6 +17,15 @@ import '../../models/class_model.dart';
 import '../../models/grade_model.dart';
 import '../../models/announcement_model.dart';
 import '../../models/homework_model.dart';
+import '../../models/behavior_point.dart';
+import '../../models/behavior_category.dart';
+import '../../models/attendance_record.dart';
+import '../../models/attendance_status.dart';
+import '../../models/story_post.dart';
+import '../../models/activity_event.dart';
+import '../../services/behavior_service.dart';
+import '../../services/attendance_service.dart';
+import '../../services/story_service.dart';
 
 class TeacherDashboard extends StatefulWidget {
   const TeacherDashboard({super.key});
@@ -44,6 +53,9 @@ class _TeacherDashboardState extends State<TeacherDashboard>
 
   final _dashSvc = DashboardService();
   final _hwSvc = HomeworkService();
+  final _behaviorSvc = BehaviorService();
+  final _attendanceSvc = AttendanceService();
+  final _storySvc = StoryService();
   String _uid = '';
 
   UserModel? _user;
@@ -53,6 +65,10 @@ class _TeacherDashboardState extends State<TeacherDashboard>
   List<GradeModel> _grades = [];
   List<AnnouncementModel> _announcements = [];
   List<HomeworkModel> _homework = [];
+  List<BehaviorPoint> _classBehavior = [];
+  List<AttendanceRecord> _todayAttendance = [];
+  List<StoryPost> _classStory = [];
+  List<ActivityEvent> _activityFeed = [];
 
   @override
   void initState() {
@@ -119,6 +135,10 @@ class _TeacherDashboardState extends State<TeacherDashboard>
       _grades = data.gradesInFirstClass;
       _announcements = data.announcements;
       _homework = data.homework;
+      _classBehavior = data.classBehavior;
+      _todayAttendance = data.todayAttendance;
+      _classStory = data.classStory;
+      _activityFeed = data.activityFeed;
     } catch (_) {}
     if (!mounted) return;
     setState(() => isLoading = false);
@@ -533,9 +553,11 @@ class _TeacherDashboardState extends State<TeacherDashboard>
           child: IndexedStack(index: _currentTab, children: [
             _buildHomeTab(),
             _buildClassesTab(),
+            _buildBehaviorTab(),
+            _buildAttendanceTab(),
             _buildGradesTab(),
             _buildHomeworkTab(),
-            _buildAnnouncementsTab(),
+            _buildStoryTab(),
             _buildMessagesTab(),
             _buildProfileTab(),
           ])));
@@ -553,6 +575,16 @@ class _TeacherDashboardState extends State<TeacherDashboard>
         'label': 'Classes'
       },
       {
+        'icon': Icons.emoji_events_outlined,
+        'active': Icons.emoji_events_rounded,
+        'label': 'Behavior'
+      },
+      {
+        'icon': Icons.fact_check_outlined,
+        'active': Icons.fact_check_rounded,
+        'label': 'Attend'
+      },
+      {
         'icon': Icons.grade_outlined,
         'active': Icons.grade_rounded,
         'label': 'Grades'
@@ -563,9 +595,9 @@ class _TeacherDashboardState extends State<TeacherDashboard>
         'label': 'Homework'
       },
       {
-        'icon': Icons.campaign_outlined,
-        'active': Icons.campaign_rounded,
-        'label': 'Posts'
+        'icon': Icons.auto_stories_outlined,
+        'active': Icons.auto_stories_rounded,
+        'label': 'Story'
       },
       {
         'icon': Icons.chat_outlined,
@@ -680,16 +712,16 @@ class _TeacherDashboardState extends State<TeacherDashboard>
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(children: [
                 _qaBtn('Enter\nGrades', Icons.edit_note_outlined, accent,
-                    () => _switchTab(2)),
-                const SizedBox(width: 8),
-                _qaBtn('Post\nHomework', Icons.assignment_outlined, primary,
-                    () => _switchTab(3)),
-                const SizedBox(width: 8),
-                _qaBtn('Announce', Icons.campaign_outlined, info,
                     () => _switchTab(4)),
                 const SizedBox(width: 8),
-                _qaBtn('Messages', Icons.chat_outlined, purple,
+                _qaBtn('Post\nHomework', Icons.assignment_outlined, primary,
                     () => _switchTab(5)),
+                const SizedBox(width: 8),
+                _qaBtn('Behavior', Icons.emoji_events_outlined, info,
+                    () => _switchTab(2)),
+                const SizedBox(width: 8),
+                _qaBtn('Messages', Icons.chat_outlined, purple,
+                    () => _switchTab(7)),
               ])),
           const SizedBox(height: 28),
           Padding(
@@ -963,7 +995,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                           ]))),
                   const SizedBox(width: 8),
                   GestureDetector(
-                      onTap: () => _switchTab(2),
+                      onTap: () => _switchTab(4),
                       child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 6),
@@ -985,6 +1017,410 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                 ])),
           ]),
         ));
+  }
+
+  // ─── BEHAVIOR TAB ──────────────────────────────────────────────────────────
+  Widget _buildBehaviorTab() {
+    final classId = _classes.isNotEmpty ? _classes.first.id : '';
+    final studentScores = <String, int>{};
+    for (final bp in _classBehavior) {
+      studentScores.update(bp.studentUid, (v) => v + bp.points,
+          ifAbsent: () => bp.points);
+    }
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const SizedBox(height: 8),
+        FadeSlideIn(
+            child: const Text('Behavior Points',
+                style: TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: textDark,
+                    letterSpacing: -0.8))),
+        const SizedBox(height: 4),
+        FadeSlideIn(
+            delayMs: 60,
+            child: Text(
+                _classes.isNotEmpty
+                    ? '${_classes.first.name} · Tap a student to award points'
+                    : 'No classes available',
+                style: const TextStyle(
+                    fontFamily: 'Raleway', fontSize: 13, color: textLight))),
+        const SizedBox(height: 20),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 1.5),
+          itemCount: _students.length,
+          itemBuilder: (_, i) {
+            final s = _students[i];
+            final score = studentScores[s.uid] ?? 0;
+            final scoreColor = score > 0
+                ? success
+                : score < 0
+                    ? danger
+                    : textLight;
+            return GestureDetector(
+              onTap: () => _showBehaviorSheet(s.uid, s.name, classId),
+              child: Container(
+                decoration: BoxDecoration(
+                    color: bgCard,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade100)),
+                child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircleAvatar(
+                          radius: 22,
+                          backgroundColor: primary.withOpacity(0.1),
+                          child: Text(s.initial,
+                              style: const TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: primary))),
+                      const SizedBox(height: 8),
+                      Text(s.name,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: textDark)),
+                      const SizedBox(height: 4),
+                      Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 2),
+                          decoration: BoxDecoration(
+                              color: scoreColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10)),
+                          child: Text(
+                              '${score >= 0 ? '+' : ''}$score pts',
+                              style: TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: scoreColor))),
+                    ]),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 24),
+      ]),
+    );
+  }
+
+  void _showBehaviorSheet(String studentUid, String studentName, String classId) {
+    final categories = BehaviorCategory.defaults;
+    final positive = categories.where((c) => c.isPositive).toList();
+    final negative = categories.where((c) => !c.isPositive).toList();
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.7),
+        decoration: const BoxDecoration(
+          color: TatvaColors.bgCard,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Center(
+              child: Container(
+                  width: 36,
+                  height: 3,
+                  decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(2)))),
+          const SizedBox(height: 16),
+          Text(studentName,
+              style: const TextStyle(
+                  fontFamily: 'Raleway',
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: textDark)),
+          const SizedBox(height: 4),
+          const Text('Select a behavior category',
+              style: TextStyle(
+                  fontFamily: 'Raleway', fontSize: 13, color: textLight)),
+          const SizedBox(height: 16),
+          const Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Positive',
+                  style: TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: textDark))),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: positive
+                .map((cat) => _behaviorChip(cat, true, studentUid,
+                    studentName, classId))
+                .toList(),
+          ),
+          const SizedBox(height: 16),
+          const Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Needs Work',
+                  style: TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: textDark))),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: negative
+                .map((cat) => _behaviorChip(cat, false, studentUid,
+                    studentName, classId))
+                .toList(),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _behaviorChip(BehaviorCategory cat, bool isPositive,
+      String studentUid, String studentName, String classId) {
+    final chipColor = isPositive ? success : danger;
+    return GestureDetector(
+      onTap: () async {
+        Navigator.pop(context);
+        await _behaviorSvc.awardPoint(
+          studentUid: studentUid,
+          studentName: studentName,
+          classId: classId,
+          categoryId: cat.id,
+          isPositive: isPositive,
+          awardedBy: _uid,
+          awardedByName: _user?.name ?? '',
+        );
+        _snack('${isPositive ? '+1' : '-1'} ${cat.name} for $studentName');
+        _loadUser();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+            color: chipColor.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: chipColor.withOpacity(0.25))),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(cat.icon, size: 16, color: chipColor),
+          const SizedBox(width: 6),
+          Text(cat.name,
+              style: TextStyle(
+                  fontFamily: 'Raleway',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: chipColor)),
+        ]),
+      ),
+    );
+  }
+
+  // ─── ATTENDANCE TAB ───────────────────────────────────────────────────────
+  Widget _buildAttendanceTab() {
+    final now = DateTime.now();
+    final dateStr =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final displayDate =
+        '${_monthName(now.month)} ${now.day}, ${now.year}';
+    final classId = _classes.isNotEmpty ? _classes.first.id : '';
+
+    final preMarked = <String, AttendanceStatus>{};
+    for (final r in _todayAttendance) {
+      preMarked[r.studentUid] = r.status;
+    }
+
+    return StatefulBuilder(builder: (ctx, setLocal) {
+      final statuses = <String, AttendanceStatus>{};
+      for (final s in _students) {
+        statuses[s.uid] = preMarked[s.uid] ?? AttendanceStatus.present;
+      }
+
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const SizedBox(height: 8),
+          FadeSlideIn(
+              child: const Text('Attendance',
+                  style: TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: textDark,
+                      letterSpacing: -0.8))),
+          const SizedBox(height: 4),
+          FadeSlideIn(
+              delayMs: 60,
+              child: Text(displayDate,
+                  style: const TextStyle(
+                      fontFamily: 'Raleway', fontSize: 13, color: textLight))),
+          const SizedBox(height: 20),
+          if (_todayAttendance.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                  color: success.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: success.withOpacity(0.2))),
+              child: Row(children: [
+                Icon(Icons.check_circle_outline, color: success, size: 16),
+                const SizedBox(width: 8),
+                const Expanded(
+                    child: Text('Attendance already marked today. You can update it.',
+                        style: TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 12,
+                            color: textMid))),
+              ]),
+            ),
+          ..._students.asMap().entries.map((e) {
+            final s = e.value;
+            final current = statuses[s.uid] ?? AttendanceStatus.present;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                  color: bgCard,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.grey.shade100)),
+              child: Row(children: [
+                CircleAvatar(
+                    radius: 18,
+                    backgroundColor: primary.withOpacity(0.1),
+                    child: Text(s.initial,
+                        style: const TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: primary))),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: Text(s.name,
+                        style: const TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: textDark))),
+                ...AttendanceStatus.values.map((st) => Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: GestureDetector(
+                        onTap: () {
+                          setLocal(() {
+                            preMarked[s.uid] = st;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                              color: current == st
+                                  ? _attendanceColor(st).withOpacity(0.15)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                  color: current == st
+                                      ? _attendanceColor(st)
+                                      : Colors.grey.shade200)),
+                          child: Text(st.label,
+                              style: TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 10,
+                                  fontWeight: current == st
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: current == st
+                                      ? _attendanceColor(st)
+                                      : textLight)),
+                        ),
+                      ),
+                    )),
+              ]),
+            );
+          }),
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: () async {
+              final finalStatuses = <String, AttendanceStatus>{};
+              final names = <String, String>{};
+              for (final s in _students) {
+                finalStatuses[s.uid] =
+                    preMarked[s.uid] ?? AttendanceStatus.present;
+                names[s.uid] = s.name;
+              }
+              await _attendanceSvc.markClassAttendance(
+                classId: classId,
+                date: dateStr,
+                studentStatuses: finalStatuses,
+                studentNames: names,
+                markedBy: _uid,
+                markedByName: _user?.name ?? '',
+              );
+              _snack('Attendance saved for $displayDate');
+              _loadUser();
+            },
+            child: Container(
+              width: double.infinity,
+              height: 50,
+              decoration: BoxDecoration(
+                  color: primary,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                        color: primary.withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4))
+                  ]),
+              child: const Center(
+                  child: Text('Save Attendance',
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white))),
+            ),
+          ),
+          const SizedBox(height: 24),
+        ]),
+      );
+    });
+  }
+
+  Color _attendanceColor(AttendanceStatus st) {
+    switch (st) {
+      case AttendanceStatus.present:
+        return success;
+      case AttendanceStatus.absent:
+        return danger;
+      case AttendanceStatus.tardy:
+        return accent;
+    }
+  }
+
+  String _monthName(int m) {
+    const months = [
+      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return months[m];
   }
 
   // ─── GRADES TAB ────────────────────────────────────────────────────────────
@@ -1488,99 +1924,297 @@ class _TeacherDashboardState extends State<TeacherDashboard>
     );
   }
 
-  // ─── ANNOUNCEMENTS TAB ─────────────────────────────────────────────────────
-  Widget _buildAnnouncementsTab() {
-    return SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const SizedBox(height: 8),
-          FadeSlideIn(
-              child: const Text('Announcements',
-                  style: TextStyle(
-                      fontFamily: 'Raleway',
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: textDark,
-                      letterSpacing: -0.8))),
-          const SizedBox(height: 4),
-          FadeSlideIn(
-              delayMs: 60,
-              child: const Text('Posts visible to students and parents',
-                  style: TextStyle(
-                      fontFamily: 'Raleway', fontSize: 13, color: textLight))),
-          const SizedBox(height: 16),
-          FadeSlideIn(
-              delayMs: 80,
-              child: GestureDetector(
-                onTap: () =>
-                    _snack('Post announcement — available in the live app!'),
-                child: Container(
+  // ─── STORY TAB ─────────────────────────────────────────────────────────────
+  Widget _buildStoryTab() {
+    return Stack(children: [
+      SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const SizedBox(height: 8),
+            FadeSlideIn(
+                child: const Text('Class Story',
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: textDark,
+                        letterSpacing: -0.8))),
+            const SizedBox(height: 4),
+            FadeSlideIn(
+                delayMs: 60,
+                child: Text(
+                    _classes.isNotEmpty
+                        ? '${_classes.first.name} · ${_classStory.length} posts'
+                        : 'No class story yet',
+                    style: const TextStyle(
+                        fontFamily: 'Raleway', fontSize: 13, color: textLight))),
+            const SizedBox(height: 16),
+            if (_classStory.isEmpty)
+              Container(
+                  padding: const EdgeInsets.all(32),
+                  child: Center(
+                      child: Column(children: [
+                    Icon(Icons.auto_stories_outlined,
+                        color: textLight, size: 48),
+                    const SizedBox(height: 12),
+                    const Text('No stories yet',
+                        style: TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: textLight)),
+                    const SizedBox(height: 4),
+                    const Text('Tap + to share the first class moment',
+                        style: TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 12,
+                            color: textLight)),
+                  ]))),
+            ..._classStory.asMap().entries.map((e) {
+              final post = e.value;
+              final liked = post.isLikedBy(_uid);
+              final timeAgo = post.createdAt != null
+                  ? _timeAgo(post.createdAt!)
+                  : '';
+              return StaggeredItem(
+                  index: e.key,
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 14),
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                        color: info.withOpacity(0.06),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: info.withOpacity(0.2))),
-                    child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        color: bgCard,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey.shade100)),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.add_rounded, color: info, size: 20),
-                          const SizedBox(width: 8),
-                          const Text('New Announcement',
-                              style: TextStyle(
-                                  fontFamily: 'Raleway',
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: info))
-                        ])),
-              )),
-          const SizedBox(height: 16),
-          ..._announcements.asMap().entries.map((e) => StaggeredItem(
-              index: e.key,
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                    color: bgCard,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.grey.shade100)),
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                              color: primary.withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(6)),
-                          child: Text(e.value.audience.label,
+                          Row(children: [
+                            CircleAvatar(
+                                radius: 18,
+                                backgroundColor: primary.withOpacity(0.1),
+                                child: Text(
+                                    post.authorName.isNotEmpty
+                                        ? post.authorName[0]
+                                        : '?',
+                                    style: const TextStyle(
+                                        fontFamily: 'Raleway',
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: primary))),
+                            const SizedBox(width: 10),
+                            Expanded(
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                  Text(post.authorName,
+                                      style: const TextStyle(
+                                          fontFamily: 'Raleway',
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: textDark)),
+                                  if (post.authorRole.isNotEmpty)
+                                    Text(post.authorRole,
+                                        style: const TextStyle(
+                                            fontFamily: 'Raleway',
+                                            fontSize: 11,
+                                            color: textLight)),
+                                ])),
+                            if (timeAgo.isNotEmpty)
+                              Text(timeAgo,
+                                  style: const TextStyle(
+                                      fontFamily: 'Raleway',
+                                      fontSize: 11,
+                                      color: textLight)),
+                          ]),
+                          const SizedBox(height: 12),
+                          Text(post.text,
                               style: const TextStyle(
                                   fontFamily: 'Raleway',
-                                  fontSize: 10,
-                                  color: primary,
-                                  fontWeight: FontWeight.w700))),
-                      const SizedBox(height: 8),
-                      Text(e.value.title,
-                          style: const TextStyle(
-                              fontFamily: 'Raleway',
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: textDark)),
-                      const SizedBox(height: 4),
-                      Text(e.value.body,
-                          style: const TextStyle(
-                              fontFamily: 'Raleway',
-                              fontSize: 12,
-                              color: textMid,
-                              height: 1.5)),
-                      const SizedBox(height: 6),
-                      Text('By ${e.value.createdByName}',
-                          style: const TextStyle(
-                              fontFamily: 'Raleway',
-                              fontSize: 10,
-                              color: textLight)),
-                    ]),
-              ))),
-        ]));
+                                  fontSize: 13,
+                                  color: textMid,
+                                  height: 1.5)),
+                          const SizedBox(height: 12),
+                          Row(children: [
+                            GestureDetector(
+                              onTap: () async {
+                                await _storySvc.toggleLike(post.id, _uid);
+                                _loadUser();
+                              },
+                              child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                        liked
+                                            ? Icons.favorite_rounded
+                                            : Icons.favorite_border_rounded,
+                                        size: 18,
+                                        color: liked ? danger : textLight),
+                                    const SizedBox(width: 4),
+                                    Text('${post.likeCount}',
+                                        style: TextStyle(
+                                            fontFamily: 'Raleway',
+                                            fontSize: 12,
+                                            color: liked ? danger : textLight,
+                                            fontWeight: FontWeight.w600)),
+                                  ]),
+                            ),
+                            const SizedBox(width: 16),
+                            Icon(Icons.comment_outlined,
+                                size: 16, color: textLight),
+                            const SizedBox(width: 4),
+                            Text('${post.commentCount}',
+                                style: const TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 12,
+                                    color: textLight)),
+                          ]),
+                        ]),
+                  ));
+            }),
+            const SizedBox(height: 80),
+          ])),
+      Positioned(
+        right: 20,
+        bottom: 20,
+        child: GestureDetector(
+          onTap: _showNewStorySheet,
+          child: Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+                color: primary,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                      color: primary.withOpacity(0.35),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4))
+                ]),
+            child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
+          ),
+        ),
+      ),
+    ]);
+  }
+
+  void _showNewStorySheet() {
+    final textCtrl = TextEditingController();
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Padding(
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          decoration: const BoxDecoration(
+              color: TatvaColors.bgCard,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                    child: Container(
+                        width: 36,
+                        height: 3,
+                        decoration: BoxDecoration(
+                            color: Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(2)))),
+                const SizedBox(height: 20),
+                const Text('New Story Post',
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: textDark)),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: textCtrl,
+                  maxLines: 4,
+                  autofocus: true,
+                  style: const TextStyle(
+                      fontFamily: 'Raleway', fontSize: 14, color: textDark),
+                  decoration: InputDecoration(
+                    hintText: 'Share a class moment...',
+                    hintStyle: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 13,
+                        color: Colors.grey.shade400),
+                    filled: true,
+                    fillColor: bg,
+                    contentPadding: const EdgeInsets.all(14),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade200)),
+                    focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                            color: primary.withOpacity(0.5), width: 1.5)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                GestureDetector(
+                  onTap: () async {
+                    final text = textCtrl.text.trim();
+                    if (text.isEmpty) return;
+                    final classId =
+                        _classes.isNotEmpty ? _classes.first.id : '';
+                    final className =
+                        _classes.isNotEmpty ? _classes.first.name : '';
+                    await _storySvc.createPost(StoryPost(
+                      authorUid: _uid,
+                      authorName: _user?.name ?? '',
+                      authorRole: 'Teacher',
+                      classId: classId,
+                      className: className,
+                      text: text,
+                    ));
+                    if (!context.mounted) return;
+                    Navigator.pop(context);
+                    _snack('Story posted!');
+                    _loadUser();
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    height: 50,
+                    decoration: BoxDecoration(
+                        color: primary,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                              color: primary.withOpacity(0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4))
+                        ]),
+                    child: const Center(
+                        child: Text('Post',
+                            style: TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white))),
+                  ),
+                ),
+              ]),
+        ),
+      ),
+    );
+  }
+
+  String _timeAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${dt.month}/${dt.day}';
   }
 
   // ─── MESSAGES TAB ──────────────────────────────────────────────────────────

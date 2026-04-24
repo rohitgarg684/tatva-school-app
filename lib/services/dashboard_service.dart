@@ -6,6 +6,12 @@ import '../models/announcement_model.dart';
 import '../models/homework_model.dart';
 import '../models/vote_model.dart';
 import '../models/audience.dart';
+import '../models/behavior_point.dart';
+import '../models/attendance_record.dart';
+import '../models/story_post.dart';
+import '../models/activity_event.dart';
+import '../models/content_item.dart';
+import '../models/child_info.dart';
 import '../repositories/auth_repository.dart';
 import '../repositories/user_repository.dart';
 import '../repositories/class_repository.dart';
@@ -13,6 +19,11 @@ import 'grade_service.dart';
 import 'homework_service.dart';
 import 'announcement_service.dart';
 import 'vote_service.dart';
+import 'behavior_service.dart';
+import 'attendance_service.dart';
+import 'story_service.dart';
+import 'activity_service.dart';
+import 'content_service.dart';
 
 /// Data bundle returned for the student dashboard.
 class StudentDashboardData {
@@ -22,6 +33,12 @@ class StudentDashboardData {
   final List<AnnouncementModel> announcements;
   final List<HomeworkModel> homework;
   final List<VoteModel> activeVotes;
+  final List<BehaviorPoint> behaviorPoints;
+  final int behaviorScore;
+  final List<AttendanceRecord> attendance;
+  final List<StoryPost> storyPosts;
+  final List<ActivityEvent> activityFeed;
+  final List<ContentItem> contentItems;
 
   const StudentDashboardData({
     required this.user,
@@ -30,6 +47,12 @@ class StudentDashboardData {
     this.announcements = const [],
     this.homework = const [],
     this.activeVotes = const [],
+    this.behaviorPoints = const [],
+    this.behaviorScore = 0,
+    this.attendance = const [],
+    this.storyPosts = const [],
+    this.activityFeed = const [],
+    this.contentItems = const [],
   });
 }
 
@@ -42,6 +65,10 @@ class TeacherDashboardData {
   final List<GradeModel> gradesInFirstClass;
   final List<AnnouncementModel> announcements;
   final List<HomeworkModel> homework;
+  final List<BehaviorPoint> classBehavior;
+  final List<AttendanceRecord> todayAttendance;
+  final List<StoryPost> classStory;
+  final List<ActivityEvent> activityFeed;
 
   const TeacherDashboardData({
     required this.user,
@@ -51,25 +78,52 @@ class TeacherDashboardData {
     this.gradesInFirstClass = const [],
     this.announcements = const [],
     this.homework = const [],
+    this.classBehavior = const [],
+    this.todayAttendance = const [],
+    this.classStory = const [],
+    this.activityFeed = const [],
+  });
+}
+
+/// Data for a single child, used in multi-child parent dashboard.
+class ChildDashboardData {
+  final ChildInfo info;
+  final String childUid;
+  final ClassModel? childClass;
+  final List<GradeModel> grades;
+  final List<BehaviorPoint> behaviorPoints;
+  final int behaviorScore;
+  final List<AttendanceRecord> attendance;
+
+  const ChildDashboardData({
+    required this.info,
+    this.childUid = '',
+    this.childClass,
+    this.grades = const [],
+    this.behaviorPoints = const [],
+    this.behaviorScore = 0,
+    this.attendance = const [],
   });
 }
 
 /// Data bundle returned for the parent dashboard.
 class ParentDashboardData {
   final UserModel user;
-  final ClassModel? childClass;
-  final String childUid;
-  final List<GradeModel> childGrades;
+  final List<ChildDashboardData> childrenData;
   final List<AnnouncementModel> announcements;
   final List<VoteModel> activeVotes;
+  final List<StoryPost> storyPosts;
+  final List<ActivityEvent> activityFeed;
+  final List<ContentItem> contentItems;
 
   const ParentDashboardData({
     required this.user,
-    this.childClass,
-    this.childUid = '',
-    this.childGrades = const [],
+    this.childrenData = const [],
     this.announcements = const [],
     this.activeVotes = const [],
+    this.storyPosts = const [],
+    this.activityFeed = const [],
+    this.contentItems = const [],
   });
 }
 
@@ -86,6 +140,9 @@ class PrincipalDashboardData {
   final Map<String, double> subjectAverages;
   final List<AnnouncementModel> announcements;
   final List<VoteModel> activeVotes;
+  final List<ActivityEvent> activityFeed;
+  final int totalBehaviorPoints;
+  final int attendanceRate;
 
   const PrincipalDashboardData({
     required this.user,
@@ -99,11 +156,13 @@ class PrincipalDashboardData {
     this.subjectAverages = const {},
     this.announcements = const [],
     this.activeVotes = const [],
+    this.activityFeed = const [],
+    this.totalBehaviorPoints = 0,
+    this.attendanceRate = 0,
   });
 }
 
 /// Orchestrates data loading for all dashboards.
-/// Dashboards call this instead of individual repositories.
 class DashboardService {
   final AuthRepository _authRepo;
   final UserRepository _userRepo;
@@ -112,6 +171,11 @@ class DashboardService {
   final HomeworkService _homeworkSvc;
   final AnnouncementService _announcementSvc;
   final VoteService _voteSvc;
+  final BehaviorService _behaviorSvc;
+  final AttendanceService _attendanceSvc;
+  final StoryService _storySvc;
+  final ActivityService _activitySvc;
+  final ContentService _contentSvc;
 
   DashboardService({
     AuthRepository? authRepo,
@@ -121,13 +185,23 @@ class DashboardService {
     HomeworkService? homeworkSvc,
     AnnouncementService? announcementSvc,
     VoteService? voteSvc,
+    BehaviorService? behaviorSvc,
+    AttendanceService? attendanceSvc,
+    StoryService? storySvc,
+    ActivityService? activitySvc,
+    ContentService? contentSvc,
   })  : _authRepo = authRepo ?? AuthRepository(),
         _userRepo = userRepo ?? UserRepository(),
         _classRepo = classRepo ?? ClassRepository(),
         _gradeSvc = gradeSvc ?? GradeService(),
         _homeworkSvc = homeworkSvc ?? HomeworkService(),
         _announcementSvc = announcementSvc ?? AnnouncementService(),
-        _voteSvc = voteSvc ?? VoteService();
+        _voteSvc = voteSvc ?? VoteService(),
+        _behaviorSvc = behaviorSvc ?? BehaviorService(),
+        _attendanceSvc = attendanceSvc ?? AttendanceService(),
+        _storySvc = storySvc ?? StoryService(),
+        _activitySvc = activitySvc ?? ActivityService(),
+        _contentSvc = contentSvc ?? ContentService();
 
   String get _uid => _authRepo.currentUid ?? '';
 
@@ -156,6 +230,12 @@ class DashboardService {
         await _announcementSvc.fetchForAudience(Audience.students);
     final homework = await _homeworkSvc.getForClasses(user.classIds);
     final votes = await _voteSvc.fetchActive();
+    final behaviorPoints = await _behaviorSvc.getStudentPoints(uid);
+    final behaviorScore = _behaviorSvc.computeScore(behaviorPoints);
+    final attendance = await _attendanceSvc.getStudentAttendance(uid);
+    final storyPosts = await _storySvc.getStoriesForClasses(user.classIds);
+    final activityFeed = await _activitySvc.getUserFeed(uid);
+    final contentItems = await _contentSvc.fetchAll();
 
     return StudentDashboardData(
       user: user,
@@ -164,6 +244,12 @@ class DashboardService {
       announcements: announcements,
       homework: homework,
       activeVotes: votes,
+      behaviorPoints: behaviorPoints,
+      behaviorScore: behaviorScore,
+      attendance: attendance,
+      storyPosts: storyPosts,
+      activityFeed: activityFeed,
+      contentItems: contentItems,
     );
   }
 
@@ -189,15 +275,26 @@ class DashboardService {
     List<UserModel> students = [];
     List<UserModel> parents = [];
     List<GradeModel> grades = [];
+    List<BehaviorPoint> classBehavior = [];
+    List<AttendanceRecord> todayAttendance = [];
+    List<StoryPost> classStory = [];
     if (classes.isNotEmpty) {
       final first = classes.first;
       students = await _userRepo.getUsersByIds(first.studentUids);
       parents = await _userRepo.getUsersByIds(first.parentUids);
       grades = await _gradeSvc.getClassGrades(first.id);
+      classBehavior = await _behaviorSvc.getClassPoints(first.id);
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      todayAttendance =
+          await _attendanceSvc.getClassAttendance(first.id, today);
+      classStory = await _storySvc.getClassStory(first.id);
     }
 
     final announcements = await _announcementSvc.fetchAll();
     final homework = await _homeworkSvc.getByTeacher(uid);
+    final activityFeed = classes.isNotEmpty
+        ? await _activitySvc.getClassFeed(classes.first.id)
+        : <ActivityEvent>[];
 
     return TeacherDashboardData(
       user: user,
@@ -207,6 +304,10 @@ class DashboardService {
       gradesInFirstClass: grades,
       announcements: announcements,
       homework: homework,
+      classBehavior: classBehavior,
+      todayAttendance: todayAttendance,
+      classStory: classStory,
+      activityFeed: activityFeed,
     );
   }
 
@@ -225,37 +326,63 @@ class DashboardService {
           user: UserModel(uid: uid, name: '', email: '', role: UserRole.parent));
     }
 
-    ClassModel? childClass;
-    String childUid = '';
-    List<GradeModel> childGrades = [];
+    // Build data for each child (multi-child support)
+    final allStudents = await _userRepo.getAllByRole(UserRole.student);
+    final childrenData = <ChildDashboardData>[];
+    final classIds = <String>{};
 
-    if (user.children.isNotEmpty) {
-      final childInfo = user.children.first;
+    for (final childInfo in user.children) {
+      ClassModel? childClass;
       if (childInfo.classId.isNotEmpty) {
         childClass = await _classRepo.getClass(childInfo.classId);
+        classIds.add(childInfo.classId);
       }
 
-      // Find child's UID by name among students
-      final allStudents = await _userRepo.getAllByRole(UserRole.student);
+      String childUid = '';
+      List<GradeModel> childGrades = [];
+      List<BehaviorPoint> childBehavior = [];
+      List<AttendanceRecord> childAttendance = [];
+      int behaviorScore = 0;
+
       final match =
           allStudents.where((s) => s.name == childInfo.childName).toList();
       if (match.isNotEmpty) {
         childUid = match.first.uid;
         childGrades = await _gradeSvc.getStudentGrades(childUid);
+        childBehavior = await _behaviorSvc.getStudentPoints(childUid);
+        behaviorScore = _behaviorSvc.computeScore(childBehavior);
+        childAttendance = await _attendanceSvc.getStudentAttendance(childUid);
       }
+
+      childrenData.add(ChildDashboardData(
+        info: childInfo,
+        childUid: childUid,
+        childClass: childClass,
+        grades: childGrades,
+        behaviorPoints: childBehavior,
+        behaviorScore: behaviorScore,
+        attendance: childAttendance,
+      ));
     }
 
     final announcements =
         await _announcementSvc.fetchForAudience(Audience.parents);
     final votes = await _voteSvc.fetchActive();
+    final storyPosts =
+        await _storySvc.getStoriesForClasses(classIds.toList());
+    final activityFeed = childrenData.isNotEmpty && childrenData.first.childUid.isNotEmpty
+        ? await _activitySvc.getUserFeed(childrenData.first.childUid)
+        : <ActivityEvent>[];
+    final contentItems = await _contentSvc.fetchAll();
 
     return ParentDashboardData(
       user: user,
-      childClass: childClass,
-      childUid: childUid,
-      childGrades: childGrades,
+      childrenData: childrenData,
       announcements: announcements,
       activeVotes: votes,
+      storyPosts: storyPosts,
+      activityFeed: activityFeed,
+      contentItems: contentItems,
     );
   }
 
@@ -285,6 +412,7 @@ class DashboardService {
     final subjectAverages = _gradeSvc.computeSubjectAverages(allGrades);
     final announcements = await _announcementSvc.fetchAll();
     final votes = await _voteSvc.fetchActive();
+    final activityFeed = await _activitySvc.getSchoolFeed();
 
     return PrincipalDashboardData(
       user: user,
@@ -298,6 +426,7 @@ class DashboardService {
       subjectAverages: subjectAverages,
       announcements: announcements,
       activeVotes: votes,
+      activityFeed: activityFeed,
     );
   }
 }
