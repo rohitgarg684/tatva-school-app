@@ -1,13 +1,14 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Allow authenticated users to read story images
     match /stories/{classId}/{fileName} {
       allow read: if request.auth != null;
-      // Writes are handled server-side via Admin SDK — deny all client writes
       allow write: if false;
     }
-    // Deny everything else
+    match /documents/{classId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
     match /{allPaths=**} {
       allow read, write: if false;
     }

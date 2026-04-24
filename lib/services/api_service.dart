@@ -111,11 +111,11 @@ class ApiService {
 
   // ─── File Upload ──────────────────────────────────────────────────────
 
-  Future<String?> uploadStoryImage(
-      Uint8List bytes, String classId, String fileName) async {
+  Future<String?> _uploadMultipart(
+      String endpoint, Uint8List bytes, String classId, String fileName) async {
     try {
       final token = await _getToken();
-      final uri = Uri.parse('$_baseUrl/story/upload');
+      final uri = Uri.parse('$_baseUrl$endpoint');
       final request = http.MultipartRequest('POST', uri)
         ..headers['Authorization'] = 'Bearer $token'
         ..fields['classId'] = classId
@@ -133,4 +133,12 @@ class ApiService {
       return null;
     }
   }
+
+  Future<String?> uploadStoryImage(
+          Uint8List bytes, String classId, String fileName) =>
+      _uploadMultipart('/story/upload', bytes, classId, fileName);
+
+  Future<String?> uploadDocument(
+          Uint8List bytes, String classId, String fileName) =>
+      _uploadMultipart('/document/upload', bytes, classId, fileName);
 }
