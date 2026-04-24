@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class ClassModel {
   final String id;
   final String name;
@@ -24,22 +22,6 @@ class ClassModel {
     this.parentUids = const [],
     this.createdAt,
   });
-
-  factory ClassModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
-    return ClassModel(
-      id: doc.id,
-      name: data['name'] as String? ?? '',
-      subject: data['subject'] as String? ?? '',
-      teacherUid: data['teacherUid'] as String? ?? '',
-      teacherName: data['teacherName'] as String? ?? '',
-      teacherEmail: data['teacherEmail'] as String? ?? '',
-      classCode: data['classCode'] as String? ?? '',
-      studentUids: List<String>.from(data['studentUids'] ?? []),
-      parentUids: List<String>.from(data['parentUids'] ?? []),
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
-    );
-  }
 
   factory ClassModel.fromJson(Map<String, dynamic> data) {
     return ClassModel(
@@ -68,7 +50,7 @@ class ClassModel {
       'classCode': classCode,
       'studentUids': studentUids,
       'parentUids': parentUids,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': DateTime.now().toIso8601String(),
     };
   }
 }

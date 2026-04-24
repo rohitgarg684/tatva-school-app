@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class GradeModel {
   final String id;
   final String studentUid;
@@ -28,23 +26,6 @@ class GradeModel {
   });
 
   double get percentage => total > 0 ? (score / total) * 100 : 0;
-
-  factory GradeModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
-    return GradeModel(
-      id: doc.id,
-      studentUid: data['studentUid'] as String? ?? '',
-      studentName: data['studentName'] as String? ?? '',
-      classId: data['classId'] as String? ?? '',
-      subject: data['subject'] as String? ?? '',
-      assessmentName: data['assessmentName'] as String? ?? '',
-      score: (data['score'] as num?)?.toDouble() ?? 0,
-      total: (data['total'] as num?)?.toDouble() ?? 0,
-      teacherUid: data['teacherUid'] as String? ?? '',
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
-      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
-    );
-  }
 
   factory GradeModel.fromJson(Map<String, dynamic> data) {
     return GradeModel(
@@ -76,8 +57,8 @@ class GradeModel {
       'score': score,
       'total': total,
       'teacherUid': teacherUid,
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
+      'createdAt': DateTime.now().toIso8601String(),
+      'updatedAt': DateTime.now().toIso8601String(),
     };
   }
 }

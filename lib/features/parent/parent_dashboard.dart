@@ -9,8 +9,6 @@ import '../../core/router/app_router.dart';
 import '../../repositories/auth_repository.dart';
 import '../../services/dashboard_service.dart';
 import '../../services/api_service.dart';
-import '../../services/attendance_service.dart';
-import '../../services/report_service.dart';
 import '../../models/user_model.dart';
 import '../../models/class_model.dart';
 import '../../models/grade_model.dart';
@@ -578,7 +576,7 @@ class _ParentDashboardState extends State<ParentDashboard>
         0.0, (s, g) => s + (g.total > 0 ? g.score / g.total * 100 : 0.0));
     final avg = grades.isEmpty ? 0.0 : total / grades.length;
     final attSummary = child != null
-        ? AttendanceService().computeSummary(child.attendance)
+        ? _computeAttendanceSummary(child.attendance)
         : (present: 0, absent: 0, tardy: 0, total: 0);
     return RefreshIndicator(
         color: purple,
@@ -2328,24 +2326,70 @@ class _ParentDashboardState extends State<ParentDashboard>
     );
 
     try {
-      final reportSvc = ReportService();
-      final report = await reportSvc.generateWeeklyReport(
+      final json = await _api.getWeeklyReport(
         studentUid: child.childUid,
+        startDate: fmt(weekStart),
+        endDate: fmt(weekEnd),
+      );
+
+      final grades = (json['grades'] as List? ?? []);
+      double gradeAvg = 0;
+      if (grades.isNotEmpty) {
+        double sum = 0;
+        for (final g in grades) {
+          final total = (g['total'] as num?) ?? 0;
+          final score = (g['score'] as num?) ?? 0;
+          sum += total > 0 ? score / total * 100 : 0;
+        }
+        gradeAvg = sum / grades.length;
+      }
+
+      final attList = (json['attendance'] as List? ?? []);
+      int present = 0, absent = 0, tardy = 0;
+      for (final a in attList) {
+        switch ((a['status'] as String? ?? '').toLowerCase()) {
+          case 'present':
+            present++;
+          case 'absent':
+            absent++;
+          case 'tardy':
+            tardy++;
+        }
+      }
+      final totalDays = present + absent + tardy;
+
+      final bpList = (json['behaviorPoints'] as List? ?? []);
+      int pos = 0, neg = 0;
+      for (final bp in bpList) {
+        if (bp['isPositive'] == true) {
+          pos++;
+        } else {
+          neg++;
+        }
+      }
+
+      final report = WeeklyReport(
         studentName: child.info.childName,
         className: child.info.className,
-        classIds: child.info.classId.isNotEmpty ? [child.info.classId] : [],
-        weekStart: fmt(weekStart),
-        weekEnd: fmt(weekEnd),
+        weekLabel: '${fmt(weekStart)} to ${fmt(weekEnd)}',
+        behaviorPointsTotal: pos - neg,
+        positivePoints: pos,
+        negativePoints: neg,
+        daysPresent: present,
+        daysAbsent: absent,
+        daysTardy: tardy,
+        totalSchoolDays: totalDays > 0 ? totalDays : 5,
+        gradeAverage: gradeAvg,
       );
       if (!mounted) return;
       Navigator.pop(context);
-      _showReportSheet(report, reportSvc);
+      _showReportSheet(report);
     } catch (_) {
       if (mounted) Navigator.pop(context);
     }
   }
 
-  void _showReportSheet(WeeklyReport report, ReportService reportSvc) {
+  void _showReportSheet(WeeklyReport report) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -2392,7 +2436,7 @@ class _ParentDashboardState extends State<ParentDashboard>
             const SizedBox(height: 20),
             GestureDetector(
               onTap: () {
-                final csv = reportSvc.exportToCsv(report);
+                final csv = _exportReportToCsv(report);
                 Clipboard.setData(ClipboardData(text: csv));
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -2478,4 +2522,48 @@ class _ParentDashboardState extends State<ParentDashboard>
                             fontWeight: FontWeight.w600,
                             height: 1.3)),
                   ]))));
+
+  static ({int present, int absent, int tardy, int total})
+      _computeAttendanceSummary(List<AttendanceRecord> records) {
+    int present = 0, absent = 0, tardy = 0;
+    for (final r in records) {
+      switch (r.status) {
+        case AttendanceStatus.present:
+          present++;
+        case AttendanceStatus.absent:
+          absent++;
+        case AttendanceStatus.tardy:
+          tardy++;
+      }
+    }
+    return (
+      present: present,
+      absent: absent,
+      tardy: tardy,
+      total: present + absent + tardy,
+    );
+  }
+
+  static String _exportReportToCsv(WeeklyReport report) {
+    final buf = StringBuffer();
+    buf.writeln('Weekly Report for ${report.studentName}');
+    buf.writeln('Class,${report.className}');
+    buf.writeln('Week,${report.weekLabel}');
+    buf.writeln('');
+    buf.writeln('Section,Metric,Value');
+    buf.writeln('Behavior,Total Points,${report.behaviorPointsTotal}');
+    buf.writeln('Behavior,Positive,${report.positivePoints}');
+    buf.writeln('Behavior,Negative,${report.negativePoints}');
+    buf.writeln('Attendance,Present,${report.daysPresent}');
+    buf.writeln('Attendance,Absent,${report.daysAbsent}');
+    buf.writeln('Attendance,Tardy,${report.daysTardy}');
+    buf.writeln(
+        'Attendance,Rate,${report.attendanceRate.toStringAsFixed(1)}%');
+    buf.writeln('Homework,Completed,${report.homeworkCompleted}');
+    buf.writeln('Homework,Total,${report.homeworkTotal}');
+    buf.writeln(
+        'Homework,Rate,${report.homeworkCompletionRate.toStringAsFixed(1)}%');
+    buf.writeln('Grades,Average,${report.gradeAverage.toStringAsFixed(1)}%');
+    return buf.toString();
+  }
 }

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../models/message_model.dart';
 import '../../repositories/auth_repository.dart';
 import '../../services/message_service.dart';
 import '../../shared/animations/animations.dart';
@@ -40,28 +39,34 @@ class _MessagingScreenState extends State<MessagingScreen>
   static const Color textLight = Color(0xFF8FAF8F);
 
   final _msgSvc = MessageService();
-  List<MessageModel> _messages = [];
-  StreamSubscription? _msgSubscription;
+  List<Map<String, dynamic>> _messages = [];
+  Timer? _pollTimer;
   late String _myUid;
   late String _conversationId;
 
   @override
   void initState() {
     super.initState();
-    _myUid = AuthRepository().currentUid ?? 'parent_suresh';
+    _myUid = AuthRepository().currentUid ?? '';
     _conversationId = _msgSvc.makeConversationId(_myUid, widget.otherUserId);
-    _msgSubscription =
-        _msgSvc.getMessages(_conversationId).listen((msgs) {
+    _loadMessages();
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _loadMessages());
+  }
+
+  Future<void> _loadMessages() async {
+    try {
+      final msgs = await _msgSvc.getMessages(_conversationId);
       if (mounted) {
+        final changed = msgs.length != _messages.length;
         setState(() => _messages = msgs);
-        _scrollToBottom();
+        if (changed) _scrollToBottom();
       }
-    });
+    } catch (_) {}
   }
 
   @override
   void dispose() {
-    _msgSubscription?.cancel();
+    _pollTimer?.cancel();
     _msgController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -74,22 +79,27 @@ class _MessagingScreenState extends State<MessagingScreen>
     _msgController.clear();
     HapticFeedback.lightImpact();
 
-    await _msgSvc.send(MessageModel(
-      text: text,
-      senderUid: _myUid,
-      receiverUid: widget.otherUserId,
+    await _msgSvc.send(
       conversationId: _conversationId,
-    ));
+      receiverUid: widget.otherUserId,
+      text: text,
+    );
 
+    await _loadMessages();
     if (mounted) setState(() => _sending = false);
   }
 
-  String _formatTime(DateTime? dt) {
-    if (dt == null) return '';
-    final h = dt.hour > 12 ? dt.hour - 12 : dt.hour;
-    final m = dt.minute.toString().padLeft(2, '0');
-    final period = dt.hour >= 12 ? 'PM' : 'AM';
-    return '$h:$m $period';
+  String _formatTime(String? isoStr) {
+    if (isoStr == null) return '';
+    try {
+      final dt = DateTime.parse(isoStr);
+      final h = dt.hour > 12 ? dt.hour - 12 : dt.hour;
+      final m = dt.minute.toString().padLeft(2, '0');
+      final period = dt.hour >= 12 ? 'PM' : 'AM';
+      return '$h:$m $period';
+    } catch (_) {
+      return '';
+    }
   }
 
   void _scrollToBottom() {
@@ -170,7 +180,7 @@ class _MessagingScreenState extends State<MessagingScreen>
             itemCount: _messages.length,
             itemBuilder: (context, index) {
               final msg = _messages[index];
-              final isMe = msg.senderUid == _myUid;
+              final isMe = msg['senderUid'] == _myUid;
               return StaggeredItem(
                 index: index % 10,
                 delayMs: 30,
@@ -223,14 +233,16 @@ class _MessagingScreenState extends State<MessagingScreen>
                           child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(msg.text,
+                                Text(msg['text'] ?? '',
                                     style: TextStyle(
                                         fontFamily: 'Raleway',
                                         fontSize: 14,
                                         color: isMe ? Colors.white : textDark,
                                         height: 1.4)),
                                 const SizedBox(height: 4),
-                                Text(_formatTime(msg.createdAt),
+                                Text(
+                                    _formatTime(
+                                        msg['createdAt']?.toString()),
                                     style: TextStyle(
                                         fontFamily: 'Raleway',
                                         fontSize: 10,

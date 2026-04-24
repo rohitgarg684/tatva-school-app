@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 enum ActivityType {
   behaviorPoint,
   attendance,
@@ -69,23 +67,6 @@ class ActivityEvent {
     this.createdAt,
   });
 
-  factory ActivityEvent.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
-    return ActivityEvent(
-      id: doc.id,
-      type: ActivityType.fromString(data['type'] as String? ?? ''),
-      actorUid: data['actorUid'] as String? ?? '',
-      actorName: data['actorName'] as String? ?? '',
-      actorRole: data['actorRole'] as String? ?? '',
-      targetUid: data['targetUid'] as String? ?? '',
-      classId: data['classId'] as String? ?? '',
-      title: data['title'] as String? ?? '',
-      body: data['body'] as String? ?? '',
-      metadata: Map<String, dynamic>.from(data['metadata'] ?? {}),
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
-    );
-  }
-
   factory ActivityEvent.fromJson(Map<String, dynamic> data) {
     return ActivityEvent(
       id: data['id'] as String? ?? '',
@@ -115,7 +96,7 @@ class ActivityEvent {
       'title': title,
       'body': body,
       'metadata': metadata,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': DateTime.now().toIso8601String(),
     };
   }
 }

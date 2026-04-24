@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class MessageModel {
   final String id;
   final String text;
@@ -17,15 +15,16 @@ class MessageModel {
     this.createdAt,
   });
 
-  factory MessageModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
+  factory MessageModel.fromJson(Map<String, dynamic> data) {
     return MessageModel(
-      id: doc.id,
+      id: data['id'] as String? ?? '',
       text: data['text'] as String? ?? '',
       senderUid: data['senderUid'] as String? ?? '',
       receiverUid: data['receiverUid'] as String? ?? '',
       conversationId: data['conversationId'] as String? ?? '',
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      createdAt: data['createdAt'] != null
+          ? DateTime.tryParse(data['createdAt'] as String)
+          : null,
     );
   }
 
@@ -35,7 +34,7 @@ class MessageModel {
       'senderUid': senderUid,
       'receiverUid': receiverUid,
       'conversationId': conversationId,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': DateTime.now().toIso8601String(),
     };
   }
 }

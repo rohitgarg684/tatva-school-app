@@ -528,6 +528,7 @@ router.get("/principal/:uid", async (req, res) => {
     ]);
 
     const teachers = teacherSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const students = studentSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     const allClasses = classSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     const parents = parentSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     const allGrades = gradeSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -538,6 +539,7 @@ router.get("/principal/:uid", async (req, res) => {
       studentCount: studentSnap.size,
       classCount: classSnap.size,
       teachers: serializeDocs(teachers),
+      students: serializeDocs(students),
       allClasses: serializeDocs(allClasses),
       parents: serializeDocs(parents),
       allGrades: serializeDocs(allGrades),

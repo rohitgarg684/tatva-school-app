@@ -1,24 +1,28 @@
-import 'dart:async';
-import '../models/message_model.dart';
-import '../repositories/message_repository.dart';
+import 'api_service.dart';
 
 class MessageService {
-  final MessageRepository _repo;
+  final ApiService _api;
 
-  MessageService({MessageRepository? repo})
-      : _repo = repo ?? MessageRepository();
+  MessageService({ApiService? api}) : _api = api ?? ApiService();
 
-  /// Generates a deterministic conversation ID from two user UIDs.
   String makeConversationId(String uid1, String uid2) {
     final sorted = [uid1, uid2]..sort();
     return '${sorted[0]}_${sorted[1]}';
   }
 
-  Future<bool> send(MessageModel msg) {
-    return _repo.send(msg);
+  Future<List<Map<String, dynamic>>> getMessages(String conversationId) {
+    return _api.getMessages(conversationId);
   }
 
-  Stream<List<MessageModel>> getMessages(String conversationId) {
-    return _repo.getMessages(conversationId);
+  Future<void> send({
+    required String conversationId,
+    required String receiverUid,
+    required String text,
+  }) async {
+    await _api.sendMessage(
+      conversationId: conversationId,
+      receiverUid: receiverUid,
+      text: text,
+    );
   }
 }

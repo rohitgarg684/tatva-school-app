@@ -123,6 +123,7 @@ class PrincipalDashboardData {
   final int studentCount;
   final int classCount;
   final List<UserModel> teachers;
+  final List<UserModel> students;
   final List<ClassModel> allClasses;
   final List<UserModel> parents;
   final List<GradeModel> allGrades;
@@ -139,6 +140,7 @@ class PrincipalDashboardData {
     this.studentCount = 0,
     this.classCount = 0,
     this.teachers = const [],
+    this.students = const [],
     this.allClasses = const [],
     this.parents = const [],
     this.allGrades = const [],
@@ -351,6 +353,7 @@ class DashboardService {
       studentCount: (json['studentCount'] as num?)?.toInt() ?? 0,
       classCount: (json['classCount'] as num?)?.toInt() ?? 0,
       teachers: _parseList(json['teachers'], UserModel.fromJson),
+      students: _parseList(json['students'], UserModel.fromJson),
       allClasses: _parseList(json['allClasses'], ClassModel.fromJson),
       parents: _parseList(json['parents'], UserModel.fromJson),
       allGrades: _parseList(json['allGrades'], GradeModel.fromJson),

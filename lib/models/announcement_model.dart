@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'audience.dart';
 
 class AnnouncementModel {
@@ -23,21 +22,6 @@ class AnnouncementModel {
     required this.createdByRole,
     this.createdAt,
   });
-
-  factory AnnouncementModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
-    return AnnouncementModel(
-      id: doc.id,
-      title: data['title'] as String? ?? '',
-      body: data['body'] as String? ?? '',
-      audience: Audience.fromString(data['audience'] as String? ?? ''),
-      classIds: List<String>.from(data['classIds'] ?? []),
-      createdBy: data['createdBy'] as String? ?? '',
-      createdByName: data['createdByName'] as String? ?? '',
-      createdByRole: data['createdByRole'] as String? ?? '',
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
-    );
-  }
 
   factory AnnouncementModel.fromJson(Map<String, dynamic> data) {
     return AnnouncementModel(
@@ -64,7 +48,7 @@ class AnnouncementModel {
       'createdBy': createdBy,
       'createdByName': createdByName,
       'createdByRole': createdByRole,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': DateTime.now().toIso8601String(),
     };
   }
 }

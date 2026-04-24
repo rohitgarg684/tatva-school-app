@@ -150,4 +150,180 @@ class ApiService {
   Future<String?> uploadDocument(
           Uint8List bytes, String classId, String fileName) =>
       _uploadMultipart('/document/upload', bytes, classId, fileName);
+
+  // ─── CRUD ─────────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getUser(String uid) => _get('/user/$uid');
+
+  Future<List<Map<String, dynamic>>> getStudents() async {
+    final data = await _get('/students');
+    return (data['students'] as List?)
+            ?.cast<Map<String, dynamic>>() ??
+        [];
+  }
+
+  Future<Map<String, dynamic>> createUser({
+    required String uid,
+    required String name,
+    required String email,
+    required String role,
+  }) =>
+      _post('/user', {
+        'uid': uid,
+        'name': name,
+        'email': email,
+        'role': role,
+      });
+
+  Future<Map<String, dynamic>> createClass({
+    required String name,
+    required String subject,
+    required String classCode,
+  }) =>
+      _post('/class', {
+        'name': name,
+        'subject': subject,
+        'classCode': classCode,
+      });
+
+  Future<Map<String, dynamic>> joinClass({
+    required String classCode,
+    String? childName,
+  }) =>
+      _post('/class/join', {
+        'classCode': classCode,
+        if (childName != null) 'childName': childName,
+      });
+
+  Future<Map<String, dynamic>> enrollStudent({
+    required String name,
+    String rollNumber = '',
+    String grade = '',
+    String section = '',
+    String parentName = '',
+    String parentPhone = '',
+    List<String> classIds = const [],
+  }) =>
+      _post('/student/enroll', {
+        'name': name,
+        'rollNumber': rollNumber,
+        'grade': grade,
+        'section': section,
+        'parentName': parentName,
+        'parentPhone': parentPhone,
+        'classIds': classIds,
+      });
+
+  Future<Map<String, dynamic>> createHomework({
+    required String title,
+    required String classId,
+    String description = '',
+    String subject = '',
+    String className = '',
+    String dueDate = '',
+  }) =>
+      _post('/homework', {
+        'title': title,
+        'classId': classId,
+        'description': description,
+        'subject': subject,
+        'className': className,
+        'dueDate': dueDate,
+      });
+
+  Future<Map<String, dynamic>> createAnnouncement({
+    required String title,
+    required String body,
+    String audience = 'Everyone',
+  }) =>
+      _post('/announcement', {
+        'title': title,
+        'body': body,
+        'audience': audience,
+      });
+
+  Future<Map<String, dynamic>> createVote({required String question}) =>
+      _post('/vote', {'question': question});
+
+  Future<Map<String, dynamic>> createStoryPost({
+    required String classId,
+    required String text,
+    String className = '',
+    List<String> mediaUrls = const [],
+    String mediaType = 'none',
+  }) =>
+      _post('/story', {
+        'classId': classId,
+        'text': text,
+        'className': className,
+        'mediaUrls': mediaUrls,
+        'mediaType': mediaType,
+      });
+
+  Future<Map<String, dynamic>> enterGrade({
+    required String studentUid,
+    required String classId,
+    required String subject,
+    required String assessmentName,
+    String studentName = '',
+    double score = 0,
+    double total = 100,
+  }) =>
+      _post('/grade', {
+        'studentUid': studentUid,
+        'classId': classId,
+        'subject': subject,
+        'assessmentName': assessmentName,
+        'studentName': studentName,
+        'score': score,
+        'total': total,
+      });
+
+  // ─── Messages ─────────────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getMessages(
+      String conversationId) async {
+    final data = await _get('/messages/$conversationId');
+    return (data['messages'] as List?)
+            ?.cast<Map<String, dynamic>>() ??
+        [];
+  }
+
+  Future<Map<String, dynamic>> sendMessage({
+    required String conversationId,
+    required String receiverUid,
+    required String text,
+  }) =>
+      _post('/messages', {
+        'conversationId': conversationId,
+        'receiverUid': receiverUid,
+        'text': text,
+      });
+
+  Future<List<Map<String, dynamic>>> getGroupMessages(
+      String groupId) async {
+    final data = await _get('/group-messages/$groupId');
+    return (data['messages'] as List?)
+            ?.cast<Map<String, dynamic>>() ??
+        [];
+  }
+
+  Future<Map<String, dynamic>> sendGroupMessage({
+    required String groupId,
+    required String text,
+    String senderName = '',
+  }) =>
+      _post('/group-messages/$groupId', {
+        'text': text,
+        'senderName': senderName,
+      });
+
+  Future<Map<String, dynamic>> getWeeklyReport({
+    required String studentUid,
+    String? startDate,
+    String? endDate,
+  }) =>
+      _get('/report/weekly?studentUid=$studentUid'
+          '${startDate != null ? '&startDate=$startDate' : ''}'
+          '${endDate != null ? '&endDate=$endDate' : ''}');
 }

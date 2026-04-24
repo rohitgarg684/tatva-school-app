@@ -9,10 +9,7 @@ import '../../models/vote_model.dart';
 import '../../repositories/auth_repository.dart';
 import '../../services/api_service.dart';
 import '../../services/dashboard_service.dart';
-import '../../services/announcement_service.dart';
-import '../../services/vote_service.dart';
 import '../../models/activity_event.dart';
-import '../../services/report_service.dart';
 import '../../models/audience.dart';
 import '../../services/class_service.dart';
 import '../../shared/theme/colors.dart';
@@ -64,8 +61,6 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
 
   final _api = ApiService();
   final _dashSvc = DashboardService();
-  final _announceSvc = AnnouncementService();
-  final _voteSvc = VoteService();
   String _uid = '';
 
   UserModel? _user;
@@ -147,13 +142,19 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
 
   Future<void> _loadStudents() async {
     setState(() => _studentsLoading = true);
-    final all = await _classService.getAllStudentRecords();
-    if (!mounted) return;
-    setState(() {
-      _students = all;
-      _filterStudents(_studentSearchCtrl.text);
-      _studentsLoading = false;
-    });
+    try {
+      final rawList = await _api.getStudents();
+      final all = rawList.map((m) => StudentModel.fromJson(m)).toList();
+      if (!mounted) return;
+      setState(() {
+        _students = all;
+        _filterStudents(_studentSearchCtrl.text);
+        _studentsLoading = false;
+      });
+    } catch (e) {
+      debugPrint('_loadStudents error: $e');
+      if (mounted) setState(() => _studentsLoading = false);
+    }
   }
 
   void _filterStudents(String query) {
@@ -201,6 +202,440 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
         AppRouter.toWelcomeAndClearStack(context);
       }
     });
+  }
+
+  void _showStudentPickerForReport() {
+    final searchCtrl = TextEditingController();
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          final query = searchCtrl.text.trim().toLowerCase();
+          final filtered = query.isEmpty
+              ? _students
+              : _students
+                  .where((s) =>
+                      s.name.toLowerCase().contains(query) ||
+                      s.rollNumber.toLowerCase().contains(query))
+                  .toList();
+          return Container(
+            constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.7),
+            decoration: BoxDecoration(
+              color: bgCard,
+              borderRadius:
+                  BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(height: 12),
+                Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2))),
+                SizedBox(height: 16),
+                Text('Select Student for Report',
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: textDark)),
+                SizedBox(height: 12),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: TextField(
+                    controller: searchCtrl,
+                    onChanged: (_) => setModalState(() {}),
+                    style: TextStyle(fontFamily: 'Raleway', fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'Search by name or roll number...',
+                      prefixIcon: Icon(Icons.search, color: textLight),
+                      filled: true,
+                      fillColor: bg,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 8),
+                Expanded(
+                  child: filtered.isEmpty
+                      ? Center(
+                          child: Text(
+                              _studentsLoading
+                                  ? 'Loading students...'
+                                  : 'No students found',
+                              style: TextStyle(
+                                  fontFamily: 'Raleway',
+                                  color: textLight)))
+                      : ListView.builder(
+                          itemCount: filtered.length,
+                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          itemBuilder: (_, i) {
+                            final s = filtered[i];
+                            return ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor:
+                                    primary.withOpacity(0.1),
+                                child: Text(
+                                    s.name.isNotEmpty
+                                        ? s.name[0].toUpperCase()
+                                        : '?',
+                                    style: TextStyle(
+                                        fontFamily: 'Raleway',
+                                        fontWeight: FontWeight.bold,
+                                        color: primary)),
+                              ),
+                              title: Text(s.name,
+                                  style: TextStyle(
+                                      fontFamily: 'Raleway',
+                                      fontWeight: FontWeight.w600,
+                                      color: textDark)),
+                              subtitle: Text(
+                                  '${s.rollNumber}${s.grade.isNotEmpty ? ' • ${s.grade}' : ''}',
+                                  style: TextStyle(
+                                      fontFamily: 'Raleway',
+                                      fontSize: 12,
+                                      color: textLight)),
+                              trailing: Icon(
+                                  Icons.arrow_forward_ios_rounded,
+                                  size: 14,
+                                  color: textLight),
+                              onTap: () {
+                                Navigator.pop(ctx);
+                                _generateReport(s);
+                              },
+                            );
+                          },
+                        ),
+                ),
+                SizedBox(height: 16),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _generateReport(StudentModel student) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Center(child: CircularProgressIndicator(color: primary)),
+    );
+
+    try {
+      final now = DateTime.now();
+      final weekAgo = now.subtract(Duration(days: 7));
+      final report = await _api.getWeeklyReport(
+        studentUid: student.id,
+        startDate:
+            '${weekAgo.year}-${weekAgo.month.toString().padLeft(2, '0')}-${weekAgo.day.toString().padLeft(2, '0')}',
+        endDate:
+            '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
+      );
+      if (mounted) Navigator.pop(context);
+      if (mounted) _showReportSheet(student, report);
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error generating report: $e',
+              style: TextStyle(fontFamily: 'Raleway')),
+          backgroundColor: danger,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+      }
+    }
+  }
+
+  void _showReportSheet(
+      StudentModel student, Map<String, dynamic> report) {
+    final grades = (report['grades'] as List?) ?? [];
+    final behavior = (report['behaviorPoints'] as List?) ?? [];
+    final attendance = (report['attendance'] as List?) ?? [];
+
+    final present =
+        attendance.where((a) => a['status'] == 'Present').length;
+    final total = attendance.length;
+    final attendancePct = total > 0 ? (present / total * 100).round() : 0;
+
+    final totalPoints =
+        behavior.fold<int>(0, (sum, b) => sum + ((b['points'] as num?)?.toInt() ?? 0));
+
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.75),
+        decoration: BoxDecoration(
+          color: bgCard,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(height: 12),
+            Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2))),
+            SizedBox(height: 16),
+            Text('Weekly Report',
+                style: TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: textDark)),
+            SizedBox(height: 4),
+            Text(student.name,
+                style: TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 14,
+                    color: primary,
+                    fontWeight: FontWeight.w600)),
+            SizedBox(height: 20),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      _reportStatCard('Attendance', '$attendancePct%',
+                          Icons.calendar_today_rounded, primary),
+                      SizedBox(width: 12),
+                      _reportStatCard(
+                          'Behavior',
+                          '$totalPoints pts',
+                          Icons.emoji_events_rounded,
+                          Colors.amber.shade700),
+                      SizedBox(width: 12),
+                      _reportStatCard('Grades', '${grades.length}',
+                          Icons.grade_rounded, purple),
+                    ]),
+                    SizedBox(height: 20),
+                    if (grades.isNotEmpty) ...[
+                      Text('Grades',
+                          style: TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: textDark)),
+                      SizedBox(height: 8),
+                      ...grades.map((g) => Padding(
+                            padding: EdgeInsets.only(bottom: 6),
+                            child: Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                    child: Text(
+                                  '${g['subject'] ?? ''} — ${g['assessmentName'] ?? ''}',
+                                  style: TextStyle(
+                                      fontFamily: 'Raleway',
+                                      fontSize: 13,
+                                      color: textDark),
+                                )),
+                                Text(
+                                  '${g['score'] ?? 0}/${g['total'] ?? 100}',
+                                  style: TextStyle(
+                                      fontFamily: 'Raleway',
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: primary),
+                                ),
+                              ],
+                            ),
+                          )),
+                      SizedBox(height: 16),
+                    ],
+                    if (attendance.isNotEmpty) ...[
+                      Text('Attendance ($present/$total days present)',
+                          style: TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: textDark)),
+                      SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: attendance.map((a) {
+                          final status = a['status'] ?? 'Absent';
+                          final color = status == 'Present'
+                              ? success
+                              : status == 'Tardy'
+                                  ? Colors.amber
+                                  : danger;
+                          return Container(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                                color: color.withOpacity(0.1),
+                                borderRadius:
+                                    BorderRadius.circular(8)),
+                            child: Text(
+                              '${a['date'] ?? ''}: $status',
+                              style: TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 11,
+                                  color: color,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      SizedBox(height: 16),
+                    ],
+                    if (behavior.isNotEmpty) ...[
+                      Text('Behavior Points',
+                          style: TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: textDark)),
+                      SizedBox(height: 8),
+                      ...behavior.map((b) => Padding(
+                            padding: EdgeInsets.only(bottom: 4),
+                            child: Row(children: [
+                              Icon(Icons.star_rounded,
+                                  color: Colors.amber, size: 16),
+                              SizedBox(width: 6),
+                              Expanded(
+                                  child: Text(
+                                '${b['categoryId'] ?? 'Point'}: +${b['points'] ?? 1}',
+                                style: TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 13,
+                                    color: textDark),
+                              )),
+                            ]),
+                          )),
+                      SizedBox(height: 16),
+                    ],
+                    if (grades.isEmpty &&
+                        attendance.isEmpty &&
+                        behavior.isEmpty)
+                      Center(
+                          child: Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Text('No data for this week.',
+                            style: TextStyle(
+                                fontFamily: 'Raleway',
+                                color: textLight,
+                                fontSize: 14)),
+                      )),
+                    SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          final csv = _buildCsvReport(
+                              student, grades, attendance, behavior);
+                          Clipboard.setData(ClipboardData(text: csv));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                            content: Text('Report CSV copied to clipboard',
+                                style:
+                                    TextStyle(fontFamily: 'Raleway')),
+                            backgroundColor: primary,
+                            behavior: SnackBarBehavior.floating,
+                          ));
+                        },
+                        icon: Icon(Icons.copy_rounded, size: 18),
+                        label: Text('Copy CSV to Clipboard',
+                            style: TextStyle(
+                                fontFamily: 'Raleway',
+                                fontWeight: FontWeight.w600)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primary,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _reportStatCard(
+      String label, String value, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        padding: EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(children: [
+          Icon(icon, color: color, size: 22),
+          SizedBox(height: 6),
+          Text(value,
+              style: TextStyle(
+                  fontFamily: 'Raleway',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: color)),
+          SizedBox(height: 2),
+          Text(label,
+              style: TextStyle(
+                  fontFamily: 'Raleway', fontSize: 11, color: textLight)),
+        ]),
+      ),
+    );
+  }
+
+  String _buildCsvReport(StudentModel student, List grades,
+      List attendance, List behavior) {
+    final buf = StringBuffer();
+    buf.writeln('Weekly Report: ${student.name}');
+    buf.writeln('Generated: ${DateTime.now().toIso8601String()}');
+    buf.writeln('');
+    buf.writeln('GRADES');
+    buf.writeln('Subject,Assessment,Score,Total');
+    for (final g in grades) {
+      buf.writeln(
+          '${g['subject']},${g['assessmentName']},${g['score']},${g['total']}');
+    }
+    buf.writeln('');
+    buf.writeln('ATTENDANCE');
+    buf.writeln('Date,Status');
+    for (final a in attendance) {
+      buf.writeln('${a['date']},${a['status']}');
+    }
+    buf.writeln('');
+    buf.writeln('BEHAVIOR POINTS');
+    buf.writeln('Category,Points,Note');
+    for (final b in behavior) {
+      buf.writeln('${b['categoryId']},${b['points']},${b['note'] ?? ''}');
+    }
+    return buf.toString();
   }
 
   void _showCreateVote() {
@@ -344,17 +779,18 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                 BouncyTap(
                   onTap: () async {
                     if (questionController.text.trim().isEmpty) return;
+                    final question = questionController.text.trim();
+                    await _api.createVote(question: question);
+                    if (!context.mounted) return;
+                    Navigator.pop(context);
                     final newVote = VoteModel(
                       id: '',
-                      question: questionController.text.trim(),
+                      question: question,
                       type: selectedType.toLowerCase().replaceAll(' ', '_'),
                       createdBy: _uid,
                       createdByName: _user?.name ?? '',
                       createdByRole: 'Principal',
                     );
-                    await _voteSvc.create(newVote);
-                    if (!context.mounted) return;
-                    Navigator.pop(context);
                     setState(() => _voteModels.insert(0, newVote));
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text('Vote sent to all parents!',
@@ -550,18 +986,24 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                 BouncyTap(
                   onTap: () async {
                     if (titleController.text.trim().isEmpty) return;
+                    final title = titleController.text.trim();
+                    final body = bodyController.text.trim();
+                    await _api.createAnnouncement(
+                      title: title,
+                      body: body,
+                      audience: selectedAudience,
+                    );
+                    if (!context.mounted) return;
+                    Navigator.pop(context);
                     final newAnn = AnnouncementModel(
                       id: '',
-                      title: titleController.text.trim(),
-                      body: bodyController.text.trim(),
+                      title: title,
+                      body: body,
                       audience: Audience.fromString(selectedAudience),
                       createdBy: _uid,
                       createdByName: _user?.name ?? '',
                       createdByRole: 'Principal',
                     );
-                    await _announceSvc.post(newAnn);
-                    if (!context.mounted) return;
-                    Navigator.pop(context);
                     setState(() => _announcementModels.insert(0, newAnn));
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text('Announcement sent to $selectedAudience!',
@@ -973,17 +1415,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20),
                 child: BouncyTap(
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text(
-                          'Reports feature ready — select a student to generate.',
-                          style: TextStyle(fontFamily: 'Raleway')),
-                      backgroundColor: purple,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                    ));
-                  },
+                  onTap: () => _showStudentPickerForReport(),
                   child: Container(
                     width: double.infinity,
                     padding: EdgeInsets.all(20),

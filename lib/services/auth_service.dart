@@ -1,24 +1,18 @@
-import '../models/user_model.dart';
 import '../models/user_role.dart';
 import '../repositories/auth_repository.dart';
-import '../repositories/user_repository.dart';
 import 'api_service.dart';
-import 'class_service.dart';
 
 class AuthService {
   final AuthRepository _authRepo;
-  final UserRepository _userRepo;
-  final ClassService _classSvc;
+  final ApiService _api;
 
   AuthService({
     AuthRepository? authRepo,
-    UserRepository? userRepo,
-    ClassService? classSvc,
+    ApiService? api,
   })  : _authRepo = authRepo ?? AuthRepository(),
-        _userRepo = userRepo ?? UserRepository(),
-        _classSvc = classSvc ?? ClassService();
+        _api = api ?? ApiService();
 
-  Future<({UserModel user, UserRole role})?> signIn({
+  Future<({String uid, UserRole role})?> signIn({
     required String email,
     required String password,
   }) async {
@@ -32,18 +26,18 @@ class AuthService {
       throw UnverifiedEmailException();
     }
 
-    final user = await _userRepo.getUser(cred.user!.uid);
-    if (user == null) throw UserNotFoundException();
-
     try {
-      await ApiService().syncClaims();
+      await _api.syncClaims();
     } catch (_) {}
 
-    return (user: user, role: user.role);
+    final tokenResult = await cred.user!.getIdTokenResult(true);
+    final roleStr = tokenResult.claims?['role'] as String?;
+    if (roleStr == null) throw UserNotFoundException();
+
+    final role = UserRole.fromString(roleStr);
+    return (uid: cred.user!.uid, role: role);
   }
 
-  /// Registers a new user, sends verification email, saves to Firestore,
-  /// optionally joins a class, then signs out (user must verify before login).
   Future<String?> register({
     required String name,
     required String email,
@@ -57,24 +51,22 @@ class AuthService {
 
     await cred.user!.sendEmailVerification();
 
-    final user = UserModel(
+    await _api.createUser(
       uid: uid,
       name: name,
       email: email,
-      role: role,
+      role: role.label,
     );
-    await _userRepo.createUser(user);
 
-    // Delegate class-joining to ClassService (no duplication)
     String? classWarning;
     if ((role == UserRole.student || role == UserRole.parent) &&
         classCode != null &&
         classCode.isNotEmpty) {
-      classWarning = await _classSvc.joinClassByCode(
-        classCode: classCode,
-        role: role,
-        childName: childName,
-      );
+      try {
+        await _api.joinClass(classCode: classCode, childName: childName);
+      } catch (e) {
+        classWarning = 'Could not join class: $e';
+      }
     }
 
     await _authRepo.signOut();

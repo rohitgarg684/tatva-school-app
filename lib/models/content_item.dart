@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 enum ContentCategory {
   mindfulness,
   growthMindset,
@@ -89,23 +87,6 @@ class ContentItem {
 
   bool isCompletedBy(String uid) => completedBy.contains(uid);
 
-  factory ContentItem.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
-    return ContentItem(
-      id: doc.id,
-      title: data['title'] as String? ?? '',
-      description: data['description'] as String? ?? '',
-      category: ContentCategory.fromString(data['category'] as String? ?? ''),
-      videoUrl: data['videoUrl'] as String? ?? '',
-      thumbnailUrl: data['thumbnailUrl'] as String? ?? '',
-      duration: data['duration'] as String? ?? '',
-      ageGroup: data['ageGroup'] as String? ?? 'All',
-      viewCount: (data['viewCount'] as num?)?.toInt() ?? 0,
-      completedBy: List<String>.from(data['completedBy'] ?? []),
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
-    );
-  }
-
   factory ContentItem.fromJson(Map<String, dynamic> data) {
     return ContentItem(
       id: data['id'] as String? ?? '',
@@ -135,7 +116,7 @@ class ContentItem {
       'ageGroup': ageGroup,
       'viewCount': viewCount,
       'completedBy': completedBy,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': DateTime.now().toIso8601String(),
     };
   }
 }

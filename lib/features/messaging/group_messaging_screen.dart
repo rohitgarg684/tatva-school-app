@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../../models/message_model.dart';
 import '../../models/group_conversation.dart';
 import '../../repositories/auth_repository.dart';
 import '../../services/group_message_service.dart';
@@ -20,23 +19,32 @@ class _GroupMessagingScreenState extends State<GroupMessagingScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   late String _myUid;
-  List<MessageModel> _messages = [];
-  StreamSubscription? _subscription;
+  List<Map<String, dynamic>> _messages = [];
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _myUid = AuthRepository().currentUid ?? '';
-    _subscription = _msgSvc.getMessages(widget.group.id).listen((msgs) {
-      if (!mounted) return;
-      setState(() => _messages = msgs);
-      _scrollToBottom();
-    });
+    _loadMessages();
+    _pollTimer =
+        Timer.periodic(const Duration(seconds: 3), (_) => _loadMessages());
+  }
+
+  Future<void> _loadMessages() async {
+    try {
+      final msgs = await _msgSvc.getMessages(widget.group.id);
+      if (mounted) {
+        final changed = msgs.length != _messages.length;
+        setState(() => _messages = msgs);
+        if (changed) _scrollToBottom();
+      }
+    } catch (_) {}
   }
 
   @override
   void dispose() {
-    _subscription?.cancel();
+    _pollTimer?.cancel();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -59,24 +67,23 @@ class _GroupMessagingScreenState extends State<GroupMessagingScreen> {
     if (text.isEmpty) return;
     _controller.clear();
 
-    final msg = MessageModel(
-      text: text,
-      senderUid: _myUid,
-      receiverUid: '',
-      conversationId: widget.group.id,
-    );
-
-    await _msgSvc.sendMessage(widget.group.id, msg, 'You');
+    await _msgSvc.sendMessage(widget.group.id, text, 'You');
+    await _loadMessages();
   }
 
-  String _formatTime(DateTime? dt) {
-    if (dt == null) return '';
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inMinutes < 1) return 'now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    return '${dt.day}/${dt.month}';
+  String _formatTime(String? isoStr) {
+    if (isoStr == null) return '';
+    try {
+      final dt = DateTime.parse(isoStr);
+      final now = DateTime.now();
+      final diff = now.difference(dt);
+      if (diff.inMinutes < 1) return 'now';
+      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+      if (diff.inHours < 24) return '${diff.inHours}h ago';
+      return '${dt.day}/${dt.month}';
+    } catch (_) {
+      return '';
+    }
   }
 
   @override
@@ -111,7 +118,7 @@ class _GroupMessagingScreenState extends State<GroupMessagingScreen> {
                     itemCount: _messages.length,
                     itemBuilder: (_, i) {
                       final msg = _messages[i];
-                      final isMe = msg.senderUid == _myUid;
+                      final isMe = msg['senderUid'] == _myUid;
                       return Align(
                         alignment:
                             isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -137,17 +144,24 @@ class _GroupMessagingScreenState extends State<GroupMessagingScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               if (!isMe)
-                                Text(msg.senderUid,
+                                Text(
+                                    msg['senderName'] ??
+                                        msg['senderUid'] ??
+                                        '',
                                     style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w600,
                                         color: TatvaColors.primary)),
-                              Text(msg.text,
+                              Text(msg['text'] ?? '',
                                   style: TextStyle(
-                                      color: isMe ? Colors.white : TatvaColors.textDark,
+                                      color: isMe
+                                          ? Colors.white
+                                          : TatvaColors.textDark,
                                       fontSize: 14)),
                               const SizedBox(height: 4),
-                              Text(_formatTime(msg.createdAt),
+                              Text(
+                                  _formatTime(
+                                      msg['createdAt']?.toString()),
                                   style: TextStyle(
                                       fontSize: 10,
                                       color: isMe
@@ -200,7 +214,8 @@ class _GroupMessagingScreenState extends State<GroupMessagingScreen> {
                       shape: BoxShape.circle,
                     ),
                     child: IconButton(
-                      icon: const Icon(Icons.send, color: Colors.white, size: 20),
+                      icon: const Icon(Icons.send,
+                          color: Colors.white, size: 20),
                       onPressed: _sendMessage,
                     ),
                   ),

@@ -8,6 +8,7 @@ import dashboardRoutes from "./routes/dashboards";
 import actionRoutes from "./routes/actions";
 import uploadRoutes from "./routes/upload";
 import adminRoutes from "./routes/admin";
+import crudRoutes from "./routes/crud";
 import { uploadLimiter, dashboardLimiter, actionLimiter } from "./middleware/rate-limit";
 
 const app = express();
@@ -29,6 +30,7 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api", adminRoutes);
+app.use("/api", actionLimiter, crudRoutes);
 app.use("/api/dashboard", dashboardLimiter, dashboardRoutes);
 app.use("/api/story/upload", uploadLimiter);
 app.use("/api/document/upload", uploadLimiter);

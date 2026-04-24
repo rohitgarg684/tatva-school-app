@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'attendance_status.dart';
 
 class AttendanceRecord {
@@ -21,20 +20,6 @@ class AttendanceRecord {
     required this.markedBy,
     this.createdAt,
   });
-
-  factory AttendanceRecord.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
-    return AttendanceRecord(
-      id: doc.id,
-      studentUid: data['studentUid'] as String? ?? '',
-      studentName: data['studentName'] as String? ?? '',
-      classId: data['classId'] as String? ?? '',
-      date: data['date'] as String? ?? '',
-      status: AttendanceStatus.fromString(data['status'] as String? ?? ''),
-      markedBy: data['markedBy'] as String? ?? '',
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
-    );
-  }
 
   factory AttendanceRecord.fromJson(Map<String, dynamic> data) {
     return AttendanceRecord(
@@ -59,7 +44,7 @@ class AttendanceRecord {
       'date': date,
       'status': status.label,
       'markedBy': markedBy,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': DateTime.now().toIso8601String(),
     };
   }
 }

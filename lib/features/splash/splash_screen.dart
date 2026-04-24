@@ -4,7 +4,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../shared/animations/animations.dart';
 import '../../models/user_role.dart';
-import '../../repositories/user_repository.dart';
 import '../../core/router/app_router.dart';
 import '../auth/login_screen.dart';
 import '../onboarding/onboarding_screen.dart';
@@ -106,9 +105,11 @@ class _SplashScreenState extends State<SplashScreen>
     final firebaseUser = FirebaseAuth.instance.currentUser;
     if (firebaseUser != null) {
       try {
-        final userDoc = await UserRepository().getUser(firebaseUser.uid);
-        if (userDoc != null && mounted) {
-          AppRouter.toDashboardAndClearStack(context, userDoc.role);
+        final tokenResult = await firebaseUser.getIdTokenResult();
+        final roleStr = tokenResult.claims?['role'] as String?;
+        if (roleStr != null && mounted) {
+          final role = UserRole.fromString(roleStr);
+          AppRouter.toDashboardAndClearStack(context, role);
           return;
         }
       } catch (_) {}

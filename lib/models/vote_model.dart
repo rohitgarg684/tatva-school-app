@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class VoteCount {
   final int school;
   final int noSchool;
@@ -58,22 +56,6 @@ class VoteModel {
 
   bool hasVoted(String uid) => voters.contains(uid);
 
-  factory VoteModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
-    return VoteModel(
-      id: doc.id,
-      question: data['question'] as String? ?? '',
-      type: data['type'] as String? ?? '',
-      createdBy: data['createdBy'] as String? ?? '',
-      createdByName: data['createdByName'] as String? ?? '',
-      createdByRole: data['createdByRole'] as String? ?? '',
-      votes: VoteCount.fromMap(data['votes'] as Map<String, dynamic>?),
-      voters: List<String>.from(data['voters'] ?? []),
-      active: data['active'] as bool? ?? true,
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
-    );
-  }
-
   factory VoteModel.fromJson(Map<String, dynamic> data) {
     return VoteModel(
       id: data['id'] as String? ?? '',
@@ -101,7 +83,7 @@ class VoteModel {
       'votes': votes.toMap(),
       'voters': voters,
       'active': active,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': DateTime.now().toIso8601String(),
     };
   }
 }

@@ -7,7 +7,6 @@ import '../../core/router/app_router.dart';
 import '../auth/welcome_screen.dart';
 import '../../repositories/auth_repository.dart';
 import '../../services/dashboard_service.dart';
-import '../../services/homework_service.dart';
 import '../../services/api_service.dart';
 import '../../models/audience.dart';
 import '../../models/user_model.dart';
@@ -49,7 +48,6 @@ class _StudentDashboardState extends State<StudentDashboard>
   static const Color purple = TatvaColors.purple;
 
   final _dashSvc = DashboardService();
-  final _hwSvc = HomeworkService();
   final _api = ApiService();
   String _uid = '';
 
@@ -1160,7 +1158,7 @@ class _StudentDashboardState extends State<StudentDashboard>
                       _completedIds.remove(hw.id);
                     } else {
                       _completedIds.add(hw.id);
-                      _hwSvc.markSubmitted(homeworkId: hw.id, studentUid: _uid);
+                      _api.submitHomework(hw.id);
                     }
                   });
                   if (!isDone) _snack('Marked as done! Great work 🎉');

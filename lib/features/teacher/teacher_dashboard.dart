@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../messaging/messaging_screen.dart';
@@ -10,7 +11,7 @@ import '../../shared/widgets/pick_student_sheet.dart';
 import '../../core/router/app_router.dart';
 import '../../services/class_service.dart';
 import '../../services/dashboard_service.dart';
-import '../../services/homework_service.dart';
+import '../../services/api_service.dart';
 import '../../repositories/auth_repository.dart';
 import '../../models/user_model.dart';
 import '../../models/class_model.dart';
@@ -23,8 +24,6 @@ import '../../models/attendance_record.dart';
 import '../../models/attendance_status.dart';
 import '../../models/story_post.dart';
 import '../../models/activity_event.dart';
-import '../../services/story_service.dart';
-import '../../services/api_service.dart';
 
 class TeacherDashboard extends StatefulWidget {
   const TeacherDashboard({super.key});
@@ -51,8 +50,6 @@ class _TeacherDashboardState extends State<TeacherDashboard>
   static const Color purple = TatvaColors.purple;
 
   final _dashSvc = DashboardService();
-  final _hwSvc = HomeworkService();
-  final _storySvc = StoryService();
   final _api = ApiService();
   String _uid = '';
 
@@ -389,14 +386,19 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                               return;
                             }
                             setModalState(() => isCreating = true);
+                            final code = String.fromCharCodes(
+                              List.generate(6, (_) => Random().nextInt(26) + 65),
+                            );
+                            final name = nameCtrl.text.trim();
                             final result = await ClassService().createClass(
-                              name: nameCtrl.text.trim(),
+                              name: name,
                               subject: subjectCtrl.text.trim(),
+                              classCode: code,
                             );
                             if (!ctx.mounted) return;
                             Navigator.pop(ctx);
                             if (result != null) {
-                              _snack('Class "${result.name}" created! Code: ${result.classCode}');
+                              _snack('Class "$name" created! Code: $code');
                             } else {
                               _snack('Failed to create class. Try again.');
                             }
@@ -1970,7 +1972,14 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                         teacherName: _user?.name ?? '',
                         dueDate: 'Dec 20, 2024',
                       );
-                      await _hwSvc.create(hw);
+                      await _api.createHomework(
+                        title: hw.title,
+                        classId: hw.classId,
+                        description: hw.description,
+                        subject: hw.subject,
+                        className: hw.className,
+                        dueDate: hw.dueDate,
+                      );
                       if (!context.mounted) return;
                       Navigator.pop(context);
                       setState(() => _homework.insert(0, hw));
@@ -2275,7 +2284,11 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                       text: text,
                       createdAt: DateTime.now(),
                     );
-                    _storySvc.createPost(newPost);
+                    _api.createStoryPost(
+                      classId: newPost.classId,
+                      text: newPost.text,
+                      className: newPost.className,
+                    );
                     if (!context.mounted) return;
                     Navigator.pop(context);
                     setState(() => _classStory.insert(0, newPost));

@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class GroupConversation {
   final String id;
   final String classId;
@@ -23,18 +21,21 @@ class GroupConversation {
     this.createdAt,
   });
 
-  factory GroupConversation.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
+  factory GroupConversation.fromJson(Map<String, dynamic> data) {
     return GroupConversation(
-      id: doc.id,
+      id: data['id'] as String? ?? '',
       classId: data['classId'] as String? ?? '',
       className: data['className'] as String? ?? '',
       createdBy: data['createdBy'] as String? ?? '',
       memberUids: List<String>.from(data['memberUids'] ?? []),
       lastMessage: data['lastMessage'] as String? ?? '',
       lastSenderName: data['lastSenderName'] as String? ?? '',
-      lastMessageAt: (data['lastMessageAt'] as Timestamp?)?.toDate(),
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      lastMessageAt: data['lastMessageAt'] != null
+          ? DateTime.tryParse(data['lastMessageAt'] as String)
+          : null,
+      createdAt: data['createdAt'] != null
+          ? DateTime.tryParse(data['createdAt'] as String)
+          : null,
     );
   }
 
@@ -46,8 +47,8 @@ class GroupConversation {
       'memberUids': memberUids,
       'lastMessage': lastMessage,
       'lastSenderName': lastSenderName,
-      'lastMessageAt': FieldValue.serverTimestamp(),
-      'createdAt': FieldValue.serverTimestamp(),
+      'lastMessageAt': DateTime.now().toIso8601String(),
+      'createdAt': DateTime.now().toIso8601String(),
     };
   }
 }

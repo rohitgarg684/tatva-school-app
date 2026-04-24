@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_role.dart';
 import 'child_info.dart';
 
@@ -24,22 +23,6 @@ class UserModel {
   });
 
   String get initial => name.isNotEmpty ? name[0] : '?';
-
-  factory UserModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
-    return UserModel(
-      uid: doc.id,
-      name: data['name'] as String? ?? '',
-      email: data['email'] as String? ?? '',
-      role: UserRole.fromString(data['role'] as String? ?? 'Student'),
-      classIds: List<String>.from(data['classIds'] ?? []),
-      children: (data['children'] as List<dynamic>? ?? [])
-          .map((c) => ChildInfo.fromMap(c as Map<String, dynamic>))
-          .toList(),
-      fcmToken: data['fcmToken'] as String?,
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
-    );
-  }
 
   factory UserModel.fromJson(Map<String, dynamic> data) {
     return UserModel(
@@ -67,7 +50,7 @@ class UserModel {
       'classIds': classIds,
       'children': children.map((c) => c.toMap()).toList(),
       if (fcmToken != null) 'fcmToken': fcmToken,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': DateTime.now().toIso8601String(),
     };
   }
 

@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 enum StoryMediaType {
   none,
   image,
@@ -49,24 +47,6 @@ class StoryPost {
   bool isLikedBy(String uid) => likedBy.contains(uid);
   int get likeCount => likedBy.length;
 
-  factory StoryPost.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
-    return StoryPost(
-      id: doc.id,
-      authorUid: data['authorUid'] as String? ?? '',
-      authorName: data['authorName'] as String? ?? '',
-      authorRole: data['authorRole'] as String? ?? '',
-      classId: data['classId'] as String? ?? '',
-      className: data['className'] as String? ?? '',
-      text: data['text'] as String? ?? '',
-      mediaUrls: List<String>.from(data['mediaUrls'] ?? []),
-      mediaType: StoryMediaType.fromString(data['mediaType'] as String? ?? ''),
-      likedBy: List<String>.from(data['likedBy'] ?? []),
-      commentCount: (data['commentCount'] as num?)?.toInt() ?? 0,
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
-    );
-  }
-
   factory StoryPost.fromJson(Map<String, dynamic> data) {
     return StoryPost(
       id: data['id'] as String? ?? '',
@@ -98,7 +78,7 @@ class StoryPost {
       'mediaType': mediaType.name,
       'likedBy': likedBy,
       'commentCount': commentCount,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': DateTime.now().toIso8601String(),
     };
   }
 }

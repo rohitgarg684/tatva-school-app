@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class HomeworkModel {
   final String id;
   final String title;
@@ -31,23 +29,6 @@ class HomeworkModel {
 
   int get submissionCount => submittedBy.length;
 
-  factory HomeworkModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
-    return HomeworkModel(
-      id: doc.id,
-      title: data['title'] as String? ?? '',
-      description: data['description'] as String? ?? '',
-      subject: data['subject'] as String? ?? '',
-      classId: data['classId'] as String? ?? '',
-      className: data['className'] as String? ?? '',
-      teacherUid: data['teacherUid'] as String? ?? '',
-      teacherName: data['teacherName'] as String? ?? '',
-      dueDate: data['dueDate'] as String? ?? '',
-      submittedBy: List<String>.from(data['submittedBy'] ?? []),
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
-    );
-  }
-
   factory HomeworkModel.fromJson(Map<String, dynamic> data) {
     return HomeworkModel(
       id: data['id'] as String? ?? '',
@@ -77,7 +58,7 @@ class HomeworkModel {
       'teacherName': teacherName,
       'dueDate': dueDate,
       'submittedBy': submittedBy,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': DateTime.now().toIso8601String(),
     };
   }
 }

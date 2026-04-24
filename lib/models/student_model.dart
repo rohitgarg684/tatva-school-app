@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class StudentModel {
   final String id;
   final String name;
@@ -25,10 +23,9 @@ class StudentModel {
     this.createdAt,
   });
 
-  factory StudentModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
+  factory StudentModel.fromJson(Map<String, dynamic> data) {
     return StudentModel(
-      id: doc.id,
+      id: data['id'] as String? ?? '',
       name: data['name'] as String? ?? '',
       rollNumber: data['rollNumber'] as String? ?? '',
       grade: data['grade'] as String? ?? '',
@@ -37,7 +34,9 @@ class StudentModel {
       parentPhone: data['parentPhone'] as String? ?? '',
       classIds: List<String>.from(data['classIds'] ?? []),
       enrolledBy: data['enrolledBy'] as String? ?? '',
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      createdAt: data['createdAt'] != null
+          ? DateTime.tryParse(data['createdAt'] as String)
+          : null,
     );
   }
 
@@ -51,7 +50,7 @@ class StudentModel {
       'parentPhone': parentPhone,
       'classIds': classIds,
       'enrolledBy': enrolledBy,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': DateTime.now().toIso8601String(),
     };
   }
 
