@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { requireAuth } from "../middleware/auth";
 import {
   db,
@@ -17,6 +17,35 @@ import {
 
 const router = Router();
 router.use(requireAuth);
+
+// ─── Access control helpers ─────────────────────────────────────────────────
+
+async function callerSharesClassWith(
+  callerUid: string,
+  targetUid: string
+): Promise<boolean> {
+  const [callerDoc, targetDoc] = await Promise.all([
+    getDoc("users", callerUid),
+    getDoc("users", targetUid),
+  ]);
+  if (!callerDoc || !targetDoc) return false;
+  const callerClasses: string[] = callerDoc.classIds || [];
+  const targetClasses: string[] = targetDoc.classIds || [];
+  return callerClasses.some((c) => targetClasses.includes(c));
+}
+
+async function callerIsParentOf(
+  callerUid: string,
+  childUid: string
+): Promise<boolean> {
+  const callerDoc = await getDoc("users", callerUid);
+  if (!callerDoc || !callerDoc.children) return false;
+  const childDoc = await getDoc("users", childUid);
+  if (!childDoc) return false;
+  return (callerDoc.children as any[]).some(
+    (c: any) => c.childName === childDoc.name
+  );
+}
 
 async function fetchShared(key: string, fetcher: () => Promise<any>) {
   const cached = cacheGet<any>(key);
@@ -61,6 +90,21 @@ function computeSubjectAverages(grades: any[]): Record<string, number> {
 router.get("/student/:uid", async (req, res) => {
   try {
     const uid = req.params.uid || req.uid!;
+    const callerUid = req.uid!;
+    const role = req.role;
+
+    // Access: Student=self, Teacher=class member, Parent=their child, Principal=any
+    if (role === "Student" && callerUid !== uid) {
+      return res.status(403).json({ error: "Students can only view their own dashboard" });
+    }
+    if (role === "Teacher" && callerUid !== uid) {
+      const shared = await callerSharesClassWith(callerUid, uid);
+      if (!shared) return res.status(403).json({ error: "Forbidden: student not in your class" });
+    }
+    if (role === "Parent" && callerUid !== uid) {
+      const isParent = await callerIsParentOf(callerUid, uid);
+      if (!isParent) return res.status(403).json({ error: "Forbidden: not your child" });
+    }
 
     const cacheKey = `student_dash_${uid}`;
     const cached = cacheGet<any>(cacheKey);
@@ -163,6 +207,16 @@ router.get("/student/:uid", async (req, res) => {
 router.get("/teacher/:uid", async (req, res) => {
   try {
     const uid = req.params.uid || req.uid!;
+    const callerUid = req.uid!;
+    const role = req.role;
+
+    // Access: Teacher=self, Principal=any
+    if (role !== "Principal" && callerUid !== uid) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    if (role !== "Teacher" && role !== "Principal") {
+      return res.status(403).json({ error: "Forbidden: insufficient role" });
+    }
 
     const cacheKey = `teacher_dash_${uid}`;
     const cached = cacheGet<any>(cacheKey);
@@ -265,6 +319,16 @@ router.get("/teacher/:uid", async (req, res) => {
 router.get("/parent/:uid", async (req, res) => {
   try {
     const uid = req.params.uid || req.uid!;
+    const callerUid = req.uid!;
+    const role = req.role;
+
+    // Access: Parent=self, Principal=any
+    if (role !== "Principal" && callerUid !== uid) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    if (role !== "Parent" && role !== "Principal") {
+      return res.status(403).json({ error: "Forbidden: insufficient role" });
+    }
 
     const cacheKey = `parent_dash_${uid}`;
     const cached = cacheGet<any>(cacheKey);
@@ -413,6 +477,16 @@ router.get("/parent/:uid", async (req, res) => {
 router.get("/principal/:uid", async (req, res) => {
   try {
     const uid = req.params.uid || req.uid!;
+    const callerUid = req.uid!;
+    const role = req.role;
+
+    // Access: Principal only, self only
+    if (role !== "Principal") {
+      return res.status(403).json({ error: "Forbidden: principal access only" });
+    }
+    if (callerUid !== uid) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
 
     const cacheKey = `principal_dash_${uid}`;
     const cached = cacheGet<any>(cacheKey);

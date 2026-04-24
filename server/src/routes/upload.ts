@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import * as admin from "firebase-admin";
 import multer from "multer";
-import { requireAuth } from "../middleware/auth";
+import { requireAuth, requireRole } from "../middleware/auth";
 import { isValidImage, isValidDocument } from "../lib/file-validation";
 
 // ─── Image upload config ────────────────────────────────────────────────────
@@ -123,6 +123,7 @@ function handleMulterError(err: any, res: Response): boolean {
 
 const router = Router();
 router.use(requireAuth);
+router.use(requireRole("Teacher", "Principal"));
 
 // POST /api/story/upload  (multipart: file + classId)
 router.post(

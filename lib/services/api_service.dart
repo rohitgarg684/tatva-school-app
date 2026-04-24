@@ -57,6 +57,15 @@ class ApiService {
     return json.decode(response.body) as Map<String, dynamic>;
   }
 
+  // ─── Auth ─────────────────────────────────────────────────────────────
+
+  /// Syncs the user's Firestore role into Firebase Auth custom claims.
+  /// Call after login, then force-refresh the token.
+  Future<void> syncClaims() async {
+    await _post('/auth/sync-claims', {});
+    await FirebaseAuth.instance.currentUser?.getIdToken(true);
+  }
+
   // ─── Dashboards ───────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getStudentDashboard(String uid) =>

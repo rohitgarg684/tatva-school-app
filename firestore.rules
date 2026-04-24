@@ -28,10 +28,11 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId) || isPrincipal();
+      // Owner can update their own profile but NOT their role field
+      allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']))
+                    || isPrincipal();
       allow delete: if isPrincipal();
 
-      // Notifications sub-collection
       match /notifications/{notifId} {
         allow read: if isOwner(userId);
         allow create: if isSignedIn();
@@ -52,7 +53,7 @@ service cloud.firestore {
     match /classes/{classId} {
       allow read: if isSignedIn();
       allow create: if isTeacherOrPrincipal();
-      allow update: if isSignedIn();
+      allow update: if isTeacherOrPrincipal();
       allow delete: if isPrincipal();
     }
 
@@ -73,24 +74,27 @@ service cloud.firestore {
     }
 
     // ── Votes ────────────────────────────────────────────────────────
+    // All vote mutations go through server Admin SDK
     match /votes/{voteId} {
       allow read: if isSignedIn();
       allow create: if isPrincipal();
-      allow update: if isSignedIn();
+      allow update: if false;
       allow delete: if isPrincipal();
     }
 
     // ── Homework ─────────────────────────────────────────────────────
+    // Submissions go through server Admin SDK
     match /homework/{homeworkId} {
       allow read: if isSignedIn();
       allow create: if isTeacherOrPrincipal();
-      allow update: if isSignedIn();
+      allow update: if isTeacherOrPrincipal();
       allow delete: if isTeacherOrPrincipal();
     }
 
     // ── Messages (1:1) ──────────────────────────────────────────────
     match /messages/{messageId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn()
+                  && request.auth.uid in resource.data.participantUids;
       allow create: if isSignedIn();
       allow update: if false;
       allow delete: if false;
@@ -105,25 +109,27 @@ service cloud.firestore {
     }
 
     // ── Attendance ──────────────────────────────────────────────────
+    // All attendance mutations go through server Admin SDK
     match /attendance/{recordId} {
       allow read: if isSignedIn();
-      allow create: if isTeacherOrPrincipal();
-      allow update: if isTeacherOrPrincipal();
+      allow create: if false;
+      allow update: if false;
       allow delete: if isPrincipal();
     }
 
     // ── Stories (Class Story / Photo Sharing) ───────────────────────
     match /stories/{storyId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
+      allow create: if isTeacherOrPrincipal();
+      allow update: if isTeacherOrPrincipal();
       allow delete: if isTeacherOrPrincipal();
     }
 
     // ── Activity Feed ───────────────────────────────────────────────
+    // Activity logging goes through server Admin SDK
     match /activities/{eventId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn();
+      allow create: if false;
       allow update: if false;
       allow delete: if isPrincipal();
     }
@@ -132,7 +138,7 @@ service cloud.firestore {
     match /group_conversations/{groupId} {
       allow read: if isSignedIn();
       allow create: if isTeacherOrPrincipal();
-      allow update: if isSignedIn();
+      allow update: if isTeacherOrPrincipal();
       allow delete: if isPrincipal();
 
       match /messages/{msgId} {
@@ -144,10 +150,11 @@ service cloud.firestore {
     }
 
     // ── Beyond School Content ───────────────────────────────────────
+    // Content completion goes through server Admin SDK
     match /content/{itemId} {
       allow read: if isSignedIn();
       allow create: if isPrincipal();
-      allow update: if isSignedIn();
+      allow update: if false;
       allow delete: if isPrincipal();
     }
   }

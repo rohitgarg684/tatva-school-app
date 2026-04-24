@@ -2,6 +2,7 @@ import '../models/user_model.dart';
 import '../models/user_role.dart';
 import '../repositories/auth_repository.dart';
 import '../repositories/user_repository.dart';
+import 'api_service.dart';
 import 'class_service.dart';
 
 class AuthService {
@@ -33,6 +34,10 @@ class AuthService {
 
     final user = await _userRepo.getUser(cred.user!.uid);
     if (user == null) throw UserNotFoundException();
+
+    try {
+      await ApiService().syncClaims();
+    } catch (_) {}
 
     return (user: user, role: user.role);
   }
