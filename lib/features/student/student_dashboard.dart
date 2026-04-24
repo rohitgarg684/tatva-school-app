@@ -8,6 +8,8 @@ import '../auth/welcome_screen.dart';
 import '../../repositories/auth_repository.dart';
 import '../../services/dashboard_service.dart';
 import '../../services/homework_service.dart';
+import '../../services/story_service.dart';
+import '../../services/content_service.dart';
 import '../../models/audience.dart';
 import '../../models/user_model.dart';
 import '../../models/grade_model.dart';
@@ -49,6 +51,7 @@ class _StudentDashboardState extends State<StudentDashboard>
 
   final _dashSvc = DashboardService();
   final _hwSvc = HomeworkService();
+  final _storySvc = StoryService();
   String _uid = '';
 
   UserModel? _user;
@@ -630,6 +633,8 @@ class _StudentDashboardState extends State<StudentDashboard>
           const SizedBox(height: 12),
           _buildAnnouncements(),
           const SizedBox(height: 28),
+          _buildRecentActivity(),
+          const SizedBox(height: 28),
           _buildVoteResults(),
           const SizedBox(height: 24),
         ]),
@@ -764,6 +769,95 @@ class _StudentDashboardState extends State<StudentDashboard>
         );
       },
     );
+  }
+
+  Widget _buildRecentActivity() {
+    if (_activityFeed.isEmpty) return const SizedBox.shrink();
+    final events = _activityFeed.length > 5
+        ? _activityFeed.sublist(0, 5)
+        : _activityFeed;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: const Text('Recent Activity',
+              style: TextStyle(
+                  fontFamily: 'Raleway',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: textDark,
+                  letterSpacing: -0.3))),
+      const SizedBox(height: 12),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+              color: bgCard,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade100)),
+          child: Column(
+            children: events.asMap().entries.map((entry) {
+              final idx = entry.key;
+              final event = entry.value;
+              final icon = _activityIcon(event.type);
+              final timeAgo = event.timestamp != null
+                  ? _formatTimeAgo(event.timestamp!)
+                  : '';
+              return Column(children: [
+                if (idx > 0)
+                  Divider(height: 1, color: Colors.grey.shade100),
+                Padding(
+                  padding: EdgeInsets.only(
+                      top: idx == 0 ? 0 : 10,
+                      bottom: idx == events.length - 1 ? 0 : 10),
+                  child: Row(children: [
+                    Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                            color: info.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(10)),
+                        child: Icon(icon, size: 16, color: info)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child: Text(event.title,
+                            style: const TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: textDark))),
+                    if (timeAgo.isNotEmpty)
+                      Text(timeAgo,
+                          style: const TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 10,
+                              color: textLight)),
+                  ]),
+                ),
+              ]);
+            }).toList(),
+          ),
+        ),
+      ),
+    ]);
+  }
+
+  IconData _activityIcon(String type) {
+    switch (type) {
+      case 'behavior':
+        return Icons.star;
+      case 'attendance':
+        return Icons.check_circle;
+      case 'homework':
+        return Icons.assignment;
+      case 'grades':
+        return Icons.grade;
+      case 'announcements':
+        return Icons.campaign;
+      case 'story':
+        return Icons.photo_camera;
+      default:
+        return Icons.circle;
+    }
   }
 
   Widget _buildVoteResults() {
@@ -1695,21 +1789,27 @@ class _StudentDashboardState extends State<StudentDashboard>
                         ),
                       ],
                       const SizedBox(height: 10),
-                      Row(children: [
-                        Icon(
-                            post.isLikedBy(_uid)
-                                ? Icons.favorite_rounded
-                                : Icons.favorite_border_rounded,
-                            size: 16,
-                            color: post.isLikedBy(_uid) ? danger : textLight),
-                        const SizedBox(width: 4),
-                        Text('${post.likeCount}',
-                            style: const TextStyle(
-                                fontFamily: 'Raleway',
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: textMid)),
-                      ]),
+                      GestureDetector(
+                        onTap: () async {
+                          await _storySvc.toggleLike(post.id, _uid);
+                          _loadUser();
+                        },
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(
+                              post.isLikedBy(_uid)
+                                  ? Icons.favorite_rounded
+                                  : Icons.favorite_border_rounded,
+                              size: 16,
+                              color: post.isLikedBy(_uid) ? danger : textLight),
+                          const SizedBox(width: 4),
+                          Text('${post.likeCount}',
+                              style: const TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: textMid)),
+                        ]),
+                      ),
                     ]),
               ),
             );
@@ -1787,17 +1887,25 @@ class _StudentDashboardState extends State<StudentDashboard>
                     final completed = ci.isCompletedBy(_uid);
                     return StaggeredItem(
                       index: catIdx * 10 + itemEntry.key,
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                            color: bgCard,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                                color: completed
-                                    ? success.withOpacity(0.2)
-                                    : Colors.grey.shade100)),
-                        child: Row(children: [
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: completed
+                            ? null
+                            : () async {
+                                await ContentService().markCompleted(ci.id, _uid);
+                                _loadUser();
+                              },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                              color: bgCard,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                  color: completed
+                                      ? success.withOpacity(0.2)
+                                      : Colors.grey.shade100)),
+                          child: Row(children: [
                           Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
@@ -1867,7 +1975,8 @@ class _StudentDashboardState extends State<StudentDashboard>
                                   ],
                                 ]),
                               ])),
-                        ]),
+                          ]),
+                        ),
                       ),
                     );
                   }),

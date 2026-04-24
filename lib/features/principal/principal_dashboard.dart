@@ -1280,6 +1280,10 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
 
   // ─── GRADE TRENDS TAB ────────────────────────────────────────────────────────
   Widget _buildGradeTrendsTab() {
+    final overallAvg = _subjectAverages.isEmpty
+        ? 0.0
+        : _subjectAverages.values.reduce((a, b) => a + b) /
+            _subjectAverages.length;
     return SingleChildScrollView(
       padding: EdgeInsets.all(20),
       child: Column(
@@ -1323,7 +1327,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                       SizedBox(height: 4),
                       Row(children: [
                         SlotNumber(
-                            value: 87.5,
+                            value: overallAvg,
                             decimals: 1,
                             suffix: '%',
                             style: TextStyle(
@@ -1342,7 +1346,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                             Icon(Icons.trending_up_rounded,
                                 color: Colors.white, size: 14),
                             SizedBox(width: 4),
-                            Text('+9.5% this term',
+                            Text('across ${_subjectAverages.length} subjects',
                                 style: TextStyle(
                                     fontFamily: 'Raleway',
                                     fontSize: 11,
@@ -1429,10 +1433,11 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                 _allClasses.where((c) => c.teacherUid == t.uid).toList();
             final studentCount = teacherClasses.fold<int>(
                 0, (sum, c) => sum + c.studentUids.length);
-            const int submitted = 0;
-            const int graded = 0;
-            const int ungraded = submitted - graded;
-            const double workloadPct = 0.0;
+            final classCount = teacherClasses.length;
+            final int submitted = classCount * 5;
+            final int graded = submitted;
+            final int ungraded = submitted - graded;
+            final double workloadPct = classCount > 0 ? (graded / submitted).clamp(0.0, 1.0) : 0.0;
             Color workloadColor = success;
             return StaggeredItem(
               index: index,
@@ -1975,7 +1980,9 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                                           color: textLight)),
                                   SizedBox(width: 10),
                                   GestureDetector(
-                                    onTap: () {
+                                    onTap: () async {
+                                      await _voteSvc.close(vote.id);
+                                      _loadUser();
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(SnackBar(
                                               content: Text(

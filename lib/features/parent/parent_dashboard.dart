@@ -9,6 +9,7 @@ import '../../core/router/app_router.dart';
 import '../../repositories/auth_repository.dart';
 import '../../services/dashboard_service.dart';
 import '../../services/vote_service.dart';
+import '../../services/story_service.dart';
 import '../../services/attendance_service.dart';
 import '../../services/report_service.dart';
 import '../../models/user_model.dart';
@@ -52,6 +53,7 @@ class _ParentDashboardState extends State<ParentDashboard>
 
   final _dashSvc = DashboardService();
   final _voteSvc = VoteService();
+  final _storySvc = StoryService();
   String _uid = '';
 
   UserModel? _user;
@@ -403,6 +405,7 @@ class _ParentDashboardState extends State<ParentDashboard>
             _homeTab(),
             _progressTab(),
             _buildBehaviorTab(),
+            _learnTab(),
             _storyTab(),
             _voteTab(),
             _profileTab(),
@@ -424,6 +427,11 @@ class _ParentDashboardState extends State<ParentDashboard>
         'icon': Icons.emoji_events_outlined,
         'active': Icons.emoji_events_rounded,
         'label': 'Behavior'
+      },
+      {
+        'icon': Icons.lightbulb_outline,
+        'active': Icons.lightbulb_rounded,
+        'label': 'Learn'
       },
       {
         'icon': Icons.auto_stories_outlined,
@@ -752,7 +760,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                       () => _switchTab(1)),
                   const SizedBox(width: 8),
                   _qaBtn('Cast\nVote', Icons.how_to_vote_outlined, accent,
-                      () => _switchTab(4)),
+                      () => _switchTab(5)),
                 ])),
             const SizedBox(height: 24),
             Padding(
@@ -815,6 +823,107 @@ class _ParentDashboardState extends State<ParentDashboard>
                                 color: textLight)),
                       ]),
                 )),
+            if (_activityFeed.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: const Text('Recent Activity',
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: textDark,
+                          letterSpacing: -0.3))),
+              const SizedBox(height: 12),
+              ..._activityFeed.take(5).toList().asMap().entries.map((entry) {
+                final evt = entry.value;
+                final timeAgo = evt.createdAt != null
+                    ? _formatTimeAgo(evt.createdAt!)
+                    : '';
+                IconData evtIcon;
+                Color evtColor;
+                switch (evt.type) {
+                  case ActivityType.behaviorPoint:
+                    evtIcon = Icons.star_rounded;
+                    evtColor = purple;
+                    break;
+                  case ActivityType.attendance:
+                    evtIcon = Icons.calendar_today_rounded;
+                    evtColor = info;
+                    break;
+                  case ActivityType.homeworkAssigned:
+                    evtIcon = Icons.assignment_outlined;
+                    evtColor = accent;
+                    break;
+                  case ActivityType.homeworkSubmitted:
+                    evtIcon = Icons.assignment_turned_in_outlined;
+                    evtColor = success;
+                    break;
+                  case ActivityType.gradeEntered:
+                    evtIcon = Icons.grading_rounded;
+                    evtColor = info;
+                    break;
+                  case ActivityType.announcement:
+                    evtIcon = Icons.campaign_outlined;
+                    evtColor = danger;
+                    break;
+                  case ActivityType.storyPost:
+                    evtIcon = Icons.auto_stories_outlined;
+                    evtColor = purple;
+                    break;
+                  case ActivityType.voteCreated:
+                    evtIcon = Icons.how_to_vote_outlined;
+                    evtColor = accent;
+                    break;
+                  case ActivityType.studentEnrolled:
+                    evtIcon = Icons.person_add_outlined;
+                    evtColor = success;
+                    break;
+                }
+                return Container(
+                  margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                      color: bgCard,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.grey.shade100)),
+                  child: Row(children: [
+                    Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                            color: evtColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10)),
+                        child: Icon(evtIcon, color: evtColor, size: 18)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                          Text(evt.title,
+                              style: const TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: textDark)),
+                          if (evt.body.isNotEmpty)
+                            Text(evt.body,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 11,
+                                    color: textMid)),
+                        ])),
+                    if (timeAgo.isNotEmpty)
+                      Text(timeAgo,
+                          style: const TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 10,
+                              color: textLight)),
+                  ]),
+                );
+              }),
+            ],
             const SizedBox(height: 24),
           ]),
         ));
@@ -1420,6 +1529,169 @@ class _ParentDashboardState extends State<ParentDashboard>
     return '${dt.day}/${dt.month}';
   }
 
+  // ─── LEARN ──────────────────────────────────────────────────────────────────
+  Widget _learnTab() {
+    final child = _currentChild;
+    final childUid = child?.childUid ?? '';
+    final Map<String, List<ContentItem>> byCategory = {};
+    for (final item in _contentItems) {
+      final key = '${item.category.emoji} ${item.category.label}';
+      byCategory.putIfAbsent(key, () => []).add(item);
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const SizedBox(height: 8),
+        _childSwitcher(),
+        FadeSlideIn(
+            child: const Text('Beyond School',
+                style: TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: textDark,
+                    letterSpacing: -0.8))),
+        const SizedBox(height: 4),
+        FadeSlideIn(
+            delayMs: 60,
+            child: Text(
+                "At-home learning for ${child?.info.childName ?? 'your child'}",
+                style: const TextStyle(
+                    fontFamily: 'Raleway', fontSize: 13, color: textLight))),
+        const SizedBox(height: 20),
+        if (_contentItems.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              child: Column(children: [
+                Icon(Icons.lightbulb_outline_rounded,
+                    size: 48, color: textLight.withOpacity(0.4)),
+                const SizedBox(height: 12),
+                const Text('No content yet',
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: textLight)),
+              ]),
+            ),
+          )
+        else
+          ...byCategory.entries.toList().asMap().entries.map((entry) {
+            final catIdx = entry.key;
+            final catLabel = entry.value.key;
+            final items = entry.value.value;
+            return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (catIdx > 0) const SizedBox(height: 20),
+                  StaggeredItem(
+                    index: catIdx,
+                    child: Text(catLabel,
+                        style: const TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: textDark)),
+                  ),
+                  const SizedBox(height: 10),
+                  ...items.asMap().entries.map((itemEntry) {
+                    final ci = itemEntry.value;
+                    final completed = ci.isCompletedBy(childUid);
+                    return StaggeredItem(
+                      index: catIdx * 10 + itemEntry.key,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                            color: bgCard,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                                color: completed
+                                    ? success.withOpacity(0.2)
+                                    : Colors.grey.shade100)),
+                        child: Row(children: [
+                          Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                  color: completed
+                                      ? success.withOpacity(0.08)
+                                      : info.withOpacity(0.08),
+                                  borderRadius: BorderRadius.circular(10)),
+                              child: Icon(
+                                  completed
+                                      ? Icons.check_circle_rounded
+                                      : Icons.play_circle_outline_rounded,
+                                  color: completed ? success : info,
+                                  size: 20)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                Text(ci.title,
+                                    style: TextStyle(
+                                        fontFamily: 'Raleway',
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: textDark,
+                                        decoration: completed
+                                            ? TextDecoration.lineThrough
+                                            : null,
+                                        decorationColor: textLight)),
+                                if (ci.description.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 3),
+                                    child: Text(ci.description,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                            fontFamily: 'Raleway',
+                                            fontSize: 11,
+                                            color: textMid,
+                                            height: 1.4)),
+                                  ),
+                                const SizedBox(height: 4),
+                                Row(children: [
+                                  const Icon(Icons.schedule_rounded,
+                                      size: 11, color: textLight),
+                                  const SizedBox(width: 4),
+                                  Text(ci.duration,
+                                      style: const TextStyle(
+                                          fontFamily: 'Raleway',
+                                          fontSize: 10,
+                                          color: textLight)),
+                                  if (completed) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                          color: success.withOpacity(0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(4)),
+                                      child: const Text('Completed',
+                                          style: TextStyle(
+                                              fontFamily: 'Raleway',
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w700,
+                                              color: success)),
+                                    ),
+                                  ],
+                                ]),
+                              ])),
+                        ]),
+                      ),
+                    );
+                  }),
+                ]);
+          }),
+        const SizedBox(height: 24),
+      ]),
+    );
+  }
+
   // ─── STORY ──────────────────────────────────────────────────────────────────
   Widget _storyTab() {
     return SingleChildScrollView(
@@ -1546,14 +1818,32 @@ class _ParentDashboardState extends State<ParentDashboard>
                           ],
                           const SizedBox(height: 10),
                           Row(children: [
-                            Icon(Icons.favorite_border_rounded,
-                                color: textLight, size: 16),
-                            const SizedBox(width: 4),
-                            Text('${post.likeCount}',
-                                style: const TextStyle(
-                                    fontFamily: 'Raleway',
-                                    fontSize: 12,
-                                    color: textLight)),
+                            GestureDetector(
+                              onTap: () async {
+                                await _storySvc.toggleLike(post.id, _uid);
+                                _loadData();
+                              },
+                              child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                        post.isLikedBy(_uid)
+                                            ? Icons.favorite_rounded
+                                            : Icons.favorite_border_rounded,
+                                        color: post.isLikedBy(_uid)
+                                            ? danger
+                                            : textLight,
+                                        size: 16),
+                                    const SizedBox(width: 4),
+                                    Text('${post.likeCount}',
+                                        style: TextStyle(
+                                            fontFamily: 'Raleway',
+                                            fontSize: 12,
+                                            color: post.isLikedBy(_uid)
+                                                ? danger
+                                                : textLight)),
+                                  ]),
+                            ),
                             const SizedBox(width: 16),
                             Icon(Icons.chat_bubble_outline_rounded,
                                 color: textLight, size: 15),

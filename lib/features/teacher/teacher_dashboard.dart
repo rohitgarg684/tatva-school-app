@@ -723,6 +723,67 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                 _qaBtn('Messages', Icons.chat_outlined, purple,
                     () => _switchTab(7)),
               ])),
+          if (_activityFeed.isNotEmpty) ...[
+            const SizedBox(height: 28),
+            Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: const Text('Recent Activity',
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: textDark))),
+            const SizedBox(height: 12),
+            ..._activityFeed.take(5).map((event) {
+              final icon = switch (event.type.name) {
+                'behaviorPoint' => Icons.star,
+                'attendance' => Icons.check_circle,
+                'homeworkAssigned' => Icons.assignment,
+                'gradeEntered' => Icons.grade,
+                'announcement' => Icons.campaign,
+                'storyPost' => Icons.photo_camera,
+                _ => Icons.circle,
+              };
+              final ago = event.createdAt != null
+                  ? _timeAgo(event.createdAt!)
+                  : '';
+              return Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                child: Row(
+                  children: [
+                    Icon(icon, size: 20, color: primary),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(event.title,
+                              style: const TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: textDark)),
+                          if (event.body.isNotEmpty)
+                            Text(event.body,
+                                style: const TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 12,
+                                    color: textLight)),
+                        ],
+                      ),
+                    ),
+                    if (ago.isNotEmpty)
+                      Text(ago,
+                          style: const TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 11,
+                              color: textLight)),
+                  ],
+                ),
+              );
+            }),
+          ],
           const SizedBox(height: 28),
           Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -1603,7 +1664,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
 
   Widget _hwCard(HomeworkModel hw, int idx) {
     final subs = hw.submissionCount;
-    final total = 0;
+    final total = _students.length;
     final pct = total > 0 ? subs / total : 0.0;
     final isDone = false;
     final color = isDone ? success : accent;
