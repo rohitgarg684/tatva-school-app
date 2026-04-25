@@ -1,4 +1,4 @@
-import 'dart:math' show min, max;
+import 'dart:math' show Random, min, max;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/announcement_model.dart';
@@ -1829,6 +1829,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
             _buildGradeTrendsTab(),
             _buildTeacherWorkloadTab(),
             _buildStudentsTab(),
+            _buildClassesTab(),
             _buildCommunicateTab(),
             _buildProfileTab(),
           ],
@@ -1863,6 +1864,11 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
         'icon': Icons.school_outlined,
         'activeIcon': Icons.school_rounded,
         'label': 'Students'
+      },
+      {
+        'icon': Icons.class_outlined,
+        'activeIcon': Icons.class_rounded,
+        'label': 'Classes'
       },
       {
         'icon': Icons.campaign_outlined,
@@ -3287,6 +3293,475 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ─── CLASSES TAB ─────────────────────────────────────────────────────────────
+  Widget _buildClassesTab() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(20, 24, 20, 0),
+          child: FadeSlideIn(
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('All Classes',
+                          style: TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: textDark,
+                              letterSpacing: -0.8)),
+                      SizedBox(height: 4),
+                      Text('${_allClasses.length} classes',
+                          style: TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 13,
+                              color: textLight)),
+                    ],
+                  ),
+                ),
+                BouncyTap(
+                  onTap: _showPrincipalCreateClass,
+                  child: Container(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: primary,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                            color: primary.withOpacity(0.3),
+                            blurRadius: 10,
+                            offset: Offset(0, 3)),
+                      ],
+                    ),
+                    child:
+                        Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.add_rounded,
+                          color: Colors.white, size: 16),
+                      SizedBox(width: 6),
+                      Text('Create Class',
+                          style: TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white)),
+                    ]),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        SizedBox(height: 16),
+        Expanded(
+          child: _allClasses.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.class_outlined,
+                          color: textLight, size: 48),
+                      SizedBox(height: 12),
+                      Text('No classes yet',
+                          style: TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 15,
+                              color: textLight)),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  color: primary,
+                  onRefresh: _loadUser,
+                  child: ListView.builder(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: _allClasses.length,
+                    itemBuilder: (_, index) {
+                      final cls = _allClasses[index];
+                      final colors = [
+                        primary, info, accent, purple, success, danger
+                      ];
+                      final cardColor = colors[index % colors.length];
+                      return StaggeredItem(
+                        index: index,
+                        child: GestureDetector(
+                          onTap: () => _showClassDetail(cls, cardColor),
+                          child: Container(
+                            margin: EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                                color: bgCard,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                    color: Colors.grey.shade100)),
+                            child: Column(children: [
+                              Container(
+                                padding: EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                    gradient: LinearGradient(colors: [
+                                      cardColor.withOpacity(0.12),
+                                      cardColor.withOpacity(0.04),
+                                    ]),
+                                    borderRadius: BorderRadius.vertical(
+                                        top: Radius.circular(16))),
+                                child: Row(children: [
+                                  Expanded(
+                                      child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                        Text(cls.name,
+                                            style: TextStyle(
+                                                fontFamily: 'Raleway',
+                                                fontSize: 16,
+                                                fontWeight:
+                                                    FontWeight.bold,
+                                                color: textDark)),
+                                        Text(cls.subject,
+                                            style: TextStyle(
+                                                fontFamily: 'Raleway',
+                                                fontSize: 12,
+                                                color: textLight)),
+                                      ])),
+                                  Container(
+                                      padding: EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                          color: accent.withOpacity(0.15),
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                          border: Border.all(
+                                              color: accent
+                                                  .withOpacity(0.3))),
+                                      child: Text(cls.classCode,
+                                          style: TextStyle(
+                                              fontFamily: 'Raleway',
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: accent,
+                                              letterSpacing: 2))),
+                                ]),
+                              ),
+                              Padding(
+                                  padding: EdgeInsets.fromLTRB(
+                                      16, 12, 16, 8),
+                                  child: Row(children: [
+                                    Icon(Icons.person_outline,
+                                        color: textLight, size: 16),
+                                    SizedBox(width: 4),
+                                    Text(cls.teacherName,
+                                        style: TextStyle(
+                                            fontFamily: 'Raleway',
+                                            fontSize: 12,
+                                            color: textLight)),
+                                    SizedBox(width: 12),
+                                    Icon(Icons.people_outline,
+                                        color: textLight, size: 16),
+                                    SizedBox(width: 4),
+                                    Text(
+                                        '${cls.studentUids.length} students',
+                                        style: TextStyle(
+                                            fontFamily: 'Raleway',
+                                            fontSize: 12,
+                                            color: textLight)),
+                                    Spacer(),
+                                    GestureDetector(
+                                        onTap: () =>
+                                            _confirmPrincipalDeleteClass(
+                                                cls),
+                                        child: Container(
+                                            padding:
+                                                EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 6),
+                                            decoration: BoxDecoration(
+                                                color: danger
+                                                    .withOpacity(0.08),
+                                                borderRadius:
+                                                    BorderRadius
+                                                        .circular(8),
+                                                border: Border.all(
+                                                    color: danger
+                                                        .withOpacity(
+                                                            0.2))),
+                                            child: Icon(
+                                                Icons
+                                                    .delete_outline_rounded,
+                                                color: danger,
+                                                size: 16))),
+                                  ])),
+                            ]),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  void _showPrincipalCreateClass() {
+    final nameCtrl = TextEditingController();
+    final subjectCtrl = TextEditingController();
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Padding(
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: StatefulBuilder(
+          builder: (ctx, setModalState) {
+            bool isCreating = false;
+            return Container(
+              decoration: BoxDecoration(
+                color: bgCard,
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: EdgeInsets.fromLTRB(24, 16, 24, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 3,
+                      decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(2)),
+                    ),
+                  ),
+                  SizedBox(height: 20),
+                  Row(children: [
+                    Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                          color: primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10)),
+                      child: Icon(Icons.class_outlined,
+                          color: primary, size: 18),
+                    ),
+                    SizedBox(width: 10),
+                    Text('Create New Class',
+                        style: TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: textDark)),
+                  ]),
+                  SizedBox(height: 4),
+                  Text('A unique class code will be generated',
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 13,
+                          color: textLight)),
+                  SizedBox(height: 20),
+                  Text('Class Name',
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: textDark)),
+                  SizedBox(height: 8),
+                  TextField(
+                    controller: nameCtrl,
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 14,
+                        color: textDark),
+                    decoration: InputDecoration(
+                      hintText: 'e.g. Grade 8 — Section A',
+                      hintStyle: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 13,
+                          color: Colors.grey.shade400),
+                      filled: true,
+                      fillColor: bg,
+                      contentPadding: EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              BorderSide(color: Colors.grey.shade200)),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                              color: primary.withOpacity(0.5),
+                              width: 1.5)),
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  Text('Subject',
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: textDark)),
+                  SizedBox(height: 8),
+                  TextField(
+                    controller: subjectCtrl,
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 14,
+                        color: textDark),
+                    decoration: InputDecoration(
+                      hintText: 'e.g. Mathematics',
+                      hintStyle: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 13,
+                          color: Colors.grey.shade400),
+                      filled: true,
+                      fillColor: bg,
+                      contentPadding: EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              BorderSide(color: Colors.grey.shade200)),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                              color: primary.withOpacity(0.5),
+                              width: 1.5)),
+                    ),
+                  ),
+                  SizedBox(height: 24),
+                  BouncyTap(
+                    onTap: isCreating
+                        ? null
+                        : () async {
+                            if (nameCtrl.text.trim().isEmpty ||
+                                subjectCtrl.text.trim().isEmpty) {
+                              return;
+                            }
+                            setModalState(() => isCreating = true);
+                            final code = String.fromCharCodes(
+                              List.generate(
+                                  6, (_) => Random().nextInt(26) + 65),
+                            );
+                            final name = nameCtrl.text.trim();
+                            try {
+                              await ApiService().createClass(
+                                name: name,
+                                subject: subjectCtrl.text.trim(),
+                                classCode: code,
+                              );
+                              if (!ctx.mounted) return;
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                      content: Text(
+                                          'Class "$name" created! Code: $code')));
+                              _loadUser();
+                            } catch (e) {
+                              if (!ctx.mounted) return;
+                              setModalState(() => isCreating = false);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                      content: Text(
+                                          'Failed to create class')));
+                            }
+                          },
+                    child: Container(
+                      width: double.infinity,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: primary,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                              color: primary.withOpacity(0.3),
+                              blurRadius: 12,
+                              offset: Offset(0, 4)),
+                        ],
+                      ),
+                      child: Center(
+                        child: isCreating
+                            ? SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                    color: Colors.white, strokeWidth: 2))
+                            : Text('Create Class',
+                                style: TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  void _confirmPrincipalDeleteClass(ClassModel cls) {
+    HapticFeedback.lightImpact();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Delete Class',
+            style: TextStyle(
+                fontFamily: 'Raleway', fontWeight: FontWeight.bold)),
+        content: Text(
+            'Are you sure you want to delete "${cls.name}"?\n\n'
+            'This will remove ${cls.studentUids.length} student(s) and '
+            '${cls.parentUids.length} parent(s) from this class. '
+            'This action cannot be undone.',
+            style: TextStyle(fontFamily: 'Raleway', fontSize: 14)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel',
+                style:
+                    TextStyle(fontFamily: 'Raleway', color: textLight)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await ApiService().deleteClass(cls.id);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('"${cls.name}" deleted')));
+                _loadUser();
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('Failed to delete class')));
+                debugPrint('Delete class error: $e');
+              }
+            },
+            child: Text('Delete',
+                style: TextStyle(
+                    fontFamily: 'Raleway',
+                    color: danger,
+                    fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }

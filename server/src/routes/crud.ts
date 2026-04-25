@@ -83,6 +83,59 @@ router.post(
   }
 );
 
+router.delete(
+  "/class/:classId",
+  requireRole("Teacher", "Principal"),
+  async (req, res) => {
+    try {
+      const classId = req.params.classId as string;
+      const uid = req.uid!;
+      const role = req.role;
+
+      const classDoc = await db.collection("classes").doc(classId).get();
+      if (!classDoc.exists)
+        return res.status(404).json({ error: "Class not found" });
+
+      const classData = classDoc.data()!;
+
+      if (role === "Teacher" && classData.teacherUid !== uid)
+        return res.status(403).json({ error: "You can only delete your own classes" });
+
+      const batch = db.batch();
+
+      batch.delete(classDoc.ref);
+
+      // Remove classId from teacher's user doc
+      if (classData.teacherUid) {
+        batch.update(db.collection("users").doc(classData.teacherUid), {
+          classIds: admin.firestore.FieldValue.arrayRemove(classId),
+        });
+      }
+
+      // Remove classId from enrolled students/parents user docs
+      const memberUids = [
+        ...(classData.studentUids || []),
+        ...(classData.parentUids || []),
+      ];
+      for (const memberId of memberUids) {
+        batch.update(db.collection("users").doc(memberId), {
+          classIds: admin.firestore.FieldValue.arrayRemove(classId),
+        });
+      }
+
+      await batch.commit();
+
+      cacheDeletePrefix("teacher_dash_");
+      cacheDeletePrefix("principal_dash_");
+      cacheDeletePrefix("student_dash_");
+      cacheDeletePrefix("parent_dash_");
+      res.json({ id: classId, deleted: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
 router.post("/class/join", async (req, res) => {
   try {
     const { classCode, childName } = req.body;

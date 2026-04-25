@@ -387,17 +387,6 @@ class _LoginScreenState extends State<LoginScreen>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          _trustBadge(Icons.lock_outline, 'Secure'),
-                          SizedBox(width: 24),
-                          _trustBadge(Icons.shield_outlined, 'Role-Based'),
-                          SizedBox(width: 24),
-                          _trustBadge(Icons.school_outlined, 'Tatva'),
-                        ],
-                      ),
-                      SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
                           Text("Don't have an account?",
                               style: TextStyle(
                                   fontFamily: 'Raleway',
@@ -484,15 +473,6 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _trustBadge(IconData icon, String label) => Column(
-        children: [
-          Icon(icon, size: 18, color: accent),
-          SizedBox(height: 4),
-          Text(label,
-              style: TextStyle(
-                  fontFamily: 'Raleway', fontSize: 10, color: textMuted)),
-        ],
-      );
 }
 
 class _PressableButton extends StatefulWidget {

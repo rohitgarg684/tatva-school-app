@@ -57,6 +57,17 @@ class ApiService {
     return json.decode(response.body) as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> _delete(String path) async {
+    final headers = await _authHeaders();
+    final response = await http
+        .delete(Uri.parse('$_baseUrl$path'), headers: headers)
+        .timeout(const Duration(seconds: 30));
+    if (response.statusCode != 200) {
+      throw Exception('API error ${response.statusCode}: ${response.body}');
+    }
+    return json.decode(response.body) as Map<String, dynamic>;
+  }
+
   // ─── Auth ─────────────────────────────────────────────────────────────
 
   /// Syncs the user's Firestore role into Firebase Auth custom claims.
@@ -185,6 +196,9 @@ class ApiService {
         'subject': subject,
         'classCode': classCode,
       });
+
+  Future<Map<String, dynamic>> deleteClass(String classId) =>
+      _delete('/class/$classId');
 
   Future<Map<String, dynamic>> joinClass({
     required String classCode,

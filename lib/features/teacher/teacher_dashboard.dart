@@ -441,6 +441,50 @@ class _TeacherDashboardState extends State<TeacherDashboard>
     );
   }
 
+  void _confirmDeleteClass(ClassModel cls) {
+    HapticFeedback.lightImpact();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Class',
+            style: TextStyle(
+                fontFamily: 'Raleway', fontWeight: FontWeight.bold)),
+        content: Text(
+            'Are you sure you want to delete "${cls.name}"?\n\n'
+            'This will remove ${cls.studentUids.length} student(s) and '
+            '${cls.parentUids.length} parent(s) from this class. '
+            'This action cannot be undone.',
+            style: const TextStyle(fontFamily: 'Raleway', fontSize: 14)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel',
+                style: TextStyle(fontFamily: 'Raleway', color: textLight)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await ApiService().deleteClass(cls.id);
+                _snack('"${cls.name}" deleted');
+                _loadUser();
+              } catch (e) {
+                _snack('Failed to delete class');
+                debugPrint('Delete class error: $e');
+              }
+            },
+            child: const Text('Delete',
+                style: TextStyle(
+                    fontFamily: 'Raleway',
+                    color: danger,
+                    fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _addStudentOption({
     required IconData icon,
     required Color color,
@@ -1077,6 +1121,19 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                                     color: primary,
                                     fontWeight: FontWeight.w600))
                           ]))),
+                  const Spacer(),
+                  GestureDetector(
+                      onTap: () => _confirmDeleteClass(c),
+                      child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                              color: danger.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(8),
+                              border:
+                                  Border.all(color: danger.withOpacity(0.2))),
+                          child: Icon(Icons.delete_outline_rounded,
+                              color: danger, size: 16))),
                 ])),
           ]),
         ));
