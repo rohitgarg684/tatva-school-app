@@ -71,6 +71,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
   List<UserModel> _parents = [];
   Map<String, double> _subjectAverages = {};
   List<GradeModel> _allGrades = [];
+  List<UserModel> _studentUsers = [];
   List<AnnouncementModel> _announcementModels = [];
   List<VoteModel> _voteModels = [];
   List<ActivityEvent> _activityFeed = [];
@@ -128,6 +129,7 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
       _parents = data.parents;
       _subjectAverages = data.subjectAverages;
       _allGrades = data.allGrades;
+      _studentUsers = data.students;
       _announcementModels = data.announcements;
       _voteModels = data.activeVotes;
       _activityFeed = data.activityFeed;
@@ -722,49 +724,58 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                     final classGrades = teacherGrades
                         .where((g) => g.classId == cls.id)
                         .toList();
-                    return Container(
-                      margin: EdgeInsets.only(bottom: 10),
-                      padding: EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                          color: bg,
-                          borderRadius: BorderRadius.circular(14)),
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(children: [
-                              Icon(Icons.class_rounded,
-                                  color: color, size: 18),
-                              SizedBox(width: 8),
-                              Expanded(
-                                  child: Text(cls.name,
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showClassDetail(cls, color);
+                      },
+                      child: Container(
+                        margin: EdgeInsets.only(bottom: 10),
+                        padding: EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                            color: bg,
+                            borderRadius: BorderRadius.circular(14)),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(children: [
+                                Icon(Icons.class_rounded,
+                                    color: color, size: 18),
+                                SizedBox(width: 8),
+                                Expanded(
+                                    child: Text(cls.name,
+                                        style: TextStyle(
+                                            fontFamily: 'Raleway',
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            color: textDark))),
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                      color: color.withOpacity(0.1),
+                                      borderRadius:
+                                          BorderRadius.circular(8)),
+                                  child: Text(cls.subject,
                                       style: TextStyle(
                                           fontFamily: 'Raleway',
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: textDark))),
-                              Container(
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                    color: color.withOpacity(0.1),
-                                    borderRadius:
-                                        BorderRadius.circular(8)),
-                                child: Text(cls.subject,
-                                    style: TextStyle(
-                                        fontFamily: 'Raleway',
-                                        fontSize: 11,
-                                        color: color,
-                                        fontWeight: FontWeight.w600)),
-                              ),
+                                          fontSize: 11,
+                                          color: color,
+                                          fontWeight: FontWeight.w600)),
+                                ),
+                                SizedBox(width: 8),
+                                Icon(Icons.arrow_forward_ios_rounded,
+                                    color: textLight, size: 12),
+                              ]),
+                              SizedBox(height: 8),
+                              Text(
+                                  '${cls.studentUids.length} students • ${classGrades.length} grades • Code: ${cls.classCode}',
+                                  style: TextStyle(
+                                      fontFamily: 'Raleway',
+                                      fontSize: 12,
+                                      color: textLight)),
                             ]),
-                            SizedBox(height: 8),
-                            Text(
-                                '${cls.studentUids.length} students • ${classGrades.length} grades • Code: ${cls.classCode}',
-                                style: TextStyle(
-                                    fontFamily: 'Raleway',
-                                    fontSize: 12,
-                                    color: textLight)),
-                          ]),
+                      ),
                     );
                   }),
                   SizedBox(height: 8),
@@ -805,6 +816,403 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
                   SizedBox(height: 16),
                 ],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showClassDetail(ClassModel cls, Color color) {
+    final classStudents = _studentUsers
+        .where((u) => cls.studentUids.contains(u.uid))
+        .toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+    final classGrades =
+        _allGrades.where((g) => g.classId == cls.id).toList();
+    final classParents = _parents
+        .where((p) => cls.parentUids.contains(p.uid))
+        .toList();
+
+    final gradeAvg = classGrades.isEmpty
+        ? 0.0
+        : classGrades.map((g) => g.percentage).reduce((a, b) => a + b) /
+            classGrades.length;
+
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.82),
+        decoration: BoxDecoration(
+          color: bgCard,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(height: 12),
+            Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2))),
+            SizedBox(height: 16),
+            Text(cls.name,
+                style: TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: textDark)),
+            SizedBox(height: 4),
+            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Container(
+                padding:
+                    EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8)),
+                child: Text(cls.subject,
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 12,
+                        color: color,
+                        fontWeight: FontWeight.w600)),
+              ),
+              SizedBox(width: 8),
+              Text('Code: ${cls.classCode}',
+                  style: TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 12,
+                      color: textLight)),
+            ]),
+            SizedBox(height: 4),
+            Text('Teacher: ${cls.teacherName}',
+                style: TextStyle(
+                    fontFamily: 'Raleway', fontSize: 13, color: textLight)),
+            SizedBox(height: 16),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Row(children: [
+                _reportStatCard('Students', '${classStudents.length}',
+                    Icons.people_rounded, color),
+                SizedBox(width: 10),
+                _reportStatCard('Parents', '${classParents.length}',
+                    Icons.family_restroom_rounded, info),
+                SizedBox(width: 10),
+                _reportStatCard(
+                    'Avg',
+                    '${gradeAvg.toStringAsFixed(1)}%',
+                    Icons.grade_rounded,
+                    gradeAvg >= 80
+                        ? success
+                        : gradeAvg >= 60
+                            ? accent
+                            : danger),
+              ]),
+            ),
+            SizedBox(height: 16),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Students',
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: textDark)),
+              ),
+            ),
+            SizedBox(height: 8),
+            Expanded(
+              child: classStudents.isEmpty
+                  ? Center(
+                      child: Text('No students enrolled',
+                          style: TextStyle(
+                              fontFamily: 'Raleway', color: textLight)))
+                  : ListView.builder(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: classStudents.length,
+                      itemBuilder: (ctx, i) {
+                        final s = classStudents[i];
+                        final studentGrades = classGrades
+                            .where((g) => g.studentUid == s.uid)
+                            .toList();
+                        final sAvg = studentGrades.isEmpty
+                            ? null
+                            : studentGrades
+                                    .map((g) => g.percentage)
+                                    .reduce((a, b) => a + b) /
+                                studentGrades.length;
+                        return GestureDetector(
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            _showStudentDetail(s, color);
+                          },
+                          child: Container(
+                            margin: EdgeInsets.only(bottom: 8),
+                            padding: EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                                color: bg,
+                                borderRadius: BorderRadius.circular(12)),
+                            child: Row(children: [
+                              CircleAvatar(
+                                radius: 18,
+                                backgroundColor: color.withOpacity(0.1),
+                                child: Text(s.initial,
+                                    style: TextStyle(
+                                        fontFamily: 'Raleway',
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: color)),
+                              ),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(s.name,
+                                          style: TextStyle(
+                                              fontFamily: 'Raleway',
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: textDark)),
+                                      Text(s.email,
+                                          style: TextStyle(
+                                              fontFamily: 'Raleway',
+                                              fontSize: 11,
+                                              color: textLight)),
+                                    ]),
+                              ),
+                              if (sAvg != null) ...[
+                                Text('${sAvg.toStringAsFixed(0)}%',
+                                    style: TextStyle(
+                                        fontFamily: 'Raleway',
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: sAvg >= 80
+                                            ? success
+                                            : sAvg >= 60
+                                                ? accent
+                                                : danger)),
+                                SizedBox(width: 6),
+                              ],
+                              Icon(Icons.arrow_forward_ios_rounded,
+                                  color: textLight, size: 12),
+                            ]),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showStudentDetail(UserModel student, Color color) {
+    final studentGrades =
+        _allGrades.where((g) => g.studentUid == student.uid).toList();
+    final bySubject = <String, List<GradeModel>>{};
+    for (final g in studentGrades) {
+      bySubject.putIfAbsent(g.subject, () => []).add(g);
+    }
+
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.75),
+        decoration: BoxDecoration(
+          color: bgCard,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(height: 12),
+            Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2))),
+            SizedBox(height: 16),
+            CircleAvatar(
+              radius: 28,
+              backgroundColor: color.withOpacity(0.12),
+              child: Text(student.initial,
+                  style: TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: color)),
+            ),
+            SizedBox(height: 10),
+            Text(student.name,
+                style: TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: textDark)),
+            SizedBox(height: 2),
+            Text(student.email,
+                style: TextStyle(
+                    fontFamily: 'Raleway', fontSize: 13, color: textLight)),
+            SizedBox(height: 16),
+            Expanded(
+              child: studentGrades.isEmpty
+                  ? Center(
+                      child: Text('No grades recorded yet',
+                          style: TextStyle(
+                              fontFamily: 'Raleway', color: textLight)))
+                  : ListView(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      children: bySubject.entries.map((entry) {
+                        final subjectAvg =
+                            entry.value
+                                    .map((g) => g.percentage)
+                                    .reduce((a, b) => a + b) /
+                                entry.value.length;
+                        final avgColor = subjectAvg >= 80
+                            ? success
+                            : subjectAvg >= 60
+                                ? accent
+                                : danger;
+                        return Container(
+                          margin: EdgeInsets.only(bottom: 12),
+                          padding: EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                              color: bg,
+                              borderRadius: BorderRadius.circular(14)),
+                          child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Row(children: [
+                                  Expanded(
+                                      child: Text(entry.key,
+                                          style: TextStyle(
+                                              fontFamily: 'Raleway',
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: textDark))),
+                                  Text(
+                                      '${subjectAvg.toStringAsFixed(0)}%',
+                                      style: TextStyle(
+                                          fontFamily: 'Raleway',
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: avgColor)),
+                                ]),
+                                SizedBox(height: 4),
+                                AnimatedProgressBar(
+                                    value: subjectAvg / 100,
+                                    color: avgColor,
+                                    height: 4,
+                                    delayMs: 200),
+                                SizedBox(height: 8),
+                                ...entry.value.map((g) => Padding(
+                                      padding:
+                                          EdgeInsets.only(bottom: 4),
+                                      child: Row(children: [
+                                        Expanded(
+                                            child: Text(g.assessmentName,
+                                                style: TextStyle(
+                                                    fontFamily:
+                                                        'Raleway',
+                                                    fontSize: 12,
+                                                    color: textLight))),
+                                        Text(
+                                            '${g.score.toInt()}/${g.total.toInt()}',
+                                            style: TextStyle(
+                                                fontFamily: 'Raleway',
+                                                fontSize: 12,
+                                                fontWeight:
+                                                    FontWeight.w600,
+                                                color: textDark)),
+                                      ]),
+                                    )),
+                              ]),
+                        );
+                      }).toList(),
+                    ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(20, 8, 20, 16),
+              child: Row(children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => MessagingScreen(
+                            otherUserId: student.uid,
+                            otherUserName: student.name,
+                            otherUserRole: 'Student',
+                            otherUserEmail: student.email,
+                            avatarColor: color,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: Icon(Icons.chat_bubble_outline_rounded, size: 16),
+                    label: Text('Message',
+                        style: TextStyle(
+                            fontFamily: 'Raleway',
+                            fontWeight: FontWeight.w600)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: color,
+                      side: BorderSide(color: color.withOpacity(0.3)),
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _generateReport(
+                          StudentModel(
+                            id: student.uid,
+                            name: student.name,
+                            rollNumber: '',
+                            grade: '',
+                            section: '',
+                            parentName: '',
+                            parentPhone: '',
+                          ));
+                    },
+                    icon: Icon(Icons.summarize_rounded, size: 16),
+                    label: Text('Report',
+                        style: TextStyle(
+                            fontFamily: 'Raleway',
+                            fontWeight: FontWeight.w600)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: color,
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ]),
             ),
           ],
         ),
