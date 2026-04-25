@@ -23,6 +23,7 @@ import '../../models/story_post.dart';
 import '../../models/activity_event.dart';
 import '../../models/content_item.dart';
 import '../../models/schedule_model.dart';
+import '../../shared/widgets/attendance_detail_sheet.dart';
 
 class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
@@ -572,58 +573,83 @@ class _StudentDashboardState extends State<StudentDashboard>
           // ── Attendance Summary ──
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                  color: bgCard,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: info.withOpacity(0.2))),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Container(
-                      padding: const EdgeInsets.all(8),
+            child: GestureDetector(
+              onTap: () => AttendanceDetailSheet.show(
+                context,
+                records: _attendance,
+                studentName: _user?.name ?? 'Student',
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                    color: bgCard,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: info.withOpacity(0.2))),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                            color: info.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10)),
+                        child: const Icon(Icons.calendar_today_rounded,
+                            color: info, size: 16)),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text('Attendance',
+                          style: TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: textDark)),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                          color: info.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(10)),
-                      child: const Icon(Icons.calendar_today_rounded,
-                          color: info, size: 16)),
-                  const SizedBox(width: 10),
-                  const Text('Attendance',
-                      style: TextStyle(
-                          fontFamily: 'Raleway',
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: textDark)),
+                          color: info.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(8)),
+                      child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                        Text('Details',
+                            style: TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: info)),
+                        SizedBox(width: 2),
+                        Icon(Icons.arrow_forward_ios_rounded, color: info, size: 10),
+                      ]),
+                    ),
+                  ]),
+                  const SizedBox(height: 14),
+                  Builder(builder: (_) {
+                    final presentCount = _attendance
+                        .where((r) => r.status == AttendanceStatus.present)
+                        .length;
+                    final absentCount = _attendance
+                        .where((r) => r.status == AttendanceStatus.absent)
+                        .length;
+                    final tardyCount = _attendance
+                        .where((r) => r.status == AttendanceStatus.tardy)
+                        .length;
+                    return Row(children: [
+                      _attendanceStat(
+                          '${AttendanceStatus.present.emoji} Present',
+                          '$presentCount',
+                          success),
+                      const SizedBox(width: 10),
+                      _attendanceStat(
+                          '${AttendanceStatus.absent.emoji} Absent',
+                          '$absentCount',
+                          danger),
+                      const SizedBox(width: 10),
+                      _attendanceStat(
+                          '${AttendanceStatus.tardy.emoji} Tardy',
+                          '$tardyCount',
+                          accent),
+                    ]);
+                  }),
                 ]),
-                const SizedBox(height: 14),
-                Builder(builder: (_) {
-                  final presentCount = _attendance
-                      .where((r) => r.status == AttendanceStatus.present)
-                      .length;
-                  final absentCount = _attendance
-                      .where((r) => r.status == AttendanceStatus.absent)
-                      .length;
-                  final tardyCount = _attendance
-                      .where((r) => r.status == AttendanceStatus.tardy)
-                      .length;
-                  return Row(children: [
-                    _attendanceStat(
-                        '${AttendanceStatus.present.emoji} Present',
-                        '$presentCount',
-                        success),
-                    const SizedBox(width: 10),
-                    _attendanceStat(
-                        '${AttendanceStatus.absent.emoji} Absent',
-                        '$absentCount',
-                        danger),
-                    const SizedBox(width: 10),
-                    _attendanceStat(
-                        '${AttendanceStatus.tardy.emoji} Tardy',
-                        '$tardyCount',
-                        accent),
-                  ]);
-                }),
-              ]),
+              ),
             ),
           ),
           const SizedBox(height: 24),

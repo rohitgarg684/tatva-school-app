@@ -24,6 +24,7 @@ import '../../models/activity_event.dart';
 import '../../models/content_item.dart';
 import '../../models/weekly_report.dart';
 import '../../models/schedule_model.dart';
+import '../../shared/widgets/attendance_detail_sheet.dart';
 
 class ParentDashboard extends StatefulWidget {
   const ParentDashboard({super.key});
@@ -679,44 +680,78 @@ class _ParentDashboardState extends State<ParentDashboard>
             // Attendance summary
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                    color: bgCard,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey.shade100)),
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [
-                        Icon(Icons.calendar_today_rounded,
-                            color: info, size: 15),
-                        const SizedBox(width: 6),
-                        const Text('Attendance',
-                            style: TextStyle(
-                                fontFamily: 'Raleway',
-                                fontSize: 12,
-                                color: info,
-                                fontWeight: FontWeight.w700)),
+              child: GestureDetector(
+                onTap: () {
+                  if (child != null) {
+                    AttendanceDetailSheet.show(
+                      context,
+                      records: child.attendance,
+                      studentName: child.info.childName,
+                    );
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                      color: bgCard,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey.shade100)),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          Icon(Icons.calendar_today_rounded,
+                              color: info, size: 15),
+                          const SizedBox(width: 6),
+                          const Expanded(
+                            child: Text('Attendance',
+                                style: TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 12,
+                                    color: info,
+                                    fontWeight: FontWeight.w700)),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                                color: info.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(8)),
+                            child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text('Details',
+                                      style: TextStyle(
+                                          fontFamily: 'Raleway',
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: info)),
+                                  SizedBox(width: 2),
+                                  Icon(Icons.arrow_forward_ios_rounded,
+                                      color: info, size: 10),
+                                ]),
+                          ),
+                        ]),
+                        const SizedBox(height: 12),
+                        Row(children: [
+                          _attChip(
+                              '${attSummary.present}', 'Present', success),
+                          const SizedBox(width: 10),
+                          _attChip('${attSummary.absent}', 'Absent', danger),
+                          const SizedBox(width: 10),
+                          _attChip('${attSummary.tardy}', 'Tardy', accent),
+                          const Spacer(),
+                          if (attSummary.total > 0)
+                            Text(
+                                '${(attSummary.present / attSummary.total * 100).toStringAsFixed(0)}%',
+                                style: const TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: success)),
+                        ]),
                       ]),
-                      const SizedBox(height: 12),
-                      Row(children: [
-                        _attChip('${attSummary.present}', 'Present', success),
-                        const SizedBox(width: 10),
-                        _attChip('${attSummary.absent}', 'Absent', danger),
-                        const SizedBox(width: 10),
-                        _attChip('${attSummary.tardy}', 'Tardy', accent),
-                        const Spacer(),
-                        if (attSummary.total > 0)
-                          Text(
-                              '${(attSummary.present / attSummary.total * 100).toStringAsFixed(0)}%',
-                              style: const TextStyle(
-                                  fontFamily: 'Raleway',
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: success)),
-                      ]),
-                    ]),
+                ),
               ),
             ),
             const SizedBox(height: 12),
