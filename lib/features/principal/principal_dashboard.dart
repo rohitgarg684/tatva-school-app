@@ -639,6 +639,179 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
     return buf.toString();
   }
 
+  void _showTeacherDetail(
+      UserModel teacher, List<ClassModel> teacherClasses, Color color) {
+    final totalStudents = teacherClasses.fold<int>(
+        0, (sum, c) => sum + c.studentUids.length);
+    final teacherGrades =
+        _allGrades.where((g) => g.teacherUid == teacher.uid).toList();
+    final subjects =
+        teacherClasses.map((c) => c.subject).toSet().toList();
+
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.8),
+        decoration: BoxDecoration(
+          color: bgCard,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(height: 12),
+            Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2))),
+            SizedBox(height: 20),
+            CircleAvatar(
+              radius: 32,
+              backgroundColor: color.withOpacity(0.12),
+              child: Text(teacher.initial,
+                  style: TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: color)),
+            ),
+            SizedBox(height: 12),
+            Text(teacher.name,
+                style: TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: textDark)),
+            SizedBox(height: 4),
+            Text(teacher.email,
+                style: TextStyle(
+                    fontFamily: 'Raleway', fontSize: 13, color: textLight)),
+            SizedBox(height: 4),
+            Text(subjects.join(', '),
+                style: TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 13,
+                    color: color,
+                    fontWeight: FontWeight.w600)),
+            SizedBox(height: 16),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Row(children: [
+                _reportStatCard('Classes', '${teacherClasses.length}',
+                    Icons.class_rounded, color),
+                SizedBox(width: 10),
+                _reportStatCard('Students', '$totalStudents',
+                    Icons.people_rounded, info),
+                SizedBox(width: 10),
+                _reportStatCard('Grades', '${teacherGrades.length}',
+                    Icons.grade_rounded, accent),
+              ]),
+            ),
+            SizedBox(height: 16),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                children: [
+                  ...teacherClasses.map((cls) {
+                    final classGrades = teacherGrades
+                        .where((g) => g.classId == cls.id)
+                        .toList();
+                    return Container(
+                      margin: EdgeInsets.only(bottom: 10),
+                      padding: EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                          color: bg,
+                          borderRadius: BorderRadius.circular(14)),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(children: [
+                              Icon(Icons.class_rounded,
+                                  color: color, size: 18),
+                              SizedBox(width: 8),
+                              Expanded(
+                                  child: Text(cls.name,
+                                      style: TextStyle(
+                                          fontFamily: 'Raleway',
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: textDark))),
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                    color: color.withOpacity(0.1),
+                                    borderRadius:
+                                        BorderRadius.circular(8)),
+                                child: Text(cls.subject,
+                                    style: TextStyle(
+                                        fontFamily: 'Raleway',
+                                        fontSize: 11,
+                                        color: color,
+                                        fontWeight: FontWeight.w600)),
+                              ),
+                            ]),
+                            SizedBox(height: 8),
+                            Text(
+                                '${cls.studentUids.length} students • ${classGrades.length} grades • Code: ${cls.classCode}',
+                                style: TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 12,
+                                    color: textLight)),
+                          ]),
+                    );
+                  }),
+                  SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                MessagingScreen(
+                                  otherUserId: teacher.uid,
+                                  otherUserName: teacher.name,
+                                  otherUserRole: 'Teacher',
+                                  otherUserEmail: teacher.email,
+                                  avatarColor: color,
+                                ),
+                          ),
+                        );
+                      },
+                      icon: Icon(Icons.chat_bubble_outline_rounded,
+                          size: 16),
+                      label: Text('Message ${teacher.name.split(' ').first}',
+                          style: TextStyle(
+                              fontFamily: 'Raleway',
+                              fontWeight: FontWeight.w600)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: color,
+                        side: BorderSide(color: color.withOpacity(0.3)),
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showSubjectGradeDetail(String subject, Color color) {
     final subjectGrades =
         _allGrades.where((g) => g.subject == subject).toList()
@@ -2020,83 +2193,88 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
               index: index,
               child: FlipCard(
                 delayMs: index * 80,
-                child: Container(
-                  margin: EdgeInsets.only(bottom: 14),
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                      color: bgCard,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey.shade100)),
-                  child: Column(children: [
-                    Row(children: [
-                      CircleAvatar(
-                          radius: 22,
-                          backgroundColor: tColor.withOpacity(0.12),
-                          child: Text(t.initial,
-                              style: TextStyle(
-                                  fontFamily: 'Raleway',
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: tColor))),
-                      SizedBox(width: 14),
-                      Expanded(
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                            Text(t.name,
+                child: GestureDetector(
+                  onTap: () => _showTeacherDetail(t, teacherClasses, tColor),
+                  child: Container(
+                    margin: EdgeInsets.only(bottom: 14),
+                    padding: EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                        color: bgCard,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey.shade100)),
+                    child: Column(children: [
+                      Row(children: [
+                        CircleAvatar(
+                            radius: 22,
+                            backgroundColor: tColor.withOpacity(0.12),
+                            child: Text(t.initial,
                                 style: TextStyle(
                                     fontFamily: 'Raleway',
-                                    fontSize: 14,
+                                    fontSize: 16,
                                     fontWeight: FontWeight.bold,
-                                    color: textDark,
-                                    letterSpacing: -0.2)),
-                            Text(
-                                teacherClasses.isNotEmpty
-                                    ? teacherClasses.first.subject
-                                    : 'N/A',
-                                style: TextStyle(
-                                    fontFamily: 'Raleway',
-                                    fontSize: 12,
-                                    color: textLight)),
-                          ])),
+                                    color: tColor))),
+                        SizedBox(width: 14),
+                        Expanded(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                              Text(t.name,
+                                  style: TextStyle(
+                                      fontFamily: 'Raleway',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: textDark,
+                                      letterSpacing: -0.2)),
+                              Text(
+                                  teacherClasses.isNotEmpty
+                                      ? teacherClasses.first.subject
+                                      : 'N/A',
+                                  style: TextStyle(
+                                      fontFamily: 'Raleway',
+                                      fontSize: 12,
+                                      color: textLight)),
+                            ])),
+                        Icon(Icons.arrow_forward_ios_rounded,
+                            color: textLight, size: 14),
+                      ]),
+                      SizedBox(height: 14),
+                      Row(children: [
+                        Expanded(
+                            child: _workloadStat(
+                                '${teacherClasses.length}', 'Classes', tColor)),
+                        Expanded(
+                            child: _workloadStat(
+                                '$studentCount', 'Students', tColor)),
+                        Expanded(
+                            child: _workloadStat(
+                                '$submitted', 'Submitted', tColor)),
+                        Expanded(
+                            child:
+                                _workloadStat('$graded', 'Graded', tColor)),
+                      ]),
+                      SizedBox(height: 12),
+                      Row(children: [
+                        Text('Grading Backlog',
+                            style: TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 11,
+                                color: textLight)),
+                        Spacer(),
+                        Text('$ungraded of $submitted ungraded',
+                            style: TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 11,
+                                color: workloadColor,
+                                fontWeight: FontWeight.bold)),
+                      ]),
+                      SizedBox(height: 6),
+                      AnimatedProgressBar(
+                          value: workloadPct,
+                          color: workloadColor,
+                          height: 6,
+                          delayMs: 300 + index * 100),
                     ]),
-                    SizedBox(height: 14),
-                    Row(children: [
-                      Expanded(
-                          child: _workloadStat(
-                              '${teacherClasses.length}', 'Classes', tColor)),
-                      Expanded(
-                          child: _workloadStat(
-                              '$studentCount', 'Students', tColor)),
-                      Expanded(
-                          child: _workloadStat(
-                              '$submitted', 'Submitted', tColor)),
-                      Expanded(
-                          child:
-                              _workloadStat('$graded', 'Graded', tColor)),
-                    ]),
-                    SizedBox(height: 12),
-                    Row(children: [
-                      Text('Grading Backlog',
-                          style: TextStyle(
-                              fontFamily: 'Raleway',
-                              fontSize: 11,
-                              color: textLight)),
-                      Spacer(),
-                      Text('$ungraded of $submitted ungraded',
-                          style: TextStyle(
-                              fontFamily: 'Raleway',
-                              fontSize: 11,
-                              color: workloadColor,
-                              fontWeight: FontWeight.bold)),
-                    ]),
-                    SizedBox(height: 6),
-                    AnimatedProgressBar(
-                        value: workloadPct,
-                        color: workloadColor,
-                        height: 6,
-                        delayMs: 300 + index * 100),
-                  ]),
+                  ),
                 ),
               ),
             );
