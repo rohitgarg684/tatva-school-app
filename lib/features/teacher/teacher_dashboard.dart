@@ -72,6 +72,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
   bool _tSchedLoaded = false;
   int _tSchedDay = 0;
   String _tSchedSelectedGS = '';
+  String _storySelectedClassId = '';
 
   @override
   void initState() {
@@ -2858,6 +2859,48 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                         fontWeight: FontWeight.bold,
                         color: textDark)),
                 const SizedBox(height: 16),
+                if (_classes.length > 1)
+                  StatefulBuilder(builder: (ctx2, setSheet) {
+                    return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Class',
+                              style: TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: textLight)),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                                color: bg,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.grey.shade200)),
+                            child: DropdownButton<String>(
+                              value: _storySelectedClassId.isNotEmpty &&
+                                      _classes.any((c) => c.id == _storySelectedClassId)
+                                  ? _storySelectedClassId
+                                  : (_classes.isNotEmpty ? _classes.first.id : null),
+                              isExpanded: true,
+                              underline: const SizedBox.shrink(),
+                              style: const TextStyle(
+                                  fontFamily: 'Raleway', fontSize: 14, color: textDark),
+                              items: _classes
+                                  .map((c) => DropdownMenuItem(
+                                      value: c.id,
+                                      child: Text('${c.name} — ${c.subject}')))
+                                  .toList(),
+                              onChanged: (v) {
+                                if (v != null) {
+                                  setSheet(() => _storySelectedClassId = v);
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ]);
+                  }),
                 TextField(
                   controller: textCtrl,
                   maxLines: 4,
@@ -2890,10 +2933,14 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                   onTap: () async {
                     final text = textCtrl.text.trim();
                     if (text.isEmpty) return;
-                    final classId =
-                        _classes.isNotEmpty ? _classes.first.id : '';
-                    final className =
-                        _classes.isNotEmpty ? _classes.first.name : '';
+                    final selId = _storySelectedClassId.isNotEmpty
+                        ? _storySelectedClassId
+                        : (_classes.isNotEmpty ? _classes.first.id : '');
+                    final selCls = _classes.cast<ClassModel?>().firstWhere(
+                        (c) => c!.id == selId,
+                        orElse: () => _classes.isNotEmpty ? _classes.first : null);
+                    final classId = selCls?.id ?? '';
+                    final className = selCls?.name ?? '';
                     final newPost = StoryPost(
                       authorUid: _uid,
                       authorName: _user?.name ?? '',
