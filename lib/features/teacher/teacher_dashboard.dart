@@ -1784,168 +1784,125 @@ class _TeacherDashboardState extends State<TeacherDashboard>
       Map<String, Map<String, String>> gsMap, List<PeriodSlot> allPeriods) {
     final colors = [primary, info, accent, purple, success, danger];
     final c = colors[index % colors.length];
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-          color: bgCard,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.grey.shade100)),
-      child: Row(children: [
-        Container(
-          width: 4,
-          height: 48,
-          decoration: BoxDecoration(
-              color: slot.subject.isNotEmpty ? c : Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(2)),
-        ),
-        const SizedBox(width: 12),
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('${slot.startTime} - ${slot.endTime}',
-              style: const TextStyle(
-                  fontFamily: 'Raleway',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: textLight)),
-          const SizedBox(height: 2),
-          Text('Period ${slot.period}',
-              style: const TextStyle(
-                  fontFamily: 'Raleway', fontSize: 10, color: textLight)),
-        ]),
-        const SizedBox(width: 12),
-        Expanded(
-          child: slot.subject.isNotEmpty
-              ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(slot.subject,
-                      style: TextStyle(
-                          fontFamily: 'Raleway',
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: c)),
-                  if (slot.teacherName.isNotEmpty)
-                    Text(slot.teacherName,
-                        style: const TextStyle(
+    final hasClass = slot.subject.isNotEmpty;
+    return GestureDetector(
+      onTap: () => _editPeriodSlot(
+          slot, index, dayOfWeek, selectedGS, gsMap, allPeriods),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+            color: bgCard,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+                color: hasClass ? c.withOpacity(0.2) : Colors.grey.shade100)),
+        child: Row(children: [
+          Container(
+            width: 4,
+            height: 48,
+            decoration: BoxDecoration(
+                color: hasClass ? c : Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2)),
+          ),
+          const SizedBox(width: 12),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${slot.startTime} - ${slot.endTime}',
+                style: const TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: textLight)),
+            const SizedBox(height: 2),
+            Text('Period ${slot.period}',
+                style: const TextStyle(
+                    fontFamily: 'Raleway', fontSize: 10, color: textLight)),
+          ]),
+          const SizedBox(width: 12),
+          Expanded(
+            child: hasClass
+                ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(slot.subject,
+                        style: TextStyle(
                             fontFamily: 'Raleway',
-                            fontSize: 11,
-                            color: textLight)),
-                ])
-              : Text('Tap to assign',
-                  style: TextStyle(
-                      fontFamily: 'Raleway',
-                      fontSize: 13,
-                      fontStyle: FontStyle.italic,
-                      color: Colors.grey.shade400)),
-        ),
-        GestureDetector(
-          onTap: () => _editPeriodSlot(
-              slot, index, dayOfWeek, selectedGS, gsMap, allPeriods),
-          child: Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-                color: primary.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(8)),
-            child: Icon(Icons.edit_outlined, color: primary, size: 16),
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: c)),
+                    if (slot.teacherName.isNotEmpty)
+                      Text(slot.teacherName,
+                          style: const TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 11,
+                              color: textLight)),
+                  ])
+                : Text('Tap to assign class',
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
+                        color: Colors.grey.shade400)),
           ),
-        ),
-        const SizedBox(width: 6),
-        GestureDetector(
-          onTap: () {
-            final updated = List<PeriodSlot>.from(allPeriods)..removeAt(index);
-            for (int j = 0; j < updated.length; j++) {
-              updated[j] = updated[j].copyWith(period: j + 1);
-            }
-            _saveScheduleDay(gsMap[selectedGS]!, dayOfWeek, updated);
-          },
-          child: Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-                color: danger.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(8)),
-            child: Icon(Icons.close_rounded, color: danger, size: 16),
-          ),
-        ),
-      ]),
+          Icon(Icons.chevron_right_rounded, color: Colors.grey.shade300, size: 20),
+        ]),
+      ),
     );
   }
 
   void _editPeriodSlot(
       PeriodSlot slot, int index, int dayOfWeek, String selectedGS,
       Map<String, Map<String, String>> gsMap, List<PeriodSlot> allPeriods) {
-    final subjectCtrl = TextEditingController(text: slot.subject);
-    final teacherCtrl = TextEditingController(text: slot.teacherName);
     final startCtrl = TextEditingController(text: slot.startTime);
     final endCtrl = TextEditingController(text: slot.endTime);
     String selectedClassId = slot.classId;
+    String selectedSubject = slot.subject;
+    String selectedTeacher = slot.teacherName;
 
     HapticFeedback.lightImpact();
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: Container(
-          decoration: const BoxDecoration(
-            color: TatvaColors.bgCard,
-            borderRadius:
-                BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                    width: 36, height: 3,
-                    decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(2))),
-              ),
-              const SizedBox(height: 20),
-              Text('Edit Period ${slot.period}',
-                  style: const TextStyle(
-                      fontFamily: 'Raleway',
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: textDark)),
-              const SizedBox(height: 16),
-              Row(children: [
-                Expanded(
-                  child: TextField(
-                    controller: startCtrl,
-                    style: const TextStyle(
-                        fontFamily: 'Raleway', fontSize: 14, color: textDark),
-                    decoration: _scheduleFieldDecor('Start Time', 'e.g. 08:00'),
-                  ),
+      builder: (_) => StatefulBuilder(builder: (ctx, setSheet) {
+        return Padding(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: TatvaColors.bgCard,
+              borderRadius:
+                  BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                      width: 36, height: 3,
+                      decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(2))),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: endCtrl,
+                const SizedBox(height: 20),
+                Text('Period ${slot.period} — ${slot.startTime}',
                     style: const TextStyle(
-                        fontFamily: 'Raleway', fontSize: 14, color: textDark),
-                    decoration: _scheduleFieldDecor('End Time', 'e.g. 08:45'),
-                  ),
-                ),
-              ]),
-              const SizedBox(height: 12),
-              TextField(
-                controller: subjectCtrl,
-                style: const TextStyle(
-                    fontFamily: 'Raleway', fontSize: 14, color: textDark),
-                decoration: _scheduleFieldDecor('Subject', 'e.g. Mathematics'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: teacherCtrl,
-                style: const TextStyle(
-                    fontFamily: 'Raleway', fontSize: 14, color: textDark),
-                decoration: _scheduleFieldDecor('Teacher', 'e.g. Mrs. Sharma'),
-              ),
-              const SizedBox(height: 12),
-              if (_classes.isNotEmpty)
+                        fontFamily: 'Raleway',
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: textDark)),
+                const SizedBox(height: 4),
+                const Text('Select which class happens during this period',
+                    style: TextStyle(
+                        fontFamily: 'Raleway', fontSize: 12, color: textLight)),
+                const SizedBox(height: 20),
+                // Class selection (primary input)
+                const Text('Class',
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: textLight)),
+                const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
@@ -1956,10 +1913,10 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                     value: _classes.any((c) => c.id == selectedClassId)
                         ? selectedClassId
                         : null,
-                    hint: const Text('Link to class (optional)',
+                    hint: const Text('Select a class',
                         style: TextStyle(
                             fontFamily: 'Raleway',
-                            fontSize: 13,
+                            fontSize: 14,
                             color: textLight)),
                     isExpanded: true,
                     underline: const SizedBox.shrink(),
@@ -1968,64 +1925,144 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                     items: _classes
                         .map((c) => DropdownMenuItem(
                             value: c.id,
-                            child: Text('${c.name} (${c.subject})')))
+                            child: Text('${c.subject}  —  ${c.teacherName}',
+                                style: const TextStyle(
+                                    fontFamily: 'Raleway', fontSize: 14))))
                         .toList(),
                     onChanged: (v) {
-                      selectedClassId = v ?? '';
                       if (v != null) {
                         final cls = _classes.firstWhere((c) => c.id == v);
-                        subjectCtrl.text = cls.subject;
-                        teacherCtrl.text = cls.teacherName;
+                        setSheet(() {
+                          selectedClassId = v;
+                          selectedSubject = cls.subject;
+                          selectedTeacher = cls.teacherName;
+                        });
                       }
                     },
                   ),
                 ),
-              const SizedBox(height: 20),
-              GestureDetector(
-                onTap: () {
-                  final updated = List<PeriodSlot>.from(allPeriods);
-                  final newSlot = PeriodSlot(
-                    period: slot.period,
-                    startTime: startCtrl.text.trim(),
-                    endTime: endCtrl.text.trim(),
-                    classId: selectedClassId,
-                    subject: subjectCtrl.text.trim(),
-                    teacherName: teacherCtrl.text.trim(),
-                  );
-                  if (index < updated.length) {
-                    updated[index] = newSlot;
-                  } else {
-                    updated.add(newSlot);
-                  }
-                  Navigator.pop(context);
-                  _saveScheduleDay(
-                      gsMap[selectedGS]!, dayOfWeek, updated);
-                },
-                child: Container(
-                  width: double.infinity,
-                  height: 50,
-                  decoration: BoxDecoration(
-                      color: primary,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                            color: primary.withOpacity(0.3),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4))
-                      ]),
-                  child: const Center(
-                      child: Text('Save Period',
-                          style: TextStyle(
-                              fontFamily: 'Raleway',
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white))),
+                if (selectedSubject.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                        color: primary.withOpacity(0.04),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: primary.withOpacity(0.15))),
+                    child: Row(children: [
+                      Icon(Icons.class_rounded, color: primary, size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(selectedSubject,
+                                  style: const TextStyle(
+                                      fontFamily: 'Raleway',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: textDark)),
+                              Text(selectedTeacher,
+                                  style: const TextStyle(
+                                      fontFamily: 'Raleway',
+                                      fontSize: 12,
+                                      color: textLight)),
+                            ]),
+                      ),
+                      GestureDetector(
+                        onTap: () => setSheet(() {
+                          selectedClassId = '';
+                          selectedSubject = '';
+                          selectedTeacher = '';
+                        }),
+                        child: Icon(Icons.clear_rounded,
+                            color: textLight, size: 18),
+                      ),
+                    ]),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                // Time
+                const Text('Time',
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: textLight)),
+                const SizedBox(height: 6),
+                Row(children: [
+                  Expanded(
+                    child: TextField(
+                      controller: startCtrl,
+                      style: const TextStyle(
+                          fontFamily: 'Raleway', fontSize: 14, color: textDark),
+                      decoration: _scheduleFieldDecor('Start', '08:00'),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text('to',
+                        style: TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 13,
+                            color: textLight)),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: endCtrl,
+                      style: const TextStyle(
+                          fontFamily: 'Raleway', fontSize: 14, color: textDark),
+                      decoration: _scheduleFieldDecor('End', '08:45'),
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 24),
+                GestureDetector(
+                  onTap: () {
+                    final updated = List<PeriodSlot>.from(allPeriods);
+                    final newSlot = PeriodSlot(
+                      period: slot.period,
+                      startTime: startCtrl.text.trim(),
+                      endTime: endCtrl.text.trim(),
+                      classId: selectedClassId,
+                      subject: selectedSubject,
+                      teacherName: selectedTeacher,
+                    );
+                    if (index < updated.length) {
+                      updated[index] = newSlot;
+                    } else {
+                      updated.add(newSlot);
+                    }
+                    Navigator.pop(context);
+                    _saveScheduleDay(
+                        gsMap[selectedGS]!, dayOfWeek, updated);
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    height: 50,
+                    decoration: BoxDecoration(
+                        color: primary,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                              color: primary.withOpacity(0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4))
+                        ]),
+                    child: const Center(
+                        child: Text('Save Period',
+                            style: TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white))),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      }),
     );
   }
 
