@@ -2874,7 +2874,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             decoration: BoxDecoration(
-                                color: bg,
+                                color: Colors.white,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: Colors.grey.shade200)),
                             child: DropdownButton<String>(
@@ -2884,12 +2884,18 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                                   : (_classes.isNotEmpty ? _classes.first.id : null),
                               isExpanded: true,
                               underline: const SizedBox.shrink(),
+                              dropdownColor: Colors.white,
                               style: const TextStyle(
-                                  fontFamily: 'Raleway', fontSize: 14, color: textDark),
+                                  fontFamily: 'Raleway', fontSize: 14, color: Color(0xFF1A2E22)),
+                              icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF6B8F76)),
                               items: _classes
                                   .map((c) => DropdownMenuItem(
                                       value: c.id,
-                                      child: Text('${c.name} — ${c.subject}')))
+                                      child: Text('${c.subject} — ${c.name}',
+                                          style: const TextStyle(
+                                              fontFamily: 'Raleway',
+                                              fontSize: 14,
+                                              color: Color(0xFF1A2E22)))))
                                   .toList(),
                               onChanged: (v) {
                                 if (v != null) {
