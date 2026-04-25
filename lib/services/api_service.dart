@@ -57,6 +57,19 @@ class ApiService {
     return json.decode(response.body) as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> _put(
+      String path, Map<String, dynamic> body) async {
+    final headers = await _authHeaders();
+    final response = await http
+        .put(Uri.parse('$_baseUrl$path'),
+            headers: headers, body: json.encode(body))
+        .timeout(const Duration(seconds: 30));
+    if (response.statusCode != 200) {
+      throw Exception('API error ${response.statusCode}: ${response.body}');
+    }
+    return json.decode(response.body) as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> _delete(String path) async {
     final headers = await _authHeaders();
     final response = await http
@@ -340,4 +353,27 @@ class ApiService {
       _get('/report/weekly?studentUid=$studentUid'
           '${startDate != null ? '&startDate=$startDate' : ''}'
           '${endDate != null ? '&endDate=$endDate' : ''}');
+
+  // ─── Schedule ───────────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getSchedule(
+      String grade, String section) async {
+    final data = await _get('/schedule/$grade/$section');
+    return (data['schedules'] as List?)
+            ?.cast<Map<String, dynamic>>() ??
+        [];
+  }
+
+  Future<Map<String, dynamic>> upsertSchedule({
+    required String grade,
+    required String section,
+    required int dayOfWeek,
+    required List<Map<String, dynamic>> periods,
+  }) =>
+      _put('/schedule', {
+        'grade': grade,
+        'section': section,
+        'dayOfWeek': dayOfWeek,
+        'periods': periods,
+      });
 }

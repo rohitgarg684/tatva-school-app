@@ -550,4 +550,59 @@ router.get("/report/weekly", async (req, res) => {
   }
 });
 
+// ─── Schedule (Timetable) ────────────────────────────────────────────────────
+
+router.put(
+  "/schedule",
+  requireRole("Teacher", "Principal"),
+  async (req, res) => {
+    try {
+      const { grade, section, dayOfWeek, periods } = req.body;
+      if (!grade || !section || !dayOfWeek || !Array.isArray(periods))
+        return res
+          .status(400)
+          .json({ error: "grade, section, dayOfWeek, periods[] required" });
+
+      const docId = `${grade}_${section}_${dayOfWeek}`;
+      await db
+        .collection("schedules")
+        .doc(docId)
+        .set(
+          {
+            grade,
+            section,
+            dayOfWeek,
+            periods,
+            createdBy: req.uid,
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+
+      res.json({ id: docId, saved: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
+router.get("/schedule/:grade/:section", requireAuth, async (req, res) => {
+  try {
+    const grade = req.params.grade as string;
+    const section = req.params.section as string;
+
+    const snap = await db
+      .collection("schedules")
+      .where("grade", "==", grade)
+      .where("section", "==", section)
+      .orderBy("dayOfWeek", "asc")
+      .get();
+
+    const schedules = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    res.json({ schedules: serializeDocs(schedules) });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

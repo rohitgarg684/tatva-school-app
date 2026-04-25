@@ -256,7 +256,6 @@ router.get("/teacher/:uid", async (req, res) => {
             { field: "createdAt", direction: "desc" }
           ),
           queryDocs("attendance", [
-            { field: "classId", op: "==", value: first.id },
             { field: "date", op: "==", value: today },
           ]),
           queryDocs(

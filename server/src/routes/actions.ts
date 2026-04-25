@@ -151,7 +151,11 @@ router.post(
         batch.set(
           ref,
           {
-            ...rec,
+            studentUid: rec.studentUid,
+            studentName: rec.studentName || "",
+            date: rec.date,
+            status: rec.status || "Present",
+            markedBy: req.uid,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
           },
           { merge: true }

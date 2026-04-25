@@ -1,0 +1,46 @@
+---
+description: Strict token-efficiency rules — always active to minimize cost and latency
+alwaysApply: true
+---
+
+# Minimize Token Usage
+
+You MUST follow every rule below. Violations waste money.
+
+## Responses — Be Terse
+- **No preamble.** Don't say "Sure!", "Let me…", "I'll…", "Great question", etc. Start with the action or answer.
+- **No restating.** Never echo back what the user asked.
+- **No narration.** Don't announce what you're about to do before doing it. Just do it.
+- **No post-summaries.** After edits, say what changed in ≤1 sentence. Don't list every file or repeat code.
+- **No code echo.** Never show the full updated file/function after editing. The diff is visible in the IDE.
+- **No obvious explanations.** Don't explain what standard code does. Only explain if the user asks or the logic is genuinely non-obvious.
+- **Short confirmations.** "Done.", "Fixed.", "Added X to Y." are ideal.
+- **Max 3-4 sentences** for most responses. Use more only for genuinely complex explanations the user requested.
+
+## Tool Calls — Minimize Round-Trips
+- **Batch aggressively.** All independent tool calls in ONE message. Never serialize what can parallelize.
+- **Read surgically.** Use `offset`/`limit` to read only the relevant section. Never read a whole file (>100 lines) if you need <20 lines. Use Grep to find the line range first if needed.
+- **Never re-read.** If you already read a file this conversation and it wasn't modified, don't read it again. Remember what you saw.
+- **Grep/Glob first.** Only use SemanticSearch when you genuinely don't know the symbol name or location. For known names, Grep is faster and cheaper.
+- **Go direct.** If the user says "fix line 42 in foo.dart", read that file at that offset. Don't explore, don't search, don't scan the directory.
+- **Skip ReadLints** for trivial edits (renaming, comments, strings). Only lint-check structural code changes.
+- **No subagents for simple work.** Task/subagents are for multi-step exploration only. Single searches, single-file edits → use tools directly.
+- **One StrReplace per change.** Use `replace_all: true` for repeated patterns. Keep `old_string` as short as uniquely possible.
+
+## Code — No Bloat
+- Zero narrating comments. Don't add `// Updated to fix X` or `// Added per user request`.
+- Don't create files unless the user explicitly asks for a new file.
+- Don't refactor code the user didn't ask about.
+- Don't add imports, types, or error handling the user didn't request unless the code would break without them.
+
+## Planning — Skip When Possible
+- No TodoWrite for <4 steps.
+- No SwitchMode for straightforward tasks.
+- No AskQuestion if the intent is clear from context.
+
+## Project Map (don't re-discover)
+- **Flutter** (Dart ^3.6.0): `lib/` — feature-first, role-based (teacher/student/parent/principal). setState, no state management lib.
+- **Server** (TS/Express 4): `server/src/` — Firestore via firebase-admin, Cloud Run.
+- **Firebase**: Auth + Firestore + Storage + Hosting. Config: `firebase.json`, `.firebaserc`.
+- **CI/CD**: `.github/workflows/deploy-firebase.yml` → Cloud Run + Firebase deploy.
+- **Key dirs**: models=`lib/models/`, services=`lib/services/`, routes=`server/src/routes/`, theme=`lib/shared/theme/`, widgets=`lib/shared/widgets/`.

@@ -23,6 +23,7 @@ import '../../models/story_post.dart';
 import '../../models/activity_event.dart';
 import '../../models/content_item.dart';
 import '../../models/weekly_report.dart';
+import '../../models/schedule_model.dart';
 
 class ParentDashboard extends StatefulWidget {
   const ParentDashboard({super.key});
@@ -420,6 +421,7 @@ class _ParentDashboardState extends State<ParentDashboard>
           opacity: _tabFade,
           child: IndexedStack(index: _currentTab, children: [
             _homeTab(),
+            _scheduleTab(),
             _progressTab(),
             _buildBehaviorTab(),
             _learnTab(),
@@ -434,6 +436,11 @@ class _ParentDashboardState extends State<ParentDashboard>
         'icon': Icons.home_outlined,
         'active': Icons.home_rounded,
         'label': 'Home'
+      },
+      {
+        'icon': Icons.calendar_view_week_outlined,
+        'active': Icons.calendar_view_week_rounded,
+        'label': 'Schedule'
       },
       {
         'icon': Icons.bar_chart_outlined,
@@ -1073,6 +1080,368 @@ class _ParentDashboardState extends State<ParentDashboard>
                 fontSize: 10,
                 color: Colors.white.withOpacity(0.5))),
       ]);
+
+  // ─── SCHEDULE ──────────────────────────────────────────────────────────────
+
+  String _childGrade() {
+    if (_childrenData.isEmpty) return '8';
+    final cls = _childrenData[_selectedChildIndex].childClass;
+    if (cls == null) return '8';
+    final match = RegExp(r'(\d+)').firstMatch(cls.name);
+    return match?.group(1) ?? '8';
+  }
+
+  String _childSection() {
+    if (_childrenData.isEmpty) return 'A';
+    final cls = _childrenData[_selectedChildIndex].childClass;
+    if (cls == null) return 'A';
+    final match = RegExp(r'Section\s*(\w+)', caseSensitive: false).firstMatch(cls.name);
+    return match?.group(1) ?? 'A';
+  }
+
+  Widget _scheduleTab() {
+    final childName = _childrenData.isNotEmpty
+        ? _childrenData[_selectedChildIndex].info.childName
+        : '';
+    final className = _childrenData.isNotEmpty
+        ? (_childrenData[_selectedChildIndex].childClass?.name ?? '')
+        : '';
+
+    return StatefulBuilder(builder: (ctx, setLocal) {
+      List<ScheduleModel> weekSchedules = [];
+      bool loading = true;
+      int selectedDay = 0;
+
+      void loadSchedule() async {
+        setLocal(() => loading = true);
+        try {
+          final raw = await _api.getSchedule(_childGrade(), _childSection());
+          weekSchedules = raw.map((m) => ScheduleModel.fromJson(m)).toList();
+        } catch (e) {
+          debugPrint('Schedule load error: $e');
+          weekSchedules = [];
+        }
+        setLocal(() => loading = false);
+      }
+
+      if (loading) Future.microtask(loadSchedule);
+
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const SizedBox(height: 8),
+          FadeSlideIn(
+              child: Text("$childName's Schedule",
+                  style: const TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: textDark,
+                      letterSpacing: -0.8))),
+          const SizedBox(height: 4),
+          FadeSlideIn(
+              delayMs: 60,
+              child: Text('$className • Weekly Timetable',
+                  style: const TextStyle(
+                      fontFamily: 'Raleway', fontSize: 13, color: textLight))),
+          const SizedBox(height: 16),
+          // Day selector
+          Row(
+            children: [
+              _schedDayChip('All', selectedDay == 0, () => setLocal(() => selectedDay = 0)),
+              ...List.generate(5, (i) {
+                final day = i + 1;
+                return _schedDayChip(
+                    ScheduleModel.dayNames[day],
+                    selectedDay == day,
+                    () => setLocal(() => selectedDay = day));
+              }),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (loading)
+            const Center(child: Padding(
+                padding: EdgeInsets.all(40),
+                child: CircularProgressIndicator()))
+          else if (weekSchedules.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(40),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.calendar_today_outlined,
+                      color: textLight, size: 48),
+                  const SizedBox(height: 12),
+                  const Text('No schedule set yet',
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 15,
+                          color: textLight)),
+                ]),
+              ),
+            )
+          else if (selectedDay == 0)
+            _schedWeekGrid(weekSchedules)
+          else
+            _schedDayDetail(weekSchedules, selectedDay),
+          const SizedBox(height: 24),
+        ]),
+      );
+    });
+  }
+
+  Widget _schedDayChip(String label, bool isActive, VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+              color: isActive ? primary : bgCard,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                  color: isActive ? primary : Colors.grey.shade200)),
+          child: Center(
+              child: Text(label,
+                  style: TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: isActive ? Colors.white : textLight))),
+        ),
+      ),
+    );
+  }
+
+  Widget _schedWeekGrid(List<ScheduleModel> schedules) {
+    final allTimes = <String>{};
+    for (final s in schedules) {
+      for (final p in s.periods) allTimes.add(p.startTime);
+    }
+    final sorted = allTimes.toList()..sort();
+    if (sorted.isEmpty) {
+      return const Center(
+          child: Text('No periods defined',
+              style: TextStyle(fontFamily: 'Raleway', color: textLight)));
+    }
+
+    final colors = [primary, info, accent, purple, success, danger];
+    final subjectColors = <String, Color>{};
+    int ci = 0;
+    for (final s in schedules) {
+      for (final p in s.periods) {
+        if (p.subject.isNotEmpty && !subjectColors.containsKey(p.subject)) {
+          subjectColors[p.subject] = colors[ci % colors.length];
+          ci++;
+        }
+      }
+    }
+
+    return Column(children: [
+      Row(children: [
+        SizedBox(
+          width: 52,
+          child: Text('Time',
+              style: TextStyle(
+                  fontFamily: 'Raleway',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: textLight)),
+        ),
+        ...List.generate(5, (i) {
+          final day = i + 1;
+          final isToday = DateTime.now().weekday == day;
+          return Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              margin: const EdgeInsets.symmetric(horizontal: 1),
+              decoration: BoxDecoration(
+                  color: isToday ? primary.withOpacity(0.1) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6)),
+              child: Center(
+                  child: Text(ScheduleModel.dayNames[day],
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: isToday ? primary : textDark))),
+            ),
+          );
+        }),
+      ]),
+      const SizedBox(height: 4),
+      ...sorted.map((time) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 2),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 52,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(time,
+                      style: const TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 10,
+                          color: textLight)),
+                ),
+              ),
+              ...List.generate(5, (i) {
+                final day = i + 1;
+                final ds = schedules.where((s) => s.dayOfWeek == day).toList();
+                PeriodSlot? slot;
+                if (ds.isNotEmpty) {
+                  final m = ds.first.periods.where((p) => p.startTime == time);
+                  if (m.isNotEmpty) slot = m.first;
+                }
+                final isToday = DateTime.now().weekday == day;
+                final c = slot != null
+                    ? (subjectColors[slot.subject] ?? primary)
+                    : Colors.grey.shade200;
+                return Expanded(
+                  child: Container(
+                    height: 52,
+                    margin: const EdgeInsets.symmetric(horizontal: 1),
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                        color: slot != null
+                            ? c.withOpacity(isToday ? 0.18 : 0.1)
+                            : Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                            color: slot != null
+                                ? c.withOpacity(0.3)
+                                : Colors.grey.shade100)),
+                    child: slot != null
+                        ? Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(slot.subject,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                      fontFamily: 'Raleway',
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      color: c)),
+                              if (slot.teacherName.isNotEmpty)
+                                Text(slot.teacherName.split(' ').last,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                        fontFamily: 'Raleway',
+                                        fontSize: 8,
+                                        color: c.withOpacity(0.7))),
+                            ],
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      }),
+      const SizedBox(height: 16),
+      Wrap(
+        spacing: 12,
+        runSpacing: 6,
+        children: subjectColors.entries
+            .map((e) => Row(mainAxisSize: MainAxisSize.min, children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                        color: e.value, borderRadius: BorderRadius.circular(3)),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(e.key,
+                      style: const TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 11,
+                          color: textDark)),
+                ]))
+            .toList(),
+      ),
+    ]);
+  }
+
+  Widget _schedDayDetail(List<ScheduleModel> schedules, int day) {
+    final ds = schedules.where((s) => s.dayOfWeek == day).toList();
+    final periods = ds.isNotEmpty ? ds.first.periods : <PeriodSlot>[];
+    final colors = [primary, info, accent, purple, success, danger];
+
+    if (periods.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.event_busy_outlined, color: textLight, size: 40),
+            const SizedBox(height: 10),
+            Text('No classes on ${ScheduleModel.dayNamesFull[day]}',
+                style: const TextStyle(
+                    fontFamily: 'Raleway', fontSize: 14, color: textLight)),
+          ]),
+        ),
+      );
+    }
+
+    return Column(
+      children: periods.asMap().entries.map((e) {
+        final i = e.key;
+        final p = e.value;
+        final c = colors[i % colors.length];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+              color: bgCard,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: c.withOpacity(0.2))),
+          child: Row(children: [
+            Container(
+              width: 4,
+              height: 48,
+              decoration: BoxDecoration(
+                  color: c, borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(width: 14),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('${p.startTime} - ${p.endTime}',
+                  style: TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: c)),
+              Text('Period ${p.period}',
+                  style: const TextStyle(
+                      fontFamily: 'Raleway', fontSize: 10, color: textLight)),
+            ]),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(p.subject.isNotEmpty ? p.subject : 'Free Period',
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: p.subject.isNotEmpty ? textDark : textLight)),
+                if (p.teacherName.isNotEmpty)
+                  Text(p.teacherName,
+                      style: const TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 12,
+                          color: textLight)),
+              ]),
+            ),
+          ]),
+        );
+      }).toList(),
+    );
+  }
 
   // ─── PROGRESS ──────────────────────────────────────────────────────────────
   Widget _progressTab() {

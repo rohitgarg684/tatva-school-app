@@ -23,6 +23,7 @@ import '../../models/behavior_category.dart';
 import '../../models/attendance_record.dart';
 import '../../models/attendance_status.dart';
 import '../../models/story_post.dart';
+import '../../models/schedule_model.dart';
 import '../../models/activity_event.dart';
 
 class TeacherDashboard extends StatefulWidget {
@@ -601,6 +602,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
             _buildClassesTab(),
             _buildBehaviorTab(),
             _buildAttendanceTab(),
+            _buildScheduleTab(),
             _buildGradesTab(),
             _buildHomeworkTab(),
             _buildStoryTab(),
@@ -629,6 +631,11 @@ class _TeacherDashboardState extends State<TeacherDashboard>
         'icon': Icons.fact_check_outlined,
         'active': Icons.fact_check_rounded,
         'label': 'Attend'
+      },
+      {
+        'icon': Icons.calendar_view_week_outlined,
+        'active': Icons.calendar_view_week_rounded,
+        'label': 'Schedule'
       },
       {
         'icon': Icons.grade_outlined,
@@ -758,16 +765,16 @@ class _TeacherDashboardState extends State<TeacherDashboard>
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(children: [
                 _qaBtn('Enter\nGrades', Icons.edit_note_outlined, accent,
-                    () => _switchTab(4)),
+                    () => _switchTab(5)),
                 const SizedBox(width: 8),
                 _qaBtn('Post\nHomework', Icons.assignment_outlined, primary,
-                    () => _switchTab(5)),
+                    () => _switchTab(6)),
                 const SizedBox(width: 8),
                 _qaBtn('Behavior', Icons.emoji_events_outlined, info,
                     () => _switchTab(2)),
                 const SizedBox(width: 8),
                 _qaBtn('Messages', Icons.chat_outlined, purple,
-                    () => _switchTab(7)),
+                    () => _switchTab(8)),
               ])),
           if (_activityFeed.isNotEmpty) ...[
             const SizedBox(height: 28),
@@ -1102,7 +1109,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                           ]))),
                   const SizedBox(width: 8),
                   GestureDetector(
-                      onTap: () => _switchTab(4),
+                      onTap: () => _switchTab(5),
                       child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 6),
@@ -1368,7 +1375,24 @@ class _TeacherDashboardState extends State<TeacherDashboard>
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     final displayDate =
         '${_monthName(now.month)} ${now.day}, ${now.year}';
-    final classId = _classes.isNotEmpty ? _classes.first.id : '';
+
+    // Deduplicate students across all classes
+    final seenUids = <String>{};
+    final allStudents = <UserModel>[];
+    for (final cls in _classes) {
+      for (final uid in cls.studentUids) {
+        if (seenUids.add(uid)) {
+          final match = _students.where((s) => s.uid == uid);
+          if (match.isNotEmpty) allStudents.add(match.first);
+        }
+      }
+    }
+    if (allStudents.isEmpty) {
+      for (final s in _students) {
+        if (seenUids.add(s.uid)) allStudents.add(s);
+      }
+    }
+    allStudents.sort((a, b) => a.name.compareTo(b.name));
 
     final preMarked = <String, AttendanceStatus>{};
     for (final r in _todayAttendance) {
@@ -1377,7 +1401,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
 
     return StatefulBuilder(builder: (ctx, setLocal) {
       final statuses = <String, AttendanceStatus>{};
-      for (final s in _students) {
+      for (final s in allStudents) {
         statuses[s.uid] = preMarked[s.uid] ?? AttendanceStatus.present;
       }
 
@@ -1396,7 +1420,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
           const SizedBox(height: 4),
           FadeSlideIn(
               delayMs: 60,
-              child: Text(displayDate,
+              child: Text('$displayDate • ${allStudents.length} students',
                   style: const TextStyle(
                       fontFamily: 'Raleway', fontSize: 13, color: textLight))),
           const SizedBox(height: 20),
@@ -1419,7 +1443,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                             color: textMid))),
               ]),
             ),
-          ..._students.asMap().entries.map((e) {
+          ...allStudents.asMap().entries.map((e) {
             final s = e.value;
             final current = statuses[s.uid] ?? AttendanceStatus.present;
             return Container(
@@ -1488,7 +1512,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
             onTap: () async {
               final finalStatuses = <String, AttendanceStatus>{};
               final names = <String, String>{};
-              for (final s in _students) {
+              for (final s in allStudents) {
                 finalStatuses[s.uid] =
                     preMarked[s.uid] ?? AttendanceStatus.present;
                 names[s.uid] = s.name;
@@ -1496,7 +1520,6 @@ class _TeacherDashboardState extends State<TeacherDashboard>
               final records = finalStatuses.entries.map((e) => {
                 'studentUid': e.key,
                 'studentName': names[e.key] ?? '',
-                'classId': classId,
                 'date': dateStr,
                 'status': e.value.label,
               }).toList();
@@ -1506,7 +1529,6 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                   AttendanceRecord(
                     studentUid: e.key,
                     studentName: names[e.key] ?? '',
-                    classId: classId,
                     date: dateStr,
                     status: e.value,
                     markedBy: _uid,
@@ -1559,6 +1581,513 @@ class _TeacherDashboardState extends State<TeacherDashboard>
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
     return months[m];
+  }
+
+  // ─── SCHEDULE TAB ──────────────────────────────────────────────────────────
+
+  Widget _buildScheduleTab() {
+    final gradeSections = <String>[];
+    final gsMap = <String, Map<String, String>>{};
+    for (final cls in _classes) {
+      final parts = cls.name.split('—').map((s) => s.trim()).toList();
+      if (parts.length >= 2) {
+        final gradePart = parts[0].replaceAll(RegExp(r'[^0-9]'), '');
+        final sectionPart = parts[1].replaceAll(RegExp(r'Section\s*', caseSensitive: false), '').trim();
+        if (gradePart.isNotEmpty && sectionPart.isNotEmpty) {
+          final key = 'Grade $gradePart - $sectionPart';
+          if (!gsMap.containsKey(key)) {
+            gsMap[key] = {'grade': gradePart, 'section': sectionPart};
+            gradeSections.add(key);
+          }
+        }
+      }
+    }
+    if (gradeSections.isEmpty) {
+      gradeSections.add('Default');
+      gsMap['Default'] = {'grade': '0', 'section': 'A'};
+    }
+
+    return StatefulBuilder(builder: (ctx, setLocal) {
+      String selectedGS = gradeSections.first;
+      List<ScheduleModel> weekSchedules = [];
+      bool loading = true;
+      int selectedDay = DateTime.now().weekday.clamp(1, 5);
+
+      void loadSchedule() async {
+        final gs = gsMap[selectedGS]!;
+        setLocal(() => loading = true);
+        try {
+          final raw = await _api.getSchedule(gs['grade']!, gs['section']!);
+          weekSchedules = raw.map((m) => ScheduleModel.fromJson(m)).toList();
+        } catch (e) {
+          debugPrint('Schedule load error: $e');
+          weekSchedules = [];
+        }
+        setLocal(() => loading = false);
+      }
+
+      if (loading) {
+        Future.microtask(loadSchedule);
+      }
+
+      final daySchedule = weekSchedules
+          .where((s) => s.dayOfWeek == selectedDay)
+          .toList();
+      final periods = daySchedule.isNotEmpty ? daySchedule.first.periods : <PeriodSlot>[];
+
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const SizedBox(height: 8),
+          FadeSlideIn(
+              child: const Text('Class Schedule',
+                  style: TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: textDark,
+                      letterSpacing: -0.8))),
+          const SizedBox(height: 4),
+          FadeSlideIn(
+              delayMs: 60,
+              child: const Text('Define weekly timetable for each grade',
+                  style: TextStyle(
+                      fontFamily: 'Raleway', fontSize: 13, color: textLight))),
+          const SizedBox(height: 16),
+          if (gradeSections.length > 1)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                  color: bgCard,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200)),
+              child: DropdownButton<String>(
+                value: selectedGS,
+                isExpanded: true,
+                underline: const SizedBox.shrink(),
+                style: const TextStyle(
+                    fontFamily: 'Raleway', fontSize: 14, color: textDark),
+                items: gradeSections
+                    .map((gs) => DropdownMenuItem(value: gs, child: Text(gs)))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) {
+                    selectedGS = v;
+                    loading = true;
+                    loadSchedule();
+                  }
+                },
+              ),
+            ),
+          const SizedBox(height: 16),
+          Row(
+            children: List.generate(5, (i) {
+              final day = i + 1;
+              final isActive = day == selectedDay;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => setLocal(() => selectedDay = day),
+                  child: Container(
+                    margin: EdgeInsets.only(right: i < 4 ? 6 : 0),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                        color: isActive ? primary : bgCard,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: isActive
+                                ? primary
+                                : Colors.grey.shade200)),
+                    child: Center(
+                        child: Text(ScheduleModel.dayNames[day],
+                            style: TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: isActive
+                                    ? Colors.white
+                                    : textLight))),
+                  ),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 16),
+          if (loading)
+            const Center(child: CircularProgressIndicator())
+          else ...[
+            ...List.generate(
+              periods.isEmpty ? 6 : periods.length,
+              (i) {
+                final slot = i < periods.length
+                    ? periods[i]
+                    : PeriodSlot(
+                        period: i + 1,
+                        startTime: _defaultStartTime(i),
+                        endTime: _defaultEndTime(i),
+                      );
+                return _periodSlotCard(slot, i, selectedDay, selectedGS, gsMap,
+                    periods, weekSchedules, setLocal);
+              },
+            ),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    final newPeriod = PeriodSlot(
+                      period: periods.length + 1,
+                      startTime: _defaultStartTime(periods.length),
+                      endTime: _defaultEndTime(periods.length),
+                    );
+                    final updated = [...periods, newPeriod];
+                    _saveScheduleDay(
+                        gsMap[selectedGS]!, selectedDay, updated, setLocal,
+                        weekSchedules: weekSchedules);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                        color: info.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: info.withOpacity(0.2))),
+                    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Icon(Icons.add_rounded, color: info, size: 18),
+                      const SizedBox(width: 6),
+                      Text('Add Period',
+                          style: TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: info)),
+                    ]),
+                  ),
+                ),
+              ),
+            ]),
+          ],
+          const SizedBox(height: 24),
+        ]),
+      );
+    });
+  }
+
+  Widget _periodSlotCard(
+      PeriodSlot slot, int index, int dayOfWeek, String selectedGS,
+      Map<String, Map<String, String>> gsMap, List<PeriodSlot> allPeriods,
+      List<ScheduleModel> weekSchedules, StateSetter setLocal) {
+    final colors = [primary, info, accent, purple, success, danger];
+    final c = colors[index % colors.length];
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+          color: bgCard,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.grey.shade100)),
+      child: Row(children: [
+        Container(
+          width: 4,
+          height: 48,
+          decoration: BoxDecoration(
+              color: slot.subject.isNotEmpty ? c : Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2)),
+        ),
+        const SizedBox(width: 12),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('${slot.startTime} - ${slot.endTime}',
+              style: const TextStyle(
+                  fontFamily: 'Raleway',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: textLight)),
+          const SizedBox(height: 2),
+          Text('Period ${slot.period}',
+              style: const TextStyle(
+                  fontFamily: 'Raleway', fontSize: 10, color: textLight)),
+        ]),
+        const SizedBox(width: 12),
+        Expanded(
+          child: slot.subject.isNotEmpty
+              ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(slot.subject,
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: c)),
+                  if (slot.teacherName.isNotEmpty)
+                    Text(slot.teacherName,
+                        style: const TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 11,
+                            color: textLight)),
+                ])
+              : Text('Tap to assign',
+                  style: TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 13,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.grey.shade400)),
+        ),
+        GestureDetector(
+          onTap: () => _editPeriodSlot(
+              slot, index, dayOfWeek, selectedGS, gsMap, allPeriods,
+              weekSchedules, setLocal),
+          child: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+                color: primary.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8)),
+            child: Icon(Icons.edit_outlined, color: primary, size: 16),
+          ),
+        ),
+        const SizedBox(width: 6),
+        GestureDetector(
+          onTap: () {
+            final updated = List<PeriodSlot>.from(allPeriods)..removeAt(index);
+            for (int j = 0; j < updated.length; j++) {
+              updated[j] = updated[j].copyWith(period: j + 1);
+            }
+            _saveScheduleDay(
+                gsMap[selectedGS]!, dayOfWeek, updated, setLocal,
+                weekSchedules: weekSchedules);
+          },
+          child: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+                color: danger.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8)),
+            child: Icon(Icons.close_rounded, color: danger, size: 16),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  void _editPeriodSlot(
+      PeriodSlot slot, int index, int dayOfWeek, String selectedGS,
+      Map<String, Map<String, String>> gsMap, List<PeriodSlot> allPeriods,
+      List<ScheduleModel> weekSchedules, StateSetter setLocal) {
+    final subjectCtrl = TextEditingController(text: slot.subject);
+    final teacherCtrl = TextEditingController(text: slot.teacherName);
+    final startCtrl = TextEditingController(text: slot.startTime);
+    final endCtrl = TextEditingController(text: slot.endTime);
+    String selectedClassId = slot.classId;
+
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: TatvaColors.bgCard,
+            borderRadius:
+                BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                    width: 36, height: 3,
+                    decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(2))),
+              ),
+              const SizedBox(height: 20),
+              Text('Edit Period ${slot.period}',
+                  style: const TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: textDark)),
+              const SizedBox(height: 16),
+              Row(children: [
+                Expanded(
+                  child: TextField(
+                    controller: startCtrl,
+                    style: const TextStyle(
+                        fontFamily: 'Raleway', fontSize: 14, color: textDark),
+                    decoration: _scheduleFieldDecor('Start Time', 'e.g. 08:00'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: endCtrl,
+                    style: const TextStyle(
+                        fontFamily: 'Raleway', fontSize: 14, color: textDark),
+                    decoration: _scheduleFieldDecor('End Time', 'e.g. 08:45'),
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 12),
+              TextField(
+                controller: subjectCtrl,
+                style: const TextStyle(
+                    fontFamily: 'Raleway', fontSize: 14, color: textDark),
+                decoration: _scheduleFieldDecor('Subject', 'e.g. Mathematics'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: teacherCtrl,
+                style: const TextStyle(
+                    fontFamily: 'Raleway', fontSize: 14, color: textDark),
+                decoration: _scheduleFieldDecor('Teacher', 'e.g. Mrs. Sharma'),
+              ),
+              const SizedBox(height: 12),
+              if (_classes.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                      color: bg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200)),
+                  child: DropdownButton<String>(
+                    value: _classes.any((c) => c.id == selectedClassId)
+                        ? selectedClassId
+                        : null,
+                    hint: const Text('Link to class (optional)',
+                        style: TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 13,
+                            color: textLight)),
+                    isExpanded: true,
+                    underline: const SizedBox.shrink(),
+                    style: const TextStyle(
+                        fontFamily: 'Raleway', fontSize: 14, color: textDark),
+                    items: _classes
+                        .map((c) => DropdownMenuItem(
+                            value: c.id,
+                            child: Text('${c.name} (${c.subject})')))
+                        .toList(),
+                    onChanged: (v) {
+                      selectedClassId = v ?? '';
+                      if (v != null) {
+                        final cls = _classes.firstWhere((c) => c.id == v);
+                        subjectCtrl.text = cls.subject;
+                        teacherCtrl.text = cls.teacherName;
+                      }
+                    },
+                  ),
+                ),
+              const SizedBox(height: 20),
+              GestureDetector(
+                onTap: () {
+                  final updated = List<PeriodSlot>.from(allPeriods);
+                  final newSlot = PeriodSlot(
+                    period: slot.period,
+                    startTime: startCtrl.text.trim(),
+                    endTime: endCtrl.text.trim(),
+                    classId: selectedClassId,
+                    subject: subjectCtrl.text.trim(),
+                    teacherName: teacherCtrl.text.trim(),
+                  );
+                  if (index < updated.length) {
+                    updated[index] = newSlot;
+                  } else {
+                    updated.add(newSlot);
+                  }
+                  Navigator.pop(context);
+                  _saveScheduleDay(
+                      gsMap[selectedGS]!, dayOfWeek, updated, setLocal,
+                      weekSchedules: weekSchedules);
+                },
+                child: Container(
+                  width: double.infinity,
+                  height: 50,
+                  decoration: BoxDecoration(
+                      color: primary,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                            color: primary.withOpacity(0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4))
+                      ]),
+                  child: const Center(
+                      child: Text('Save Period',
+                          style: TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white))),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _scheduleFieldDecor(String label, String hint) =>
+      InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(
+            fontFamily: 'Raleway', fontSize: 12, color: textLight),
+        hintText: hint,
+        hintStyle: TextStyle(
+            fontFamily: 'Raleway', fontSize: 13, color: Colors.grey.shade400),
+        filled: true,
+        fillColor: bg,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+                color: primary.withOpacity(0.5), width: 1.5)),
+      );
+
+  void _saveScheduleDay(
+      Map<String, String> gs, int dayOfWeek, List<PeriodSlot> periods,
+      StateSetter setLocal,
+      {List<ScheduleModel>? weekSchedules}) async {
+    try {
+      await _api.upsertSchedule(
+        grade: gs['grade']!,
+        section: gs['section']!,
+        dayOfWeek: dayOfWeek,
+        periods: periods.map((p) => p.toMap()).toList(),
+      );
+      // Reload schedules after save
+      final raw = await _api.getSchedule(gs['grade']!, gs['section']!);
+      final loaded = raw.map((m) => ScheduleModel.fromJson(m)).toList();
+      setLocal(() {
+        weekSchedules?.clear();
+        weekSchedules?.addAll(loaded);
+      });
+      _snack('Schedule saved');
+    } catch (e) {
+      debugPrint('Save schedule error: $e');
+      _snack('Failed to save schedule');
+    }
+  }
+
+  String _defaultStartTime(int index) {
+    final hour = 8 + (index * 50) ~/ 60;
+    final minute = (index * 50) % 60;
+    return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+  }
+
+  String _defaultEndTime(int index) {
+    final startMinutes = 8 * 60 + index * 50;
+    final endMinutes = startMinutes + 45;
+    final hour = endMinutes ~/ 60;
+    final minute = endMinutes % 60;
+    return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
   }
 
   // ─── GRADES TAB ────────────────────────────────────────────────────────────

@@ -4,7 +4,6 @@ class AttendanceRecord {
   final String id;
   final String studentUid;
   final String studentName;
-  final String classId;
   final String date; // YYYY-MM-DD
   final AttendanceStatus status;
   final String markedBy;
@@ -14,7 +13,6 @@ class AttendanceRecord {
     this.id = '',
     required this.studentUid,
     required this.studentName,
-    required this.classId,
     required this.date,
     required this.status,
     required this.markedBy,
@@ -26,7 +24,6 @@ class AttendanceRecord {
       id: data['id'] as String? ?? '',
       studentUid: data['studentUid'] as String? ?? '',
       studentName: data['studentName'] as String? ?? '',
-      classId: data['classId'] as String? ?? '',
       date: data['date'] as String? ?? '',
       status: AttendanceStatus.fromString(data['status'] as String? ?? ''),
       markedBy: data['markedBy'] as String? ?? '',
@@ -40,7 +37,6 @@ class AttendanceRecord {
     return {
       'studentUid': studentUid,
       'studentName': studentName,
-      'classId': classId,
       'date': date,
       'status': status.label,
       'markedBy': markedBy,
