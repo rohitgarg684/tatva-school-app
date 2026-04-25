@@ -67,6 +67,13 @@ class _StudentDashboardState extends State<StudentDashboard>
   List<ActivityEvent> _activityFeed = [];
   List<ContentItem> _contentItems = [];
 
+  // ── SCHEDULE STATE ────────────────────────────────────────────────────────
+  List<ScheduleModel> _schedWeekData = [];
+  bool _schedLoading = false;
+  bool _schedLoaded = false;
+  int _schedSelectedDay = 0;
+  DateTime _schedWeekStart = DateTime.now();
+
   // ── ANIMATIONS ─────────────────────────────────────────────────────────────
   late AnimationController _shimmerController;
   late AnimationController _greetingController;
@@ -1005,132 +1012,123 @@ class _StudentDashboardState extends State<StudentDashboard>
     return match?.group(1) ?? 'A';
   }
 
+  void _loadScheduleData() async {
+    if (_schedLoading) return;
+    setState(() => _schedLoading = true);
+    try {
+      final raw = await _api.getSchedule(_parseGrade(), _parseSection());
+      _schedWeekData = raw.map((m) => ScheduleModel.fromJson(m)).toList();
+    } catch (e) {
+      debugPrint('Schedule load error: $e');
+      _schedWeekData = [];
+    }
+    if (mounted) setState(() { _schedLoading = false; _schedLoaded = true; });
+  }
+
   Widget _buildScheduleTab() {
-    return StatefulBuilder(builder: (ctx, setLocal) {
-      List<ScheduleModel> weekSchedules = [];
-      bool loading = true;
-      int selectedDay = 0; // 0 = full week view
-      DateTime selectedWeekStart = _weekStart(DateTime.now());
-
-      void loadSchedule() async {
-        setLocal(() => loading = true);
-        try {
-          final raw = await _api.getSchedule(_parseGrade(), _parseSection());
-          weekSchedules = raw.map((m) => ScheduleModel.fromJson(m)).toList();
-        } catch (e) {
-          debugPrint('Schedule load error: $e');
-          weekSchedules = [];
-        }
-        setLocal(() => loading = false);
-      }
-
-      if (loading) Future.microtask(loadSchedule);
-
-      return SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const SizedBox(height: 8),
-          FadeSlideIn(
-              child: const Text('My Schedule',
-                  style: TextStyle(
-                      fontFamily: 'Raleway',
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: textDark,
-                      letterSpacing: -0.8))),
-          const SizedBox(height: 4),
-          FadeSlideIn(
-              delayMs: 60,
-              child: Text(
-                  '${_primaryClass?.name ?? ''} • Weekly Timetable',
-                  style: const TextStyle(
-                      fontFamily: 'Raleway', fontSize: 13, color: textLight))),
-          const SizedBox(height: 16),
-          // Week navigation
-          Row(children: [
-            GestureDetector(
-              onTap: () => setLocal(() {
-                selectedWeekStart = selectedWeekStart.subtract(const Duration(days: 7));
-                loading = true;
-              }),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                    color: bgCard,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade200)),
-                child: const Icon(Icons.chevron_left, color: textLight, size: 20),
-              ),
+    if (!_schedLoaded && !_schedLoading) {
+      Future.microtask(_loadScheduleData);
+    }
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const SizedBox(height: 8),
+        FadeSlideIn(
+            child: const Text('My Schedule',
+                style: TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: textDark,
+                    letterSpacing: -0.8))),
+        const SizedBox(height: 4),
+        FadeSlideIn(
+            delayMs: 60,
+            child: Text(
+                '${_primaryClass?.name ?? ''} • Weekly Timetable',
+                style: const TextStyle(
+                    fontFamily: 'Raleway', fontSize: 13, color: textLight))),
+        const SizedBox(height: 16),
+        Row(children: [
+          GestureDetector(
+            onTap: () => setState(() {
+              _schedWeekStart = _schedWeekStart.subtract(const Duration(days: 7));
+            }),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                  color: bgCard,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade200)),
+              child: const Icon(Icons.chevron_left, color: textLight, size: 20),
             ),
-            Expanded(
-              child: Center(
-                child: Text(
-                    _weekLabel(selectedWeekStart),
-                    style: const TextStyle(
-                        fontFamily: 'Raleway',
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: textDark)),
-              ),
-            ),
-            GestureDetector(
-              onTap: () => setLocal(() {
-                selectedWeekStart = selectedWeekStart.add(const Duration(days: 7));
-                loading = true;
-              }),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                    color: bgCard,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade200)),
-                child: const Icon(Icons.chevron_right, color: textLight, size: 20),
-              ),
-            ),
-          ]),
-          const SizedBox(height: 12),
-          // Day selector (0 = All, 1-5 = specific day)
-          Row(
-            children: [
-              _dayChip('All', selectedDay == 0, () => setLocal(() => selectedDay = 0)),
-              ...List.generate(5, (i) {
-                final day = i + 1;
-                return _dayChip(
-                    ScheduleModel.dayNames[day],
-                    selectedDay == day,
-                    () => setLocal(() => selectedDay = day));
-              }),
-            ],
           ),
-          const SizedBox(height: 16),
-          if (loading)
-            const Center(child: Padding(
-                padding: EdgeInsets.all(40),
-                child: CircularProgressIndicator()))
-          else if (weekSchedules.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(40),
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.calendar_today_outlined,
-                      color: textLight, size: 48),
-                  const SizedBox(height: 12),
-                  const Text('No schedule set yet',
-                      style: TextStyle(
-                          fontFamily: 'Raleway',
-                          fontSize: 15,
-                          color: textLight)),
-                ]),
-              ),
-            )
-          else if (selectedDay == 0)
-            _buildWeekGrid(weekSchedules)
-          else
-            _buildDayDetail(weekSchedules, selectedDay),
-          const SizedBox(height: 24),
+          Expanded(
+            child: Center(
+              child: Text(
+                  _weekLabel(_schedWeekStart),
+                  style: const TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: textDark)),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => setState(() {
+              _schedWeekStart = _schedWeekStart.add(const Duration(days: 7));
+            }),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                  color: bgCard,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade200)),
+              child: const Icon(Icons.chevron_right, color: textLight, size: 20),
+            ),
+          ),
         ]),
-      );
-    });
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            _dayChip('All', _schedSelectedDay == 0, () => setState(() => _schedSelectedDay = 0)),
+            ...List.generate(5, (i) {
+              final day = i + 1;
+              return _dayChip(
+                  ScheduleModel.dayNames[day],
+                  _schedSelectedDay == day,
+                  () => setState(() => _schedSelectedDay = day));
+            }),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (_schedLoading && !_schedLoaded)
+          const Center(child: Padding(
+              padding: EdgeInsets.all(40),
+              child: CircularProgressIndicator()))
+        else if (_schedWeekData.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(40),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.calendar_today_outlined,
+                    color: textLight, size: 48),
+                const SizedBox(height: 12),
+                const Text('No schedule set yet',
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 15,
+                        color: textLight)),
+              ]),
+            ),
+          )
+        else if (_schedSelectedDay == 0)
+          _buildWeekGrid(_schedWeekData)
+        else
+          _buildDayDetail(_schedWeekData, _schedSelectedDay),
+        const SizedBox(height: 24),
+      ]),
+    );
   }
 
   Widget _dayChip(String label, bool isActive, VoidCallback onTap) {

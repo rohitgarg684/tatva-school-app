@@ -63,6 +63,12 @@ class _ParentDashboardState extends State<ParentDashboard>
   List<AnnouncementModel> _announcements = [];
   List<VoteModel> _activeVotes = [];
 
+  // ── SCHEDULE STATE
+  List<ScheduleModel> _schedWeekData = [];
+  bool _schedLoading = false;
+  bool _schedLoaded = false;
+  int _schedSelectedDay = 0;
+
   late AnimationController _shimmerController;
   late AnimationController _greetingController;
   late AnimationController _tabController;
@@ -1134,7 +1140,23 @@ class _ParentDashboardState extends State<ParentDashboard>
     return match?.group(1) ?? 'A';
   }
 
+  void _loadScheduleData() async {
+    if (_schedLoading) return;
+    setState(() => _schedLoading = true);
+    try {
+      final raw = await _api.getSchedule(_childGrade(), _childSection());
+      _schedWeekData = raw.map((m) => ScheduleModel.fromJson(m)).toList();
+    } catch (e) {
+      debugPrint('Schedule load error: $e');
+      _schedWeekData = [];
+    }
+    if (mounted) setState(() { _schedLoading = false; _schedLoaded = true; });
+  }
+
   Widget _scheduleTab() {
+    if (!_schedLoaded && !_schedLoading) {
+      Future.microtask(_loadScheduleData);
+    }
     final childName = _childrenData.isNotEmpty
         ? _childrenData[_selectedChildIndex].info.childName
         : '';
@@ -1142,86 +1164,65 @@ class _ParentDashboardState extends State<ParentDashboard>
         ? (_childrenData[_selectedChildIndex].childClass?.name ?? '')
         : '';
 
-    return StatefulBuilder(builder: (ctx, setLocal) {
-      List<ScheduleModel> weekSchedules = [];
-      bool loading = true;
-      int selectedDay = 0;
-
-      void loadSchedule() async {
-        setLocal(() => loading = true);
-        try {
-          final raw = await _api.getSchedule(_childGrade(), _childSection());
-          weekSchedules = raw.map((m) => ScheduleModel.fromJson(m)).toList();
-        } catch (e) {
-          debugPrint('Schedule load error: $e');
-          weekSchedules = [];
-        }
-        setLocal(() => loading = false);
-      }
-
-      if (loading) Future.microtask(loadSchedule);
-
-      return SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const SizedBox(height: 8),
-          FadeSlideIn(
-              child: Text("$childName's Schedule",
-                  style: const TextStyle(
-                      fontFamily: 'Raleway',
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: textDark,
-                      letterSpacing: -0.8))),
-          const SizedBox(height: 4),
-          FadeSlideIn(
-              delayMs: 60,
-              child: Text('$className • Weekly Timetable',
-                  style: const TextStyle(
-                      fontFamily: 'Raleway', fontSize: 13, color: textLight))),
-          const SizedBox(height: 16),
-          // Day selector
-          Row(
-            children: [
-              _schedDayChip('All', selectedDay == 0, () => setLocal(() => selectedDay = 0)),
-              ...List.generate(5, (i) {
-                final day = i + 1;
-                return _schedDayChip(
-                    ScheduleModel.dayNames[day],
-                    selectedDay == day,
-                    () => setLocal(() => selectedDay = day));
-              }),
-            ],
-          ),
-          const SizedBox(height: 16),
-          if (loading)
-            const Center(child: Padding(
-                padding: EdgeInsets.all(40),
-                child: CircularProgressIndicator()))
-          else if (weekSchedules.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(40),
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.calendar_today_outlined,
-                      color: textLight, size: 48),
-                  const SizedBox(height: 12),
-                  const Text('No schedule set yet',
-                      style: TextStyle(
-                          fontFamily: 'Raleway',
-                          fontSize: 15,
-                          color: textLight)),
-                ]),
-              ),
-            )
-          else if (selectedDay == 0)
-            _schedWeekGrid(weekSchedules)
-          else
-            _schedDayDetail(weekSchedules, selectedDay),
-          const SizedBox(height: 24),
-        ]),
-      );
-    });
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const SizedBox(height: 8),
+        FadeSlideIn(
+            child: Text("$childName's Schedule",
+                style: const TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: textDark,
+                    letterSpacing: -0.8))),
+        const SizedBox(height: 4),
+        FadeSlideIn(
+            delayMs: 60,
+            child: Text('$className • Weekly Timetable',
+                style: const TextStyle(
+                    fontFamily: 'Raleway', fontSize: 13, color: textLight))),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            _schedDayChip('All', _schedSelectedDay == 0, () => setState(() => _schedSelectedDay = 0)),
+            ...List.generate(5, (i) {
+              final day = i + 1;
+              return _schedDayChip(
+                  ScheduleModel.dayNames[day],
+                  _schedSelectedDay == day,
+                  () => setState(() => _schedSelectedDay = day));
+            }),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (_schedLoading && !_schedLoaded)
+          const Center(child: Padding(
+              padding: EdgeInsets.all(40),
+              child: CircularProgressIndicator()))
+        else if (_schedWeekData.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(40),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.calendar_today_outlined,
+                    color: textLight, size: 48),
+                const SizedBox(height: 12),
+                const Text('No schedule set yet',
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 15,
+                        color: textLight)),
+              ]),
+            ),
+          )
+        else if (_schedSelectedDay == 0)
+          _schedWeekGrid(_schedWeekData)
+        else
+          _schedDayDetail(_schedWeekData, _schedSelectedDay),
+        const SizedBox(height: 24),
+      ]),
+    );
   }
 
   Widget _schedDayChip(String label, bool isActive, VoidCallback onTap) {
