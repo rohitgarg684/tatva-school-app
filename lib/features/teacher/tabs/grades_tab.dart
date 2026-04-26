@@ -489,6 +489,7 @@ class _TeacherGradesTabState extends State<TeacherGradesTab> {
                             borderRadius: BorderRadius.circular(10)),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
+                            dropdownColor: TatvaColors.bgCard,
                             value: selectedStudentUid.isEmpty
                                 ? null
                                 : selectedStudentUid,

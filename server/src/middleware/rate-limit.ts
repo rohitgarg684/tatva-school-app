@@ -12,7 +12,7 @@ export const uploadLimiter = rateLimit({
 
 export const dashboardLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 30,
+  max: 60,
   keyGenerator: (req: any) => req.uid || "anonymous",
   standardHeaders: true,
   legacyHeaders: false,
