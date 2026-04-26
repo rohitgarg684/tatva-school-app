@@ -10,15 +10,17 @@ import '../widgets/submit_work_sheet.dart';
 class StudentHomeworkTab extends StatelessWidget {
   final List<HomeworkModel> homework;
   final Set<String> completedIds;
+  final Map<String, Map<String, dynamic>> mySubmissions;
   final String uid;
   final ApiService api;
-  final void Function(String hwId) onMarkDone;
+  final void Function(String hwId, [Map<String, dynamic>? submission]) onMarkDone;
   final void Function(String hwId) onMarkIncomplete;
 
   const StudentHomeworkTab({
     super.key,
     required this.homework,
     required this.completedIds,
+    required this.mySubmissions,
     required this.uid,
     required this.api,
     required this.onMarkDone,
@@ -218,6 +220,63 @@ class StudentHomeworkTab extends StatelessWidget {
                 color: c)),
       );
 
+  Widget _mySubmissionSection(Map<String, dynamic> sub) {
+    final files = (sub['files'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final note = sub['note'] as String? ?? '';
+    if (files.isEmpty && note.isEmpty) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: TatvaColors.success.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: TatvaColors.success.withOpacity(0.15)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(Icons.upload_file_rounded, size: 13, color: TatvaColors.success),
+          const SizedBox(width: 4),
+          const Text('Your Submission',
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: TatvaColors.success)),
+        ]),
+        if (note.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(note,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  fontSize: 11, color: TatvaColors.neutral600, height: 1.4)),
+        ],
+        if (files.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Wrap(spacing: 6, runSpacing: 4, children: files.map((f) {
+            final type = f['type'] as String? ?? 'link';
+            final name = f['name'] as String? ?? 'File';
+            final isImg = type == 'image';
+            final ac = isImg ? TatvaColors.info : TatvaColors.error;
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                  color: ac.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: ac.withOpacity(0.15))),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(isImg ? Icons.image_rounded : Icons.picture_as_pdf_rounded,
+                    size: 12, color: ac),
+                const SizedBox(width: 4),
+                Text(name,
+                    style: TextStyle(
+                        fontSize: 10, fontWeight: FontWeight.w600, color: ac)),
+              ]),
+            );
+          }).toList()),
+        ],
+      ]),
+    );
+  }
+
   Widget _hwSectionHeader(String title, IconData icon, Color c) => Row(
         children: [
           Icon(icon, size: 16, color: c),
@@ -375,6 +434,10 @@ class StudentHomeworkTab extends StatelessWidget {
                     style: const TextStyle(
                         fontSize: 11, color: TatvaColors.neutral400)),
               ]),
+              if (isDone && mySubmissions.containsKey(hw.id)) ...[
+                const SizedBox(height: 8),
+                _mySubmissionSection(mySubmissions[hw.id]!),
+              ],
               const SizedBox(height: 12),
               if (!isDone)
                 Row(children: [
@@ -385,7 +448,7 @@ class StudentHomeworkTab extends StatelessWidget {
                         hw: hw,
                         color: color,
                         api: api,
-                        onSubmitted: () => onMarkDone(hw.id),
+                        onSubmitted: (submission) => onMarkDone(hw.id, submission),
                       ),
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 12),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../../shared/animations/animations.dart';
 import '../../../shared/theme/colors.dart';
 import '../../../models/grade_model.dart';
@@ -183,7 +184,16 @@ class StudentGradesTab extends StatelessWidget {
                     height: 6,
                     delayMs: 300 + index * 80),
                 const SizedBox(height: 12),
-                ...subjectGrades.map((g) {
+                ...(List.of(subjectGrades)
+                  ..sort((a, b) {
+                    final da = a.testDate ?? a.createdAt;
+                    final db = b.testDate ?? b.createdAt;
+                    if (da == null && db == null) return 0;
+                    if (da == null) return 1;
+                    if (db == null) return -1;
+                    return db.compareTo(da);
+                  }))
+                    .map((g) {
                   final score = g.score;
                   final total = g.total;
                   final pct = total > 0 ? score / total : 0.0;
@@ -202,10 +212,21 @@ class StudentGradesTab extends StatelessWidget {
                               BoxDecoration(color: gc, shape: BoxShape.circle)),
                       const SizedBox(width: 8),
                       Expanded(
-                          child: Text(g.assessmentName,
-                              style: const TextStyle(
-                                  fontSize: 12,
-                                  color: TatvaColors.neutral600))),
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                            Text(g.assessmentName,
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    color: TatvaColors.neutral600)),
+                            if (g.testDate != null || g.createdAt != null)
+                              Text(
+                                  DateFormat('d MMM yyyy')
+                                      .format(g.testDate ?? g.createdAt!),
+                                  style: const TextStyle(
+                                      fontSize: 10,
+                                      color: TatvaColors.neutral400)),
+                          ])),
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 3),

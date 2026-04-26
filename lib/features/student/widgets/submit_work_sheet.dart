@@ -13,7 +13,7 @@ class SubmitWorkSheet {
     required HomeworkModel hw,
     required Color color,
     required ApiService api,
-    required VoidCallback onSubmitted,
+    required void Function(Map<String, dynamic>? submission) onSubmitted,
   }) {
     final noteCtrl = TextEditingController();
     final pickedFiles = <MapEntry<String, Uint8List>>[];
@@ -196,7 +196,12 @@ class SubmitWorkSheet {
                             if (!context.mounted) return;
                             Navigator.pop(context);
                             if (resp['error'] == null) {
-                              onSubmitted();
+                              final files = (resp['files'] as List?)
+                                  ?.cast<Map<String, dynamic>>() ?? [];
+                              onSubmitted({
+                                'files': files,
+                                'note': noteCtrl.text.trim(),
+                              });
                               TatvaSnackbar.show(context, 'Submitted! 🎉');
                             } else {
                               TatvaSnackbar.show(context, 'Failed to submit');

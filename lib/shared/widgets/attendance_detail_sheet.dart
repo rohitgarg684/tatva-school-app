@@ -448,7 +448,7 @@ fontSize: 13, color: textLight)),
 
       Color cellColor;
       Color textColor;
-      if (isFuture || isWeekend) {
+      if (isFuture) {
         cellColor = Colors.grey.shade50;
         textColor = Colors.grey.shade300;
       } else if (record != null) {

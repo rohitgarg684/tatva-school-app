@@ -4,6 +4,7 @@ import '../../../shared/theme/colors.dart';
 import '../../../shared/animations/animations.dart';
 import '../../../models/child_info.dart';
 import '../../../models/schedule_model.dart';
+import '../../../models/schedule_event.dart';
 import '../../../services/api_service.dart';
 
 class ParentScheduleTab extends StatefulWidget {
@@ -25,6 +26,7 @@ class ParentScheduleTab extends StatefulWidget {
 class _ParentScheduleTabState extends State<ParentScheduleTab> {
   List<ScheduleModel> _weekData = [];
   List<Map<String, dynamic>> _cancellations = [];
+  List<ScheduleEvent> _events = [];
   bool _loading = false;
   bool _loaded = false;
   int _selectedDay = 0;
@@ -59,17 +61,28 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
     if (_loading) return;
     setState(() => _loading = true);
     try {
-      final data =
-          await widget.api.getScheduleWithCancellations(_grade(), _section());
+      final now = DateTime.now();
+      final ws = DateTime(now.year, now.month, now.day - (now.weekday - 1));
+      final we = ws.add(const Duration(days: 4));
+      String fmtDate(DateTime d) =>
+          '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+      final results = await Future.wait([
+        widget.api.getScheduleWithCancellations(_grade(), _section()),
+        widget.api.getScheduleEvents(fmtDate(ws), fmtDate(we)),
+      ]);
+      final data = results[0] as Map<String, dynamic>;
       final raw =
           (data['schedules'] as List?)?.cast<Map<String, dynamic>>() ?? [];
       _weekData = raw.map((m) => ScheduleModel.fromJson(m)).toList();
       _cancellations =
           (data['cancellations'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final evRaw = results[1] as List<Map<String, dynamic>>;
+      _events = evRaw.map((m) => ScheduleEvent.fromJson(m)).toList();
     } catch (e) {
       debugPrint('Schedule load error: $e');
       _weekData = [];
       _cancellations = [];
+      _events = [];
     }
     if (mounted) {
       setState(() {
@@ -158,6 +171,10 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
           _weekGrid(_weekData)
         else
           _dayDetail(_weekData, _selectedDay),
+        if (_visibleEvents.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          ..._visibleEvents.map(_buildEventCard),
+        ],
         const SizedBox(height: 24),
       ]),
     );
@@ -287,7 +304,9 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
                     ? (subjectColors[slot.subject] ?? TatvaColors.primary)
                     : Colors.grey.shade200;
                 return Expanded(
-                  child: Opacity(
+                  child: slot == null
+                      ? const SizedBox(height: 52)
+                      : Opacity(
                     opacity: cancelled ? 0.4 : 1.0,
                     child: Container(
                       height: 52,
@@ -296,18 +315,13 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
                       decoration: BoxDecoration(
                           color: cancelled
                               ? Colors.grey.shade100
-                              : slot != null
-                                  ? c.withOpacity(isToday ? 0.18 : 0.1)
-                                  : Colors.grey.shade50,
+                              : c.withOpacity(isToday ? 0.18 : 0.1),
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
                               color: cancelled
                                   ? Colors.grey.shade200
-                                  : slot != null
-                                      ? c.withOpacity(0.3)
-                                      : Colors.grey.shade100)),
-                      child: slot != null
-                          ? Column(
+                                  : c.withOpacity(0.3))),
+                      child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(cancelled ? '✕' : slot.subject,
@@ -333,8 +347,7 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
                                           fontSize: 8,
                                           color: c.withOpacity(0.7))),
                               ],
-                            )
-                          : const SizedBox.shrink(),
+                            ),
                     ),
                   ),
                 );
@@ -364,6 +377,66 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
             .toList(),
       ),
     ]);
+  }
+
+  List<ScheduleEvent> get _visibleEvents {
+    if (_selectedDay == 0) return _events;
+    final ds = _dateStr(_selectedDay);
+    return _events.where((e) => e.date == ds).toList();
+  }
+
+  Widget _buildEventCard(ScheduleEvent ev) {
+    final c = ev.type == 'holiday'
+        ? TatvaColors.error
+        : ev.type == 'ptm'
+            ? TatvaColors.purple
+            : TatvaColors.accent;
+    final icon = ev.type == 'holiday'
+        ? Icons.wb_sunny_outlined
+        : ev.type == 'ptm'
+            ? Icons.people_outline
+            : Icons.event_outlined;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+          color: c.withOpacity(0.07),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: c.withOpacity(0.2))),
+      child: Row(children: [
+        Icon(icon, size: 18, color: c),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(ev.title,
+                style: TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w700, color: c)),
+            if (ev.startTime.isNotEmpty)
+              Text('${ev.date} • ${ev.startTime}${ev.endTime.isNotEmpty ? ' – ${ev.endTime}' : ''}',
+                  style: const TextStyle(fontSize: 11, color: TatvaColors.neutral400))
+            else
+              Text(ev.date,
+                  style: const TextStyle(fontSize: 11, color: TatvaColors.neutral400)),
+            if (ev.description.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(ev.description,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11, color: TatvaColors.neutral400)),
+              ),
+          ]),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+              color: c.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(4)),
+          child: Text(ev.typeLabel,
+              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: c)),
+        ),
+      ]),
+    );
   }
 
   Widget _dayDetail(List<ScheduleModel> schedules, int day) {

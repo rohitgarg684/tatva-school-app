@@ -54,6 +54,7 @@ class _StudentDashboardState extends State<StudentDashboard>
   StudentDashboardData? _data;
   List<AnnouncementModel> _announcements = [];
   final Set<String> _completedIds = {};
+  final Map<String, Map<String, dynamic>> _mySubmissions = {};
 
   late AnimationController _shimmerController;
   late AnimationController _greetingController;
@@ -112,9 +113,11 @@ class _StudentDashboardState extends State<StudentDashboard>
       _data = data;
       _announcements = List.of(data.announcements);
       _completedIds.clear();
+      _mySubmissions.clear();
       for (final hw in data.homework) {
         if (hw.isSubmittedBy(_uid)) _completedIds.add(hw.id);
       }
+      await _fetchMySubmissions();
     } catch (e) {
       debugPrint('StudentDashboard._loadData error: $e');
     }
@@ -148,8 +151,20 @@ class _StudentDashboardState extends State<StudentDashboard>
     });
   }
 
-  void _handleMarkDone(String hwId) {
-    setState(() => _completedIds.add(hwId));
+  Future<void> _fetchMySubmissions() async {
+    for (final hwId in _completedIds) {
+      try {
+        final sub = await _api.getMyHomeworkSubmission(hwId);
+        if (sub != null) _mySubmissions[hwId] = sub;
+      } catch (_) {}
+    }
+  }
+
+  void _handleMarkDone(String hwId, [Map<String, dynamic>? submission]) {
+    setState(() {
+      _completedIds.add(hwId);
+      if (submission != null) _mySubmissions[hwId] = submission;
+    });
     _api.submitHomework(hwId);
   }
 
@@ -271,6 +286,7 @@ class _StudentDashboardState extends State<StudentDashboard>
         StudentHomeworkTab(
           homework: _data?.homework ?? [],
           completedIds: _completedIds,
+          mySubmissions: _mySubmissions,
           uid: _uid,
           api: _api,
           onMarkDone: _handleMarkDone,

@@ -226,6 +226,11 @@ class StudentHomeTab extends StatelessWidget {
                               style: const TextStyle(
                                   fontSize: 11,
                                   color: TatvaColors.neutral400)),
+                        if (bp.createdAt != null)
+                          Text(_shortDate(bp.createdAt!),
+                              style: const TextStyle(
+                                  fontSize: 10,
+                                  color: TatvaColors.neutral400)),
                       ])),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -469,6 +474,12 @@ class StudentHomeTab extends StatelessWidget {
         ),
       ),
     ]);
+  }
+
+  static String _shortDate(DateTime dt) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    final l = dt.toLocal();
+    return '${months[l.month - 1]} ${l.day}';
   }
 
   IconData _activityIcon(String type) {
