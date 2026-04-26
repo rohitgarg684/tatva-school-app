@@ -42,7 +42,33 @@ class BehaviorPoint {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  BehaviorPoint copyWith({
+    String? id,
+    String? studentUid,
+    String? studentName,
+    String? classId,
+    String? categoryId,
+    int? points,
+    String? awardedBy,
+    String? awardedByName,
+    String? note,
+    DateTime? createdAt,
+  }) {
+    return BehaviorPoint(
+      id: id ?? this.id,
+      studentUid: studentUid ?? this.studentUid,
+      studentName: studentName ?? this.studentName,
+      classId: classId ?? this.classId,
+      categoryId: categoryId ?? this.categoryId,
+      points: points ?? this.points,
+      awardedBy: awardedBy ?? this.awardedBy,
+      awardedByName: awardedByName ?? this.awardedByName,
+      note: note ?? this.note,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
     return {
       'studentUid': studentUid,
       'studentName': studentName,
@@ -52,7 +78,7 @@ class BehaviorPoint {
       'awardedBy': awardedBy,
       'awardedByName': awardedByName,
       'note': note,
-      'createdAt': DateTime.now().toIso8601String(),
+      'createdAt': (createdAt ?? DateTime.now()).toIso8601String(),
     };
   }
 }

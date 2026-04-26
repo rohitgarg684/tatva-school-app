@@ -44,7 +44,33 @@ class ClassModel {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  ClassModel copyWith({
+    String? id,
+    String? name,
+    String? subject,
+    String? teacherUid,
+    String? teacherName,
+    String? teacherEmail,
+    String? classCode,
+    List<String>? studentUids,
+    List<String>? parentUids,
+    DateTime? createdAt,
+  }) {
+    return ClassModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      subject: subject ?? this.subject,
+      teacherUid: teacherUid ?? this.teacherUid,
+      teacherName: teacherName ?? this.teacherName,
+      teacherEmail: teacherEmail ?? this.teacherEmail,
+      classCode: classCode ?? this.classCode,
+      studentUids: studentUids ?? this.studentUids,
+      parentUids: parentUids ?? this.parentUids,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
     return {
       'name': name,
       'subject': subject,
@@ -54,7 +80,7 @@ class ClassModel {
       'classCode': classCode,
       'studentUids': studentUids,
       'parentUids': parentUids,
-      'createdAt': DateTime.now().toIso8601String(),
+      'createdAt': (createdAt ?? DateTime.now()).toIso8601String(),
     };
   }
 }

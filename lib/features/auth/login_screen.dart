@@ -184,7 +184,6 @@ class _LoginScreenState extends State<LoginScreen>
                 SizedBox(height: 16),
                 Text('Check your email!',
                     style: TextStyle(
-                        fontFamily: 'Raleway',
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: textWhite)),
@@ -192,7 +191,6 @@ class _LoginScreenState extends State<LoginScreen>
                 Text('We sent a reset link to\n${emailController.text.trim()}',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                        fontFamily: 'Raleway',
                         fontSize: 13,
                         color: textMuted,
                         height: 1.5)),
@@ -209,7 +207,6 @@ class _LoginScreenState extends State<LoginScreen>
                         elevation: 0),
                     child: Text('Got it',
                         style: TextStyle(
-                            fontFamily: 'Raleway',
                             fontWeight: FontWeight.bold,
                             color: Colors.white)),
                   ),
@@ -268,14 +265,12 @@ class _LoginScreenState extends State<LoginScreen>
                       SizedBox(height: 28),
                       Text('Welcome back 👋',
                           style: TextStyle(
-                              fontFamily: 'Raleway',
                               fontSize: 28,
                               fontWeight: FontWeight.bold,
                               color: textWhite)),
                       SizedBox(height: 6),
                       Text('Sign in to your Tatva Academy account',
                           style: TextStyle(
-                              fontFamily: 'Raleway',
                               fontSize: 13,
                               color: textMuted)),
                       SizedBox(height: 32),
@@ -289,7 +284,6 @@ class _LoginScreenState extends State<LoginScreen>
                         onSubmitted: (_) =>
                             FocusScope.of(context).requestFocus(passwordFocus),
                         style: TextStyle(
-                            fontFamily: 'Raleway',
                             fontSize: 14,
                             color: textWhite),
                         decoration: _inputDecoration('Enter your email',
@@ -306,7 +300,6 @@ class _LoginScreenState extends State<LoginScreen>
                         textInputAction: TextInputAction.done,
                         onSubmitted: (_) => login(),
                         style: TextStyle(
-                            fontFamily: 'Raleway',
                             fontSize: 14,
                             color: textWhite),
                         decoration: _inputDecoration('Enter your password',
@@ -335,7 +328,6 @@ class _LoginScreenState extends State<LoginScreen>
                               minimumSize: Size(0, 0)),
                           child: Text('Forgot password?',
                               style: TextStyle(
-                                  fontFamily: 'Raleway',
                                   fontSize: 13,
                                   color: accentLight,
                                   fontWeight: FontWeight.w600)),
@@ -361,7 +353,6 @@ class _LoginScreenState extends State<LoginScreen>
                               Expanded(
                                   child: Text(generalError,
                                       style: TextStyle(
-                                          fontFamily: 'Raleway',
                                           fontSize: 13,
                                           color: Colors.red.shade300))),
                             ],
@@ -378,7 +369,6 @@ class _LoginScreenState extends State<LoginScreen>
                                     color: Colors.white, strokeWidth: 2))
                             : Text('Sign In',
                                 style: TextStyle(
-                                    fontFamily: 'Raleway',
                                     fontSize: 15,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.white)),
@@ -389,7 +379,6 @@ class _LoginScreenState extends State<LoginScreen>
                         children: [
                           Text("Don't have an account?",
                               style: TextStyle(
-                                  fontFamily: 'Raleway',
                                   fontSize: 13,
                                   color: textMuted)),
                           TextButton(
@@ -398,7 +387,6 @@ class _LoginScreenState extends State<LoginScreen>
                                 padding: EdgeInsets.only(left: 4)),
                             child: Text('Register',
                                 style: TextStyle(
-                                    fontFamily: 'Raleway',
                                     fontSize: 13,
                                     color: accentLight,
                                     fontWeight: FontWeight.bold)),
@@ -409,7 +397,6 @@ class _LoginScreenState extends State<LoginScreen>
                       Center(
                           child: Text('v1.0.0',
                               style: TextStyle(
-                                  fontFamily: 'Raleway',
                                   fontSize: 10,
                                   color: Colors.white24))),
                       SizedBox(height: 16),
@@ -426,7 +413,6 @@ class _LoginScreenState extends State<LoginScreen>
 
   Widget _label(String text) => Text(text,
       style: TextStyle(
-          fontFamily: 'Raleway',
           fontSize: 13,
           fontWeight: FontWeight.w600,
           color: textWhite));
@@ -439,7 +425,6 @@ class _LoginScreenState extends State<LoginScreen>
             SizedBox(width: 4),
             Text(text,
                 style: TextStyle(
-                    fontFamily: 'Raleway',
                     fontSize: 12,
                     color: Colors.red.shade300)),
           ],
@@ -450,7 +435,7 @@ class _LoginScreenState extends State<LoginScreen>
     return InputDecoration(
       hintText: hint,
       hintStyle:
-          TextStyle(fontFamily: 'Raleway', fontSize: 13, color: Colors.white24),
+          TextStyle(fontSize: 13, color: Colors.white24),
       prefixIcon: Icon(icon,
           color: error.isEmpty ? textMuted : Colors.red.shade300, size: 20),
       filled: true,

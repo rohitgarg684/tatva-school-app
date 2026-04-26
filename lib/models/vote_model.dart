@@ -11,7 +11,7 @@ class VoteCount {
 
   int get total => school + noSchool + undecided;
 
-  factory VoteCount.fromMap(Map<String, dynamic>? data) {
+  factory VoteCount.fromJson(Map<String, dynamic>? data) {
     if (data == null) return const VoteCount();
     return VoteCount(
       school: (data['school'] as num?)?.toInt() ?? 0,
@@ -20,7 +20,19 @@ class VoteCount {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  VoteCount copyWith({
+    int? school,
+    int? noSchool,
+    int? undecided,
+  }) {
+    return VoteCount(
+      school: school ?? this.school,
+      noSchool: noSchool ?? this.noSchool,
+      undecided: undecided ?? this.undecided,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
     return {
       'school': school,
       'no_school': noSchool,
@@ -64,7 +76,7 @@ class VoteModel {
       createdBy: data['createdBy'] as String? ?? '',
       createdByName: data['createdByName'] as String? ?? '',
       createdByRole: data['createdByRole'] as String? ?? '',
-      votes: VoteCount.fromMap(data['votes'] as Map<String, dynamic>?),
+      votes: VoteCount.fromJson(data['votes'] as Map<String, dynamic>?),
       voters: List<String>.from(data['voters'] ?? []),
       active: data['active'] as bool? ?? true,
       createdAt: data['createdAt'] != null
@@ -73,17 +85,43 @@ class VoteModel {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  VoteModel copyWith({
+    String? id,
+    String? question,
+    String? type,
+    String? createdBy,
+    String? createdByName,
+    String? createdByRole,
+    VoteCount? votes,
+    List<String>? voters,
+    bool? active,
+    DateTime? createdAt,
+  }) {
+    return VoteModel(
+      id: id ?? this.id,
+      question: question ?? this.question,
+      type: type ?? this.type,
+      createdBy: createdBy ?? this.createdBy,
+      createdByName: createdByName ?? this.createdByName,
+      createdByRole: createdByRole ?? this.createdByRole,
+      votes: votes ?? this.votes,
+      voters: voters ?? this.voters,
+      active: active ?? this.active,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
     return {
       'question': question,
       'type': type,
       'createdBy': createdBy,
       'createdByName': createdByName,
       'createdByRole': createdByRole,
-      'votes': votes.toMap(),
+      'votes': votes.toJson(),
       'voters': voters,
       'active': active,
-      'createdAt': DateTime.now().toIso8601String(),
+      'createdAt': (createdAt ?? DateTime.now()).toIso8601String(),
     };
   }
 }

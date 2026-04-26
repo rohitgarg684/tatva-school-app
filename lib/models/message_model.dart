@@ -28,13 +28,31 @@ class MessageModel {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  MessageModel copyWith({
+    String? id,
+    String? text,
+    String? senderUid,
+    String? receiverUid,
+    String? conversationId,
+    DateTime? createdAt,
+  }) {
+    return MessageModel(
+      id: id ?? this.id,
+      text: text ?? this.text,
+      senderUid: senderUid ?? this.senderUid,
+      receiverUid: receiverUid ?? this.receiverUid,
+      conversationId: conversationId ?? this.conversationId,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
     return {
       'text': text,
       'senderUid': senderUid,
       'receiverUid': receiverUid,
       'conversationId': conversationId,
-      'createdAt': DateTime.now().toIso8601String(),
+      'createdAt': (createdAt ?? DateTime.now()).toIso8601String(),
     };
   }
 }

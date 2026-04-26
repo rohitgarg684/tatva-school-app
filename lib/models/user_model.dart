@@ -32,7 +32,7 @@ class UserModel {
       role: UserRole.fromString(data['role'] as String? ?? 'Student'),
       classIds: List<String>.from(data['classIds'] ?? []),
       children: (data['children'] as List<dynamic>? ?? [])
-          .map((c) => ChildInfo.fromMap(c as Map<String, dynamic>))
+          .map((c) => ChildInfo.fromJson(c as Map<String, dynamic>))
           .toList(),
       fcmToken: data['fcmToken'] as String?,
       createdAt: data['createdAt'] != null
@@ -41,16 +41,16 @@ class UserModel {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
       'name': name,
       'email': email,
       'role': role.label,
       'uid': uid,
       'classIds': classIds,
-      'children': children.map((c) => c.toMap()).toList(),
+      'children': children.map((c) => c.toJson()).toList(),
       if (fcmToken != null) 'fcmToken': fcmToken,
-      'createdAt': DateTime.now().toIso8601String(),
+      'createdAt': (createdAt ?? DateTime.now()).toIso8601String(),
     };
   }
 

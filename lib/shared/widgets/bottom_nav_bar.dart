@@ -81,7 +81,6 @@ class TatvaBottomNavBar extends StatelessWidget {
                         AnimatedDefaultTextStyle(
                           duration: const Duration(milliseconds: 250),
                           style: TextStyle(
-                            fontFamily: 'Raleway',
                             fontSize: 9,
                             color: isActive
                                 ? accentColor

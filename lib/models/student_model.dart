@@ -40,7 +40,7 @@ class StudentModel {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
       'name': name,
       'rollNumber': rollNumber,
@@ -50,7 +50,7 @@ class StudentModel {
       'parentPhone': parentPhone,
       'classIds': classIds,
       'enrolledBy': enrolledBy,
-      'createdAt': DateTime.now().toIso8601String(),
+      'createdAt': (createdAt ?? DateTime.now()).toIso8601String(),
     };
   }
 

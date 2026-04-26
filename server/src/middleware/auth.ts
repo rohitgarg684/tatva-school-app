@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import * as admin from "firebase-admin";
+import { db } from "../lib/firestore-helpers";
+import { Collections } from "../lib/collections";
 
 declare global {
   namespace Express {
@@ -9,8 +11,6 @@ declare global {
     }
   }
 }
-
-const db = admin.firestore();
 
 export async function requireAuth(
   req: Request,
@@ -30,7 +30,7 @@ export async function requireAuth(
     req.role = (decoded as any).role || null;
 
     if (!req.role) {
-      const userDoc = await db.collection("users").doc(decoded.uid).get();
+      const userDoc = await db.collection(Collections.USERS).doc(decoded.uid).get();
       const firestoreRole = userDoc.data()?.role;
       if (firestoreRole) {
         req.role = firestoreRole;

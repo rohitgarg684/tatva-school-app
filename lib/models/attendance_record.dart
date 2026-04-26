@@ -33,14 +33,34 @@ class AttendanceRecord {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  AttendanceRecord copyWith({
+    String? id,
+    String? studentUid,
+    String? studentName,
+    String? date,
+    AttendanceStatus? status,
+    String? markedBy,
+    DateTime? createdAt,
+  }) {
+    return AttendanceRecord(
+      id: id ?? this.id,
+      studentUid: studentUid ?? this.studentUid,
+      studentName: studentName ?? this.studentName,
+      date: date ?? this.date,
+      status: status ?? this.status,
+      markedBy: markedBy ?? this.markedBy,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
     return {
       'studentUid': studentUid,
       'studentName': studentName,
       'date': date,
       'status': status.label,
       'markedBy': markedBy,
-      'createdAt': DateTime.now().toIso8601String(),
+      'createdAt': (createdAt ?? DateTime.now()).toIso8601String(),
     };
   }
 }

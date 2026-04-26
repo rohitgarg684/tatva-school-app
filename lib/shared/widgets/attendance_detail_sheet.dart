@@ -156,14 +156,13 @@ class _AttendanceDetailViewState extends State<_AttendanceDetailView> {
           const SizedBox(height: 16),
           Text('Attendance',
               style: const TextStyle(
-                  fontFamily: 'Raleway',
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: textDark)),
           const SizedBox(height: 4),
           Text(widget.studentName,
               style: const TextStyle(
-                  fontFamily: 'Raleway', fontSize: 13, color: textLight)),
+fontSize: 13, color: textLight)),
           const SizedBox(height: 16),
 
           // Attendance rate ring
@@ -230,7 +229,6 @@ class _AttendanceDetailViewState extends State<_AttendanceDetailView> {
           child: Center(
               child: Text(label,
                   style: TextStyle(
-                      fontFamily: 'Raleway',
                       fontSize: 13,
                       fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                       color: isActive ? primary : textLight))),
@@ -266,13 +264,11 @@ class _AttendanceDetailViewState extends State<_AttendanceDetailView> {
             Column(mainAxisSize: MainAxisSize.min, children: [
               Text('${rate.toStringAsFixed(0)}%',
                   style: TextStyle(
-                      fontFamily: 'Raleway',
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: rateColor)),
               const Text('rate',
                   style: TextStyle(
-                      fontFamily: 'Raleway',
                       fontSize: 10,
                       color: textLight)),
             ]),
@@ -301,7 +297,6 @@ class _AttendanceDetailViewState extends State<_AttendanceDetailView> {
       const SizedBox(width: 6),
       Text('$count $label',
           style: const TextStyle(
-              fontFamily: 'Raleway',
               fontSize: 13,
               fontWeight: FontWeight.w600,
               color: textDark)),
@@ -359,7 +354,6 @@ class _AttendanceDetailViewState extends State<_AttendanceDetailView> {
             child: Center(
                 child: Text(label,
                     style: TextStyle(
-                        fontFamily: 'Raleway',
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: _viewMode == 2 ? primary : textDark))),
@@ -431,7 +425,6 @@ class _AttendanceDetailViewState extends State<_AttendanceDetailView> {
       cells.add(Center(
           child: Text(l,
               style: const TextStyle(
-                  fontFamily: 'Raleway',
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                   color: textLight))));
@@ -487,7 +480,6 @@ class _AttendanceDetailViewState extends State<_AttendanceDetailView> {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Text('$day',
                 style: TextStyle(
-                    fontFamily: 'Raleway',
                     fontSize: 12,
                     fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
                     color: textColor)),
@@ -499,7 +491,6 @@ class _AttendanceDetailViewState extends State<_AttendanceDetailView> {
                           ? 'A'
                           : 'T',
                   style: TextStyle(
-                      fontFamily: 'Raleway',
                       fontSize: 8,
                       fontWeight: FontWeight.w700,
                       color: textColor)),
@@ -584,13 +575,11 @@ class _AttendanceDetailViewState extends State<_AttendanceDetailView> {
               child: Column(children: [
                 Text(dayNames[date.weekday - 1],
                     style: TextStyle(
-                        fontFamily: 'Raleway',
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                         color: isToday ? primary : textLight)),
                 Text('${date.day}',
                     style: TextStyle(
-                        fontFamily: 'Raleway',
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: isToday ? primary : textDark)),
@@ -602,7 +591,6 @@ class _AttendanceDetailViewState extends State<_AttendanceDetailView> {
             Expanded(
               child: Text(statusText,
                   style: TextStyle(
-                      fontFamily: 'Raleway',
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: statusColor)),
@@ -625,7 +613,7 @@ class _AttendanceDetailViewState extends State<_AttendanceDetailView> {
           const Text('Tap the date range button to select dates',
               textAlign: TextAlign.center,
               style: TextStyle(
-                  fontFamily: 'Raleway', fontSize: 14, color: textLight)),
+fontSize: 14, color: textLight)),
         ]),
       );
     }
@@ -638,7 +626,7 @@ class _AttendanceDetailViewState extends State<_AttendanceDetailView> {
         padding: EdgeInsets.all(32),
         child: Text('No attendance records in this range',
             style: TextStyle(
-                fontFamily: 'Raleway', fontSize: 14, color: textLight)),
+fontSize: 14, color: textLight)),
       );
     }
 
@@ -670,7 +658,6 @@ class _AttendanceDetailViewState extends State<_AttendanceDetailView> {
           child: Row(children: [
             Text('${_monthsShort[month]} $day',
                 style: const TextStyle(
-                    fontFamily: 'Raleway',
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: textDark)),
@@ -679,7 +666,6 @@ class _AttendanceDetailViewState extends State<_AttendanceDetailView> {
             const SizedBox(width: 6),
             Text(r.status.label,
                 style: TextStyle(
-                    fontFamily: 'Raleway',
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: c)),
@@ -701,7 +687,6 @@ class _AttendanceDetailViewState extends State<_AttendanceDetailView> {
           const SizedBox(width: 6),
           const Text('Period Summary',
               style: TextStyle(
-                  fontFamily: 'Raleway',
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: textDark)),
@@ -723,7 +708,7 @@ class _AttendanceDetailViewState extends State<_AttendanceDetailView> {
         width: 55,
         child: Text(label,
             style: const TextStyle(
-                fontFamily: 'Raleway', fontSize: 11, color: textLight)),
+fontSize: 11, color: textLight)),
       ),
       Expanded(
         child: Container(
@@ -747,7 +732,6 @@ class _AttendanceDetailViewState extends State<_AttendanceDetailView> {
         child: Text('$count',
             textAlign: TextAlign.right,
             style: TextStyle(
-                fontFamily: 'Raleway',
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
                 color: color)),
@@ -784,13 +768,12 @@ class _AttendanceDetailViewState extends State<_AttendanceDetailView> {
             const SizedBox(height: 4),
             Text('$currentStreak',
                 style: const TextStyle(
-                    fontFamily: 'Raleway',
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: textDark)),
             const Text('Current Streak',
                 style: TextStyle(
-                    fontFamily: 'Raleway', fontSize: 10, color: textLight)),
+fontSize: 10, color: textLight)),
           ]),
         ),
         Container(width: 1, height: 40, color: Colors.grey.shade200),
@@ -800,13 +783,12 @@ class _AttendanceDetailViewState extends State<_AttendanceDetailView> {
             const SizedBox(height: 4),
             Text('$longestStreak',
                 style: const TextStyle(
-                    fontFamily: 'Raleway',
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: textDark)),
             const Text('Best Streak',
                 style: TextStyle(
-                    fontFamily: 'Raleway', fontSize: 10, color: textLight)),
+fontSize: 10, color: textLight)),
           ]),
         ),
       ]),
@@ -829,14 +811,13 @@ class _AttendanceDetailViewState extends State<_AttendanceDetailView> {
           const SizedBox(width: 6),
           const Text('All-Time Record',
               style: TextStyle(
-                  fontFamily: 'Raleway',
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: textDark)),
           const Spacer(),
           Text('$total school days',
               style: const TextStyle(
-                  fontFamily: 'Raleway', fontSize: 11, color: textLight)),
+fontSize: 11, color: textLight)),
         ]),
         const SizedBox(height: 10),
         ClipRRect(
@@ -865,13 +846,11 @@ class _AttendanceDetailViewState extends State<_AttendanceDetailView> {
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text('${(presentPct * 100).toStringAsFixed(1)}% present',
               style: const TextStyle(
-                  fontFamily: 'Raleway',
                   fontSize: 11,
                   color: success,
                   fontWeight: FontWeight.w600)),
           Text('${(absentPct * 100).toStringAsFixed(1)}% absent',
               style: const TextStyle(
-                  fontFamily: 'Raleway',
                   fontSize: 11,
                   color: danger,
                   fontWeight: FontWeight.w600)),

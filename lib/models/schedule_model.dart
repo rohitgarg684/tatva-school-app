@@ -26,7 +26,7 @@ class PeriodSlot {
     );
   }
 
-  Map<String, dynamic> toMap() => {
+  Map<String, dynamic> toJson() => {
         'period': period,
         'startTime': startTime,
         'endTime': endTime,
@@ -89,11 +89,31 @@ class ScheduleModel {
     );
   }
 
-  Map<String, dynamic> toMap() => {
+  ScheduleModel copyWith({
+    String? id,
+    String? grade,
+    String? section,
+    int? dayOfWeek,
+    List<PeriodSlot>? periods,
+    String? createdBy,
+    DateTime? updatedAt,
+  }) {
+    return ScheduleModel(
+      id: id ?? this.id,
+      grade: grade ?? this.grade,
+      section: section ?? this.section,
+      dayOfWeek: dayOfWeek ?? this.dayOfWeek,
+      periods: periods ?? this.periods,
+      createdBy: createdBy ?? this.createdBy,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
         'grade': grade,
         'section': section,
         'dayOfWeek': dayOfWeek,
-        'periods': periods.map((p) => p.toMap()).toList(),
+        'periods': periods.map((p) => p.toJson()).toList(),
         'createdBy': createdBy,
       };
 

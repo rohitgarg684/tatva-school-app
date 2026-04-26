@@ -3,8 +3,11 @@ import * as admin from "firebase-admin";
 import multer from "multer";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { isValidImage, isValidDocument } from "../lib/file-validation";
-
-// ─── Image upload config ────────────────────────────────────────────────────
+import { db, serializeDocs } from "../lib/firestore-helpers";
+import { cacheDeletePrefix } from "../lib/cache";
+import { asyncHandler } from "../lib/async-handler";
+import { Collections } from "../lib/collections";
+import { Config } from "../lib/config";
 
 const IMAGE_MIME_TYPES = [
   "image/jpeg",
@@ -12,25 +15,18 @@ const IMAGE_MIME_TYPES = [
   "image/gif",
   "image/webp",
 ];
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
 
 const imageUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_IMAGE_SIZE },
+  limits: { fileSize: Config.MAX_IMAGE_SIZE },
   fileFilter: (_req, file, cb) => {
     if (IMAGE_MIME_TYPES.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(
-        new Error(
-          `Invalid image type: ${file.mimetype}. Allowed: JPEG, PNG, GIF, WebP.`
-        )
-      );
+      cb(new Error(`Invalid image type: ${file.mimetype}. Allowed: JPEG, PNG, GIF, WebP.`));
     }
   },
 });
-
-// ─── Document upload config ─────────────────────────────────────────────────
 
 const DOC_MIME_TYPES = [
   ...IMAGE_MIME_TYPES,
@@ -39,30 +35,18 @@ const DOC_MIME_TYPES = [
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 ];
-const MAX_DOC_SIZE = 10 * 1024 * 1024; // 10 MB
 
 const docUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_DOC_SIZE },
+  limits: { fileSize: Config.MAX_DOC_SIZE },
   fileFilter: (_req, file, cb) => {
-    if (
-      DOC_MIME_TYPES.includes(file.mimetype) ||
-      file.mimetype === "application/octet-stream"
-    ) {
+    if (DOC_MIME_TYPES.includes(file.mimetype) || file.mimetype === "application/octet-stream") {
       cb(null, true);
     } else {
-      cb(
-        new Error(
-          `Invalid file type: ${file.mimetype}. Allowed: images, PDF, DOCX, XLSX, PPTX.`
-        )
-      );
+      cb(new Error(`Invalid file type: ${file.mimetype}. Allowed: images, PDF, DOCX, XLSX, PPTX.`));
     }
   },
 });
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-const SIGNED_URL_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 function sanitizeId(val: string): string {
   return val.replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -75,35 +59,30 @@ function generateFileName(mimetype: string): string {
     "image/gif": "gif",
     "image/webp": "webp",
     "application/pdf": "pdf",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-      "docx",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
-      "xlsx",
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation":
-      "pptx",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
   };
   const ext = extMap[mimetype] || "bin";
   return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
 }
 
-async function uploadToStorage(
-  buffer: Buffer,
-  storagePath: string,
-  contentType: string
-): Promise<string> {
+async function uploadToStorage(buffer: Buffer, storagePath: string, contentType: string): Promise<string> {
   const bucket = admin.storage().bucket();
   const fileRef = bucket.file(storagePath);
-
-  await fileRef.save(buffer, {
-    metadata: { contentType },
-  });
-
+  await fileRef.save(buffer, { metadata: { contentType } });
   const [signedUrl] = await fileRef.getSignedUrl({
     action: "read",
-    expires: Date.now() + SIGNED_URL_EXPIRY_MS,
+    expires: Date.now() + Config.SIGNED_URL_EXPIRY_MS,
   });
-
   return signedUrl;
+}
+
+function classifyFileType(originalname: string): "pdf" | "image" | "document" {
+  const ext = originalname.split(".").pop()?.toLowerCase() || "";
+  if (ext === "pdf") return "pdf";
+  if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) return "image";
+  return "document";
 }
 
 function handleMulterError(err: any, res: Response): boolean {
@@ -122,40 +101,25 @@ function handleMulterError(err: any, res: Response): boolean {
   return false;
 }
 
-// ─── Router ─────────────────────────────────────────────────────────────────
-
 const router = Router();
 router.use(requireAuth);
 
-// POST /api/story/upload  (multipart: file + classId) — Teacher, Principal
 router.post(
   "/story/upload",
   requireRole("Teacher", "Principal"),
   imageUpload.single("file"),
   async (req: Request, res: Response) => {
     try {
-      if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded" });
-      }
-
-      if (!isValidImage(req.file.buffer)) {
-        return res
-          .status(400)
-          .json({ error: "File content does not match a valid image format" });
-      }
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      if (!isValidImage(req.file.buffer))
+        return res.status(400).json({ error: "File content does not match a valid image format" });
 
       const classId = req.body.classId;
-      if (!classId || typeof classId !== "string") {
+      if (!classId || typeof classId !== "string")
         return res.status(400).json({ error: "classId required" });
-      }
 
       const storagePath = `stories/${sanitizeId(classId)}/${generateFileName(req.file.mimetype)}`;
-      const url = await uploadToStorage(
-        req.file.buffer,
-        storagePath,
-        req.file.mimetype
-      );
-
+      const url = await uploadToStorage(req.file.buffer, storagePath, req.file.mimetype);
       res.json({ url, path: storagePath });
     } catch (err: any) {
       if (handleMulterError(err, res)) return;
@@ -165,35 +129,22 @@ router.post(
   }
 );
 
-// POST /api/document/upload  (multipart: file + classId) — Teacher, Principal
 router.post(
   "/document/upload",
   requireRole("Teacher", "Principal"),
   docUpload.single("file"),
   async (req: Request, res: Response) => {
     try {
-      if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded" });
-      }
-
-      if (!isValidDocument(req.file.buffer)) {
-        return res
-          .status(400)
-          .json({ error: "File content does not match a valid document format" });
-      }
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      if (!isValidDocument(req.file.buffer))
+        return res.status(400).json({ error: "File content does not match a valid document format" });
 
       const classId = req.body.classId;
-      if (!classId || typeof classId !== "string") {
+      if (!classId || typeof classId !== "string")
         return res.status(400).json({ error: "classId required" });
-      }
 
       const storagePath = `documents/${sanitizeId(classId)}/${generateFileName(req.file.mimetype)}`;
-      const url = await uploadToStorage(
-        req.file.buffer,
-        storagePath,
-        req.file.mimetype
-      );
-
+      const url = await uploadToStorage(req.file.buffer, storagePath, req.file.mimetype);
       res.json({ url, path: storagePath });
     } catch (err: any) {
       if (handleMulterError(err, res)) return;
@@ -203,44 +154,28 @@ router.post(
   }
 );
 
-// ─── Homework file uploads ───────────────────────────────────────────────────
-
-import { db, getDoc, serializeDocs } from "../lib/firestore-helpers";
-import { cacheDeletePrefix } from "../lib/cache";
-
-// POST /api/homework/:id/upload  — Teacher uploads attachment files
 router.post(
   "/homework/:id/upload",
   requireRole("Teacher", "Principal"),
-  docUpload.array("files", 10),
+  docUpload.array("files", Config.MAX_UPLOAD_FILES),
   async (req: Request, res: Response) => {
     try {
       const homeworkId = sanitizeId(req.params.id as string);
       const files = req.files as Express.Multer.File[];
-      if (!files || files.length === 0) {
+      if (!files || files.length === 0)
         return res.status(400).json({ error: "No files uploaded" });
-      }
 
       const uploaded: { url: string; name: string; type: string }[] = [];
       for (const file of files) {
-        if (!isValidDocument(file.buffer)) {
-          return res.status(400).json({
-            error: `File "${file.originalname}" has invalid content`,
-          });
-        }
-        const ext = file.originalname.split(".").pop()?.toLowerCase() || "";
-        const fileType = ["pdf"].includes(ext)
-          ? "pdf"
-          : ["jpg", "jpeg", "png", "gif", "webp"].includes(ext)
-          ? "image"
-          : "document";
+        if (!isValidDocument(file.buffer))
+          return res.status(400).json({ error: `File "${file.originalname}" has invalid content` });
+
         const storagePath = `homework/${homeworkId}/attachments/${generateFileName(file.mimetype)}`;
         const url = await uploadToStorage(file.buffer, storagePath, file.mimetype);
-        uploaded.push({ url, name: file.originalname, type: fileType });
+        uploaded.push({ url, name: file.originalname, type: classifyFileType(file.originalname) });
       }
 
-      const hwRef = db.collection("homework").doc(homeworkId);
-      await hwRef.update({
+      await db.collection(Collections.HOMEWORK).doc(homeworkId).update({
         attachments: admin.firestore.FieldValue.arrayUnion(...uploaded),
       });
 
@@ -255,11 +190,10 @@ router.post(
   }
 );
 
-// POST /api/homework/:id/submit-files  — Student uploads submission files
 router.post(
   "/homework/:id/submit-files",
   requireRole("Student"),
-  docUpload.array("files", 10),
+  docUpload.array("files", Config.MAX_UPLOAD_FILES),
   async (req: Request, res: Response) => {
     try {
       const homeworkId = sanitizeId(req.params.id as string);
@@ -270,26 +204,16 @@ router.post(
       const fileUrls: { url: string; name: string; type: string }[] = [];
       if (files && files.length > 0) {
         for (const file of files) {
-          if (!isValidDocument(file.buffer)) {
-            return res.status(400).json({
-              error: `File "${file.originalname}" has invalid content`,
-            });
-          }
-          const ext = file.originalname.split(".").pop()?.toLowerCase() || "";
-          const fileType = ["pdf"].includes(ext)
-            ? "pdf"
-            : ["jpg", "jpeg", "png", "gif", "webp"].includes(ext)
-            ? "image"
-            : "document";
+          if (!isValidDocument(file.buffer))
+            return res.status(400).json({ error: `File "${file.originalname}" has invalid content` });
+
           const storagePath = `homework/${homeworkId}/submissions/${sanitizeId(uid)}/${generateFileName(file.mimetype)}`;
           const url = await uploadToStorage(file.buffer, storagePath, file.mimetype);
-          fileUrls.push({ url, name: file.originalname, type: fileType });
+          fileUrls.push({ url, name: file.originalname, type: classifyFileType(file.originalname) });
         }
       }
 
-      const subRef = db
-        .collection("homework_submissions")
-        .doc(`${homeworkId}_${uid}`);
+      const subRef = db.collection(Collections.HOMEWORK_SUBMISSIONS).doc(`${homeworkId}_${uid}`);
       await subRef.set(
         {
           homeworkId,
@@ -301,12 +225,9 @@ router.post(
         { merge: true }
       );
 
-      await db
-        .collection("homework")
-        .doc(homeworkId)
-        .update({
-          submittedBy: admin.firestore.FieldValue.arrayUnion(uid),
-        });
+      await db.collection(Collections.HOMEWORK).doc(homeworkId).update({
+        submittedBy: admin.firestore.FieldValue.arrayUnion(uid),
+      });
 
       cacheDeletePrefix("student_dash_");
       cacheDeletePrefix("teacher_dash_");
@@ -319,86 +240,57 @@ router.post(
   }
 );
 
-// GET /api/homework/:id/submissions  — Teacher sees all submissions
 router.get(
   "/homework/:id/submissions",
   requireRole("Teacher", "Principal"),
-  async (req: Request, res: Response) => {
-    try {
-      const homeworkId = req.params.id as string;
-      const snaps = await db
-        .collection("homework_submissions")
-        .where("homeworkId", "==", homeworkId)
-        .get();
+  asyncHandler(async (req, res) => {
+    const homeworkId = req.params.id as string;
+    const snaps = await db.collection(Collections.HOMEWORK_SUBMISSIONS)
+      .where("homeworkId", "==", homeworkId).get();
 
-      const submissions = snaps.docs.map((d) => {
-        const data = d.data();
-        return {
-          id: d.id,
-          ...data,
-          submittedAt: data.submittedAt?.toDate?.()?.toISOString?.() || null,
-        };
-      });
+    const submissions = snaps.docs.map((d) => {
+      const data = d.data();
+      return { id: d.id, ...data, submittedAt: data.submittedAt?.toDate?.()?.toISOString?.() || null };
+    });
 
-      const studentUids = submissions.map((s: any) => s.studentUid).filter(Boolean);
-      const userMap: Record<string, string> = {};
-      if (studentUids.length > 0) {
-        const chunks = [];
-        for (let i = 0; i < studentUids.length; i += 10) {
-          chunks.push(studentUids.slice(i, i + 10));
-        }
-        for (const chunk of chunks) {
-          const snap = await db
-            .collection("users")
-            .where(admin.firestore.FieldPath.documentId(), "in", chunk)
-            .get();
-          snap.docs.forEach((d) => {
-            userMap[d.id] = d.data().name || d.id;
-          });
-        }
+    const studentUids = submissions.map((s: any) => s.studentUid).filter(Boolean);
+    const userMap: Record<string, string> = {};
+    if (studentUids.length > 0) {
+      const chunks = [];
+      for (let i = 0; i < studentUids.length; i += 10) {
+        chunks.push(studentUids.slice(i, i + 10));
       }
-
-      const enriched = submissions.map((s: any) => ({
-        ...s,
-        studentName: userMap[s.studentUid] || s.studentUid,
-      }));
-
-      res.json({ submissions: enriched });
-    } catch (err: any) {
-      console.error("getSubmissions error:", err);
-      res.status(500).json({ error: err.message || "Internal server error" });
+      for (const chunk of chunks) {
+        const snap = await db.collection(Collections.USERS)
+          .where(admin.firestore.FieldPath.documentId(), "in", chunk).get();
+        snap.docs.forEach((d) => { userMap[d.id] = d.data().name || d.id; });
+      }
     }
-  }
+
+    const enriched = submissions.map((s: any) => ({
+      ...s,
+      studentName: userMap[s.studentUid] || s.studentUid,
+    }));
+
+    res.json({ submissions: enriched });
+  })
 );
 
-// GET /api/homework/:id/my-submission  — Student sees their own submission
 router.get(
   "/homework/:id/my-submission",
   requireRole("Student"),
-  async (req: Request, res: Response) => {
-    try {
-      const homeworkId = req.params.id as string;
-      const uid = req.uid!;
-      const docRef = db
-        .collection("homework_submissions")
-        .doc(`${homeworkId}_${uid}`);
-      const snap = await docRef.get();
-      if (!snap.exists) {
-        return res.json({ submission: null });
-      }
-      const data = snap.data()!;
-      res.json({
-        submission: {
-          id: snap.id,
-          ...data,
-          submittedAt: data.submittedAt?.toDate?.()?.toISOString?.() || null,
-        },
-      });
-    } catch (err: any) {
-      console.error("getMySubmission error:", err);
-      res.status(500).json({ error: err.message || "Internal server error" });
-    }
-  }
+  asyncHandler(async (req, res) => {
+    const homeworkId = req.params.id as string;
+    const uid = req.uid!;
+    const docRef = db.collection(Collections.HOMEWORK_SUBMISSIONS).doc(`${homeworkId}_${uid}`);
+    const snap = await docRef.get();
+    if (!snap.exists) return res.json({ submission: null });
+
+    const data = snap.data()!;
+    res.json({
+      submission: { id: snap.id, ...data, submittedAt: data.submittedAt?.toDate?.()?.toISOString?.() || null },
+    });
+  })
 );
 
 export default router;

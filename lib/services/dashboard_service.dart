@@ -308,7 +308,7 @@ class DashboardService {
       final m = Map<String, dynamic>.from(raw as Map);
       final infoMap = Map<String, dynamic>.from(m['info'] as Map? ?? {});
       return ChildDashboardData(
-        info: ChildInfo.fromMap(infoMap),
+        info: ChildInfo.fromJson(infoMap),
         childUid: m['childUid'] as String? ?? '',
         childClass: _parseNullable(m['childClass'], ClassModel.fromJson),
         grades: _parseList(m['grades'], GradeModel.fromJson),

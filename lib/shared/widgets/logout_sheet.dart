@@ -42,7 +42,6 @@ class LogoutSheet {
             const Text(
               'Sign Out',
               style: TextStyle(
-                fontFamily: 'Raleway',
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: TatvaColors.neutral900,
@@ -52,7 +51,6 @@ class LogoutSheet {
             const Text(
               'Are you sure you want to sign out?',
               style: TextStyle(
-                fontFamily: 'Raleway',
                 fontSize: 14,
                 color: TatvaColors.neutral400,
               ),
@@ -72,7 +70,6 @@ class LogoutSheet {
                     child: const Text(
                       'Cancel',
                       style: TextStyle(
-                        fontFamily: 'Raleway',
                         color: TatvaColors.neutral600,
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
@@ -94,7 +91,6 @@ class LogoutSheet {
                     child: const Text(
                       'Sign Out',
                       style: TextStyle(
-                        fontFamily: 'Raleway',
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 15,

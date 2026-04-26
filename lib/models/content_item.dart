@@ -87,6 +87,34 @@ class ContentItem {
 
   bool isCompletedBy(String uid) => completedBy.contains(uid);
 
+  ContentItem copyWith({
+    String? id,
+    String? title,
+    String? description,
+    ContentCategory? category,
+    String? videoUrl,
+    String? thumbnailUrl,
+    String? duration,
+    String? ageGroup,
+    int? viewCount,
+    List<String>? completedBy,
+    DateTime? createdAt,
+  }) {
+    return ContentItem(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      category: category ?? this.category,
+      videoUrl: videoUrl ?? this.videoUrl,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      duration: duration ?? this.duration,
+      ageGroup: ageGroup ?? this.ageGroup,
+      viewCount: viewCount ?? this.viewCount,
+      completedBy: completedBy ?? this.completedBy,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
   factory ContentItem.fromJson(Map<String, dynamic> data) {
     return ContentItem(
       id: data['id'] as String? ?? '',
@@ -105,7 +133,7 @@ class ContentItem {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
       'title': title,
       'description': description,
@@ -116,7 +144,7 @@ class ContentItem {
       'ageGroup': ageGroup,
       'viewCount': viewCount,
       'completedBy': completedBy,
-      'createdAt': DateTime.now().toIso8601String(),
+      'createdAt': (createdAt ?? DateTime.now()).toIso8601String(),
     };
   }
 }

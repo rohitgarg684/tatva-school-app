@@ -154,7 +154,7 @@ class _RegisterScreenState extends State<RegisterScreen>
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
               'Registered! But: $warning You can add a class later.',
-              style: TextStyle(fontFamily: 'Raleway')),
+              style: TextStyle()),
           backgroundColor: accent,
           duration: Duration(seconds: 5),
           behavior: SnackBarBehavior.floating,
@@ -167,7 +167,7 @@ class _RegisterScreenState extends State<RegisterScreen>
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
               'Account created! Please check your email to verify, then sign in.',
-              style: TextStyle(fontFamily: 'Raleway')),
+              style: TextStyle()),
           backgroundColor: success,
           duration: Duration(seconds: 5),
           behavior: SnackBarBehavior.floating,
@@ -254,7 +254,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                       child: Center(
                           child: Text('T',
                               style: TextStyle(
-                                  fontFamily: 'Raleway',
                                   fontSize: 22,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white))),
@@ -265,14 +264,12 @@ class _RegisterScreenState extends State<RegisterScreen>
                         children: [
                           Text('Create Account',
                               style: TextStyle(
-                                  fontFamily: 'Raleway',
                                   fontSize: 26,
                                   fontWeight: FontWeight.bold,
                                   color: textDark,
                                   letterSpacing: -0.5)),
                           Text('Join Tatva Academy',
                               style: TextStyle(
-                                  fontFamily: 'Raleway',
                                   fontSize: 14,
                                   color: textLight)),
                         ]),
@@ -282,7 +279,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                   // Role selector
                   Text('I am a...',
                       style: TextStyle(
-                          fontFamily: 'Raleway',
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: textDark)),
@@ -328,7 +324,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                             SizedBox(width: 8),
                             Text(role['label'],
                                 style: TextStyle(
-                                    fontFamily: 'Raleway',
                                     fontSize: 13,
                                     fontWeight: isSelected
                                         ? FontWeight.bold
@@ -368,11 +363,10 @@ class _RegisterScreenState extends State<RegisterScreen>
                     controller: _passwordController,
                     obscureText: _obscurePassword,
                     style: TextStyle(
-                        fontFamily: 'Raleway', fontSize: 14, color: textDark),
+fontSize: 14, color: textDark),
                     decoration: InputDecoration(
                       hintText: 'At least 6 characters',
                       hintStyle: TextStyle(
-                          fontFamily: 'Raleway',
                           fontSize: 13,
                           color: Colors.grey.shade400),
                       prefixIcon: Icon(Icons.lock_outline_rounded,
@@ -425,7 +419,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                             ? 'Get this from your teacher'
                             : "Get this from your child's teacher",
                         style: TextStyle(
-                            fontFamily: 'Raleway',
                             fontSize: 12,
                             color: textLight)),
                     SizedBox(height: 8),
@@ -433,7 +426,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                       controller: _classCodeController,
                       textCapitalization: TextCapitalization.characters,
                       style: TextStyle(
-                          fontFamily: 'Raleway',
                           fontSize: 18,
                           color: textDark,
                           fontWeight: FontWeight.bold,
@@ -441,7 +433,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                       decoration: InputDecoration(
                         hintText: 'e.g. MATH123',
                         hintStyle: TextStyle(
-                            fontFamily: 'Raleway',
                             fontSize: 14,
                             color: Colors.grey.shade400,
                             letterSpacing: 1,
@@ -485,7 +476,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                             child: Text(
                                 'After registering, create a class to get your class code.',
                                 style: TextStyle(
-                                    fontFamily: 'Raleway',
                                     fontSize: 12,
                                     color: textMid,
                                     height: 1.5))),
@@ -511,7 +501,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                             child: Text(
                                 'Principal accounts have full school access and can manage all teachers and parents.',
                                 style: TextStyle(
-                                    fontFamily: 'Raleway',
                                     fontSize: 12,
                                     color: textMid,
                                     height: 1.5))),
@@ -535,7 +524,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                         Expanded(
                             child: Text(_errorMessage!,
                                 style: TextStyle(
-                                    fontFamily: 'Raleway',
                                     fontSize: 12,
                                     color: danger,
                                     height: 1.4))),
@@ -574,7 +562,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       color: Colors.white, strokeWidth: 2.5))
                               : Text('Create Account',
                                   style: TextStyle(
-                                      fontFamily: 'Raleway',
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                       color: Colors.white,
@@ -594,13 +581,11 @@ class _RegisterScreenState extends State<RegisterScreen>
                           TextSpan(
                               text: 'Already have an account? ',
                               style: TextStyle(
-                                  fontFamily: 'Raleway',
                                   fontSize: 14,
                                   color: textLight)),
                           TextSpan(
                               text: 'Sign In',
                               style: TextStyle(
-                                  fontFamily: 'Raleway',
                                   fontSize: 14,
                                   color: _roleColor,
                                   fontWeight: FontWeight.bold)),
@@ -634,7 +619,6 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   Widget _inputLabel(String label) => Text(label,
       style: TextStyle(
-          fontFamily: 'Raleway',
           fontSize: 13,
           fontWeight: FontWeight.w600,
           color: textDark));
@@ -648,11 +632,11 @@ class _RegisterScreenState extends State<RegisterScreen>
       TextField(
         controller: controller,
         keyboardType: keyboardType,
-        style: TextStyle(fontFamily: 'Raleway', fontSize: 14, color: textDark),
+        style: TextStyle(fontSize: 14, color: textDark),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: TextStyle(
-              fontFamily: 'Raleway', fontSize: 13, color: Colors.grey.shade400),
+fontSize: 13, color: Colors.grey.shade400),
           prefixIcon: Icon(icon, color: textLight, size: 20),
           filled: true,
           fillColor: bgCard,

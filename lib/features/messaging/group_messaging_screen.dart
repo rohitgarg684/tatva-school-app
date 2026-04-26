@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../models/group_conversation.dart';
 import '../../repositories/auth_repository.dart';
-import '../../services/group_message_service.dart';
+import '../../services/api_service.dart';
 import '../../shared/theme/colors.dart';
 
 class GroupMessagingScreen extends StatefulWidget {
@@ -15,7 +15,7 @@ class GroupMessagingScreen extends StatefulWidget {
 }
 
 class _GroupMessagingScreenState extends State<GroupMessagingScreen> {
-  final _msgSvc = GroupMessageService();
+  final _api = ApiService();
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   late String _myUid;
@@ -33,7 +33,7 @@ class _GroupMessagingScreenState extends State<GroupMessagingScreen> {
 
   Future<void> _loadMessages() async {
     try {
-      final msgs = await _msgSvc.getMessages(widget.group.id);
+      final msgs = await _api.getGroupMessages(widget.group.id);
       if (mounted) {
         final changed = msgs.length != _messages.length;
         setState(() => _messages = msgs);
@@ -67,7 +67,7 @@ class _GroupMessagingScreenState extends State<GroupMessagingScreen> {
     if (text.isEmpty) return;
     _controller.clear();
 
-    await _msgSvc.sendMessage(widget.group.id, text, 'You');
+    await _api.sendGroupMessage(groupId: widget.group.id, text: text, senderName: 'You');
     await _loadMessages();
   }
 

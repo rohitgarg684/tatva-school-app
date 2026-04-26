@@ -47,7 +47,35 @@ class GradeModel {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  GradeModel copyWith({
+    String? id,
+    String? studentUid,
+    String? studentName,
+    String? classId,
+    String? subject,
+    String? assessmentName,
+    double? score,
+    double? total,
+    String? teacherUid,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return GradeModel(
+      id: id ?? this.id,
+      studentUid: studentUid ?? this.studentUid,
+      studentName: studentName ?? this.studentName,
+      classId: classId ?? this.classId,
+      subject: subject ?? this.subject,
+      assessmentName: assessmentName ?? this.assessmentName,
+      score: score ?? this.score,
+      total: total ?? this.total,
+      teacherUid: teacherUid ?? this.teacherUid,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
     return {
       'studentUid': studentUid,
       'studentName': studentName,
@@ -57,7 +85,7 @@ class GradeModel {
       'score': score,
       'total': total,
       'teacherUid': teacherUid,
-      'createdAt': DateTime.now().toIso8601String(),
+      'createdAt': (createdAt ?? DateTime.now()).toIso8601String(),
       'updatedAt': DateTime.now().toIso8601String(),
     };
   }

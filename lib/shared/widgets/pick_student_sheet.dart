@@ -101,7 +101,7 @@ class _PickStudentSheetState extends State<PickStudentSheet> {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('${student.name} added to class',
-            style: const TextStyle(fontFamily: 'Raleway')),
+            style: const TextStyle()),
         backgroundColor: TatvaColors.success,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -111,7 +111,7 @@ class _PickStudentSheetState extends State<PickStudentSheet> {
       setState(() => _addingId = null);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: const Text('Failed to add student',
-            style: TextStyle(fontFamily: 'Raleway')),
+            style: TextStyle()),
         backgroundColor: TatvaColors.error,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -158,7 +158,6 @@ class _PickStudentSheetState extends State<PickStudentSheet> {
             const SizedBox(width: 10),
             const Text('Pick Existing Student',
                 style: TextStyle(
-                    fontFamily: 'Raleway',
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: TatvaColors.neutral900)),
@@ -166,7 +165,6 @@ class _PickStudentSheetState extends State<PickStudentSheet> {
           const SizedBox(height: 4),
           const Text('Search from students already enrolled in the school',
               style: TextStyle(
-                  fontFamily: 'Raleway',
                   fontSize: 13,
                   color: TatvaColors.neutral400)),
           const SizedBox(height: 16),
@@ -175,13 +173,11 @@ class _PickStudentSheetState extends State<PickStudentSheet> {
             controller: _searchCtrl,
             onChanged: _filter,
             style: const TextStyle(
-                fontFamily: 'Raleway',
                 fontSize: 14,
                 color: TatvaColors.neutral900),
             decoration: InputDecoration(
               hintText: 'Search by name or roll number...',
               hintStyle: TextStyle(
-                  fontFamily: 'Raleway',
                   fontSize: 13,
                   color: Colors.grey.shade400),
               prefixIcon: const Icon(Icons.search,
@@ -224,7 +220,6 @@ class _PickStudentSheetState extends State<PickStudentSheet> {
                         ? 'No students match your search'
                         : 'No students enrolled yet',
                     style: const TextStyle(
-                        fontFamily: 'Raleway',
                         fontSize: 13,
                         color: TatvaColors.neutral400),
                   ),
@@ -257,7 +252,6 @@ class _PickStudentSheetState extends State<PickStudentSheet> {
                           child: Text(
                             s.name.isNotEmpty ? s.name[0].toUpperCase() : '?',
                             style: const TextStyle(
-                                fontFamily: 'Raleway',
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: TatvaColors.primary),
@@ -270,7 +264,6 @@ class _PickStudentSheetState extends State<PickStudentSheet> {
                             children: [
                               Text(s.name,
                                   style: const TextStyle(
-                                      fontFamily: 'Raleway',
                                       fontSize: 14,
                                       fontWeight: FontWeight.bold,
                                       color: TatvaColors.neutral900)),
@@ -283,7 +276,6 @@ class _PickStudentSheetState extends State<PickStudentSheet> {
                                       s.displayGradeSection,
                                   ].join(' · '),
                                   style: const TextStyle(
-                                      fontFamily: 'Raleway',
                                       fontSize: 12,
                                       color: TatvaColors.neutral400),
                                 ),
@@ -315,7 +307,6 @@ class _PickStudentSheetState extends State<PickStudentSheet> {
                                 SizedBox(width: 2),
                                 Text('Add',
                                     style: TextStyle(
-                                        fontFamily: 'Raleway',
                                         fontSize: 12,
                                         color: TatvaColors.primary,
                                         fontWeight: FontWeight.w600)),

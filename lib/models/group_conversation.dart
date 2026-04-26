@@ -39,7 +39,31 @@ class GroupConversation {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  GroupConversation copyWith({
+    String? id,
+    String? classId,
+    String? className,
+    String? createdBy,
+    List<String>? memberUids,
+    String? lastMessage,
+    String? lastSenderName,
+    DateTime? lastMessageAt,
+    DateTime? createdAt,
+  }) {
+    return GroupConversation(
+      id: id ?? this.id,
+      classId: classId ?? this.classId,
+      className: className ?? this.className,
+      createdBy: createdBy ?? this.createdBy,
+      memberUids: memberUids ?? this.memberUids,
+      lastMessage: lastMessage ?? this.lastMessage,
+      lastSenderName: lastSenderName ?? this.lastSenderName,
+      lastMessageAt: lastMessageAt ?? this.lastMessageAt,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
     return {
       'classId': classId,
       'className': className,
@@ -48,7 +72,7 @@ class GroupConversation {
       'lastMessage': lastMessage,
       'lastSenderName': lastSenderName,
       'lastMessageAt': DateTime.now().toIso8601String(),
-      'createdAt': DateTime.now().toIso8601String(),
+      'createdAt': (createdAt ?? DateTime.now()).toIso8601String(),
     };
   }
 }

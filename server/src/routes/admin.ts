@@ -2,16 +2,17 @@ import { Router } from "express";
 import * as admin from "firebase-admin";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { db } from "../lib/firestore-helpers";
+import { asyncHandler } from "../lib/async-handler";
+import { Collections } from "../lib/collections";
 
 const router = Router();
 
-// POST /api/auth/sync-claims
-// Any authenticated user can call this for themselves.
-// Reads role from Firestore, stamps it as a custom claim.
-router.post("/auth/sync-claims", requireAuth, async (req, res) => {
-  try {
+router.post(
+  "/auth/sync-claims",
+  requireAuth,
+  asyncHandler(async (req, res) => {
     const uid = req.uid!;
-    const userDoc = await db.collection("users").doc(uid).get();
+    const userDoc = await db.collection(Collections.USERS).doc(uid).get();
     const role = userDoc.data()?.role;
 
     if (!role) {
@@ -20,42 +21,30 @@ router.post("/auth/sync-claims", requireAuth, async (req, res) => {
 
     await admin.auth().setCustomUserClaims(uid, { role });
     res.json({ role, synced: true });
-  } catch (err: any) {
-    console.error("sync-claims error:", err);
-    res.status(500).json({ error: err.message || "Internal server error" });
-  }
-});
+  })
+);
 
-// POST /api/admin/set-role
-// Principal-only. Changes a user's role in both Firestore and custom claims.
 router.post(
   "/admin/set-role",
   requireAuth,
   requireRole("Principal"),
-  async (req, res) => {
-    try {
-      const { targetUid, role } = req.body;
+  asyncHandler(async (req, res) => {
+    const { targetUid, role } = req.body;
 
-      if (!targetUid || !role) {
-        return res
-          .status(400)
-          .json({ error: "targetUid and role are required" });
-      }
-
-      const validRoles = ["Student", "Teacher", "Parent", "Principal"];
-      if (!validRoles.includes(role)) {
-        return res.status(400).json({ error: `Invalid role: ${role}` });
-      }
-
-      await admin.auth().setCustomUserClaims(targetUid, { role });
-      await db.collection("users").doc(targetUid).update({ role });
-
-      res.json({ targetUid, role, updated: true });
-    } catch (err: any) {
-      console.error("set-role error:", err);
-      res.status(500).json({ error: err.message || "Internal server error" });
+    if (!targetUid || !role) {
+      return res.status(400).json({ error: "targetUid and role are required" });
     }
-  }
+
+    const validRoles = ["Student", "Teacher", "Parent", "Principal"];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ error: `Invalid role: ${role}` });
+    }
+
+    await admin.auth().setCustomUserClaims(targetUid, { role });
+    await db.collection(Collections.USERS).doc(targetUid).update({ role });
+
+    res.json({ targetUid, role, updated: true });
+  })
 );
 
 export default router;

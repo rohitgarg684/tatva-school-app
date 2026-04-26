@@ -47,6 +47,36 @@ class StoryPost {
   bool isLikedBy(String uid) => likedBy.contains(uid);
   int get likeCount => likedBy.length;
 
+  StoryPost copyWith({
+    String? id,
+    String? authorUid,
+    String? authorName,
+    String? authorRole,
+    String? classId,
+    String? className,
+    String? text,
+    List<String>? mediaUrls,
+    StoryMediaType? mediaType,
+    List<String>? likedBy,
+    int? commentCount,
+    DateTime? createdAt,
+  }) {
+    return StoryPost(
+      id: id ?? this.id,
+      authorUid: authorUid ?? this.authorUid,
+      authorName: authorName ?? this.authorName,
+      authorRole: authorRole ?? this.authorRole,
+      classId: classId ?? this.classId,
+      className: className ?? this.className,
+      text: text ?? this.text,
+      mediaUrls: mediaUrls ?? this.mediaUrls,
+      mediaType: mediaType ?? this.mediaType,
+      likedBy: likedBy ?? this.likedBy,
+      commentCount: commentCount ?? this.commentCount,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
   factory StoryPost.fromJson(Map<String, dynamic> data) {
     return StoryPost(
       id: data['id'] as String? ?? '',
@@ -66,7 +96,7 @@ class StoryPost {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
       'authorUid': authorUid,
       'authorName': authorName,
@@ -78,7 +108,7 @@ class StoryPost {
       'mediaType': mediaType.name,
       'likedBy': likedBy,
       'commentCount': commentCount,
-      'createdAt': DateTime.now().toIso8601String(),
+      'createdAt': (createdAt ?? DateTime.now()).toIso8601String(),
     };
   }
 }

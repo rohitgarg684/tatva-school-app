@@ -209,7 +209,6 @@ class _SplashScreenState extends State<SplashScreen>
                             child: Column(children: [
                               const Text('Tatva Academy',
                                   style: TextStyle(
-                                      fontFamily: 'Raleway',
                                       fontSize: 32,
                                       fontWeight: FontWeight.bold,
                                       color: textWhite,
@@ -228,7 +227,6 @@ class _SplashScreenState extends State<SplashScreen>
                                       const Text(
                                           'Empowering Academic Excellence',
                                           style: TextStyle(
-                                              fontFamily: 'Raleway',
                                               fontSize: 13,
                                               color: textMuted,
                                               letterSpacing: 0.8)),
@@ -264,7 +262,6 @@ class _SplashScreenState extends State<SplashScreen>
                       const SizedBox(height: 16),
                       Text(_getLoadingText(_progressAnim.value),
                           style: const TextStyle(
-                              fontFamily: 'Raleway',
                               fontSize: 12,
                               color: textMuted)),
                     ]),
@@ -280,7 +277,6 @@ class _SplashScreenState extends State<SplashScreen>
                   const SizedBox(height: 16),
                   const Text('v1.0.0',
                       style: TextStyle(
-                          fontFamily: 'Raleway',
                           fontSize: 10,
                           color: Colors.white12)),
                 ]),
@@ -304,7 +300,7 @@ class _SplashScreenState extends State<SplashScreen>
           const SizedBox(width: 4),
           Text(label,
               style: const TextStyle(
-                  fontFamily: 'Raleway', fontSize: 11, color: Colors.white24)),
+fontSize: 11, color: Colors.white24)),
         ],
       );
 }

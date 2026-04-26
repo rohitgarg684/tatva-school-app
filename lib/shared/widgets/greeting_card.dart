@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../animations/animations.dart';
-import '../theme/colors.dart';
+import '../utils/greeting.dart';
 
 class GreetingCardStat {
   final String value;
@@ -16,6 +16,7 @@ class GreetingCard extends StatelessWidget {
   final Color accentColor;
   final List<Color> gradientColors;
   final List<GreetingCardStat> stats;
+  final Widget? bottomWidget;
 
   const GreetingCard({
     super.key,
@@ -25,21 +26,8 @@ class GreetingCard extends StatelessWidget {
     required this.accentColor,
     required this.gradientColors,
     this.stats = const [],
+    this.bottomWidget,
   });
-
-  String get _greeting {
-    final h = DateTime.now().hour;
-    if (h < 12) return 'Good Morning';
-    if (h < 17) return 'Good Afternoon';
-    return 'Good Evening';
-  }
-
-  String get _greetingEmoji {
-    final h = DateTime.now().hour;
-    if (h < 12) return '🌤️';
-    if (h < 17) return '☀️';
-    return '🌙';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -98,13 +86,12 @@ class GreetingCard extends StatelessWidget {
                           children: [
                             Row(
                               children: [
-                                Text(_greetingEmoji,
+                                Text(Greeting.emoji,
                                     style: const TextStyle(fontSize: 16)),
                                 const SizedBox(width: 6),
                                 Text(
-                                  _greeting,
+                                  Greeting.text,
                                   style: TextStyle(
-                                    fontFamily: 'Raleway',
                                     fontSize: 13,
                                     color: Colors.white.withOpacity(0.7),
                                     fontWeight: FontWeight.w500,
@@ -117,7 +104,6 @@ class GreetingCard extends StatelessWidget {
                               text: userName,
                               delayMs: 400,
                               style: const TextStyle(
-                                fontFamily: 'Raleway',
                                 fontSize: 26,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
@@ -129,7 +115,6 @@ class GreetingCard extends StatelessWidget {
                             Text(
                               'Tatva Academy · $roleLabel',
                               style: TextStyle(
-                                fontFamily: 'Raleway',
                                 fontSize: 13,
                                 color: Colors.white.withOpacity(0.6),
                               ),
@@ -167,7 +152,6 @@ class GreetingCard extends StatelessWidget {
                                 Text(
                                   stats[i].value,
                                   style: const TextStyle(
-                                    fontFamily: 'Raleway',
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.white,
@@ -177,7 +161,6 @@ class GreetingCard extends StatelessWidget {
                                 Text(
                                   stats[i].label,
                                   style: TextStyle(
-                                    fontFamily: 'Raleway',
                                     fontSize: 10,
                                     color: Colors.white.withOpacity(0.55),
                                   ),
@@ -189,6 +172,10 @@ class GreetingCard extends StatelessWidget {
                         ],
                       ],
                     ),
+                  ],
+                  if (bottomWidget != null) ...[
+                    const SizedBox(height: 16),
+                    bottomWidget!,
                   ],
                 ],
               ),

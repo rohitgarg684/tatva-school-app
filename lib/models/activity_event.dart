@@ -85,7 +85,35 @@ class ActivityEvent {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  ActivityEvent copyWith({
+    String? id,
+    ActivityType? type,
+    String? actorUid,
+    String? actorName,
+    String? actorRole,
+    String? targetUid,
+    String? classId,
+    String? title,
+    String? body,
+    Map<String, dynamic>? metadata,
+    DateTime? createdAt,
+  }) {
+    return ActivityEvent(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      actorUid: actorUid ?? this.actorUid,
+      actorName: actorName ?? this.actorName,
+      actorRole: actorRole ?? this.actorRole,
+      targetUid: targetUid ?? this.targetUid,
+      classId: classId ?? this.classId,
+      title: title ?? this.title,
+      body: body ?? this.body,
+      metadata: metadata ?? this.metadata,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
     return {
       'type': type.name,
       'actorUid': actorUid,
@@ -96,7 +124,7 @@ class ActivityEvent {
       'title': title,
       'body': body,
       'metadata': metadata,
-      'createdAt': DateTime.now().toIso8601String(),
+      'createdAt': (createdAt ?? DateTime.now()).toIso8601String(),
     };
   }
 }

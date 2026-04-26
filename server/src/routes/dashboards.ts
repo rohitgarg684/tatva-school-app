@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
 import {
   db,
@@ -8,25 +8,20 @@ import {
   serializeDocs,
   serializeDoc,
 } from "../lib/firestore-helpers";
-import {
-  cacheGet,
-  cacheSet,
-  SHARED_TTL,
-  USER_TTL,
-} from "../lib/cache";
+import { cacheGet, cacheSet, SHARED_TTL, USER_TTL } from "../lib/cache";
+import { asyncHandler } from "../lib/async-handler";
+import { Collections } from "../lib/collections";
+import { Config } from "../lib/config";
 
 const router = Router();
 router.use(requireAuth);
 
 // ─── Access control helpers ─────────────────────────────────────────────────
 
-async function callerSharesClassWith(
-  callerUid: string,
-  targetUid: string
-): Promise<boolean> {
+async function callerSharesClassWith(callerUid: string, targetUid: string): Promise<boolean> {
   const [callerDoc, targetDoc] = await Promise.all([
-    getDoc("users", callerUid),
-    getDoc("users", targetUid),
+    getDoc(Collections.USERS, callerUid),
+    getDoc(Collections.USERS, targetUid),
   ]);
   if (!callerDoc || !targetDoc) return false;
   const callerClasses: string[] = callerDoc.classIds || [];
@@ -34,21 +29,18 @@ async function callerSharesClassWith(
   return callerClasses.some((c) => targetClasses.includes(c));
 }
 
-async function callerIsParentOf(
-  callerUid: string,
-  childUid: string
-): Promise<boolean> {
-  const callerDoc = await getDoc("users", callerUid);
+async function callerIsParentOf(callerUid: string, childUid: string): Promise<boolean> {
+  const callerDoc = await getDoc(Collections.USERS, callerUid);
   if (!callerDoc || !callerDoc.children) return false;
-  const childDoc = await getDoc("users", childUid);
+  const childDoc = await getDoc(Collections.USERS, childUid);
   if (!childDoc) return false;
-  return (callerDoc.children as any[]).some(
-    (c: any) => c.childName === childDoc.name
+  return (callerDoc.children as Array<{ childName: string }>).some(
+    (c) => c.childName === childDoc.name
   );
 }
 
-async function fetchShared(key: string, fetcher: () => Promise<any>) {
-  const cached = cacheGet<any>(key);
+async function fetchShared<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+  const cached = cacheGet<T>(key);
   if (cached) return cached;
   const data = await fetcher();
   cacheSet(key, data, SHARED_TTL);
@@ -59,7 +51,7 @@ async function safe<T>(promise: Promise<T>, fallback: T): Promise<T> {
   try {
     return await promise;
   } catch (err) {
-    console.warn("Non-fatal query error (using fallback):", (err as any)?.message || err);
+    console.warn("Non-fatal query error (using fallback):", (err as Error)?.message || err);
     return fallback;
   }
 }
@@ -82,7 +74,7 @@ function computeSubjectAverages(grades: any[]): Record<string, number> {
   const sums: Record<string, { total: number; count: number }> = {};
   for (const g of grades) {
     const subj = g.subject || "Unknown";
-    const pct = g.total > 0 ? ((g.score || 0) / g.total) * 100 : 0;
+    const pct = (g.total ?? 0) > 0 ? ((g.score || 0) / (g.total ?? 1)) * 100 : 0;
     if (!sums[subj]) sums[subj] = { total: 0, count: 0 };
     sums[subj].total += pct;
     sums[subj].count += 1;
@@ -96,13 +88,13 @@ function computeSubjectAverages(grades: any[]): Record<string, number> {
 
 // ─── Student Dashboard ──────────────────────────────────────────────────────
 
-router.get("/student/:uid", async (req, res) => {
-  try {
-    const uid = req.params.uid || req.uid!;
+router.get(
+  "/student/:uid",
+  asyncHandler(async (req, res) => {
+    const uid = (req.params.uid as string) || req.uid!;
     const callerUid = req.uid!;
     const role = req.role;
 
-    // Access: Student=self, Teacher=class member, Parent=their child, Principal=any
     if (role === "Student" && callerUid !== uid) {
       return res.status(403).json({ error: "Students can only view their own dashboard" });
     }
@@ -119,80 +111,45 @@ router.get("/student/:uid", async (req, res) => {
     const cached = cacheGet<any>(cacheKey);
     if (cached) return res.json(cached);
 
-    const user = await getDoc("users", uid);
+    const user = await getDoc(Collections.USERS, uid);
     if (!user) return res.status(404).json({ error: "User not found" });
 
     const classIds: string[] = user.classIds || [];
+    const inLimit = classIds.slice(0, Config.FIRESTORE_IN_LIMIT);
 
     const [
-      primaryClass,
-      grades,
-      announcements,
-      homework,
-      votes,
-      behaviorPoints,
-      attendance,
-      stories,
-      activityFeed,
-      contentItems,
+      primaryClass, grades, announcements, homework, votes,
+      behaviorPoints, attendance, stories, activityFeed, contentItems,
     ] = await Promise.all([
-      safe(classIds.length > 0 ? getDoc("classes", classIds[0]) : Promise.resolve(null), null),
-      safe(queryDocs("grades", [{ field: "studentUid", op: "==", value: uid }], {
-        field: "createdAt",
-      }), []),
+      safe(classIds.length > 0 ? getDoc(Collections.CLASSES, classIds[0]) : Promise.resolve(null), null),
+      safe(queryDocs(Collections.GRADES, [{ field: "studentUid", op: "==", value: uid }], { field: "createdAt" }), []),
       safe(fetchShared("announcements_all", () =>
-        queryDocs("announcements", [], { field: "createdAt", direction: "desc" }, 25)
+        queryDocs(Collections.ANNOUNCEMENTS, [], { field: "createdAt", direction: "desc" }, Config.ANNOUNCEMENTS_LIMIT)
       ), []),
       safe(classIds.length > 0
-        ? queryDocs(
-            "homework",
-            [{ field: "classId", op: "in", value: classIds.slice(0, 30) }],
-            { field: "createdAt", direction: "desc" }
-          )
+        ? queryDocs(Collections.HOMEWORK, [{ field: "classId", op: "in", value: inLimit }], { field: "createdAt", direction: "desc" })
         : Promise.resolve([]), []),
       safe(fetchShared("votes_active", () =>
-        queryDocs("votes", [{ field: "active", op: "==", value: true }], {
-          field: "createdAt",
-          direction: "desc",
-        })
+        queryDocs(Collections.VOTES, [{ field: "active", op: "==", value: true }], { field: "createdAt", direction: "desc" })
       ), []),
-      safe(queryDocs(
-        "behavior_points",
-        [{ field: "studentUid", op: "==", value: uid }],
-        { field: "createdAt", direction: "desc" }
-      ), []),
-      safe(queryDocs(
-        "attendance",
-        [{ field: "studentUid", op: "==", value: uid }],
-        { field: "date", direction: "desc" }
-      ), []),
+      safe(queryDocs(Collections.BEHAVIOR_POINTS, [{ field: "studentUid", op: "==", value: uid }], { field: "createdAt", direction: "desc" }), []),
+      safe(queryDocs(Collections.ATTENDANCE, [{ field: "studentUid", op: "==", value: uid }], { field: "date", direction: "desc" }), []),
       safe(classIds.length > 0
-        ? queryDocs(
-            "stories",
-            [{ field: "classId", op: "in", value: classIds.slice(0, 30) }],
-            { field: "createdAt", direction: "desc" }
-          )
+        ? queryDocs(Collections.STORIES, [{ field: "classId", op: "in", value: inLimit }], { field: "createdAt", direction: "desc" })
         : Promise.resolve([]), []),
-      safe(queryDocs(
-        "activities",
-        [{ field: "targetUid", op: "==", value: uid }],
-        { field: "createdAt", direction: "desc" },
-        10
-      ), []),
+      safe(queryDocs(Collections.ACTIVITIES, [{ field: "targetUid", op: "==", value: uid }], { field: "createdAt", direction: "desc" }, Config.ACTIVITY_FEED_LIMIT), []),
       safe(fetchShared("content_all", () =>
-        queryDocs("content", [], { field: "createdAt", direction: "desc" })
+        queryDocs(Collections.CONTENT, [], { field: "createdAt", direction: "desc" })
       ), []),
     ]);
 
-    const filteredAnnouncements = (announcements as any[]).filter((a: any) =>
-      isVisibleTo(a.audience, "students")
-    );
+    const filteredAnnouncements = (announcements as any[]).filter((a: any) => isVisibleTo(a.audience, "students"));
 
     const result = {
       user: serializeDoc(user),
       primaryClass: serializeDoc(primaryClass),
       grades: serializeDocs(grades),
-      announcements: serializeDocs(filteredAnnouncements.slice(0, 20)),
+      announcements: serializeDocs(filteredAnnouncements.slice(0, Config.PRINCIPAL_ACTIVITY_LIMIT)),
       homework: serializeDocs(homework as any[]),
       activeVotes: serializeDocs(votes),
       behaviorPoints: serializeDocs(behaviorPoints),
@@ -205,38 +162,32 @@ router.get("/student/:uid", async (req, res) => {
 
     cacheSet(cacheKey, result, USER_TTL);
     res.json(result);
-  } catch (err: any) {
-    console.error("getStudentDashboard error:", err);
-    res.status(500).json({ error: err.message || "Internal server error" });
-  }
-});
+  })
+);
 
 // ─── Teacher Dashboard ──────────────────────────────────────────────────────
 
-router.get("/teacher/:uid", async (req, res) => {
-  try {
-    const uid = req.params.uid || req.uid!;
+router.get(
+  "/teacher/:uid",
+  asyncHandler(async (req, res) => {
+    const uid = (req.params.uid as string) || req.uid!;
     const callerUid = req.uid!;
     const role = req.role;
 
-    // Access: Teacher=self, Principal=any
-    if (role !== "Principal" && callerUid !== uid) {
+    if (role !== "Principal" && callerUid !== uid)
       return res.status(403).json({ error: "Forbidden" });
-    }
-    if (role !== "Teacher" && role !== "Principal") {
+    if (role !== "Teacher" && role !== "Principal")
       return res.status(403).json({ error: "Forbidden: insufficient role" });
-    }
 
     const cacheKey = `teacher_dash_${uid}`;
     const cached = cacheGet<any>(cacheKey);
     if (cached) return res.json(cached);
 
-    const user = await getDoc("users", uid);
+    const user = await getDoc(Collections.USERS, uid);
     if (!user) return res.status(404).json({ error: "User not found" });
 
     const classIds: string[] = user.classIds || [];
-    const classes =
-      classIds.length > 0 ? await getDocs("classes", classIds) : [];
+    const classes = classIds.length > 0 ? await getDocs(Collections.CLASSES, classIds) : [];
 
     let studentsInFirstClass: any[] = [];
     let parentsInFirstClass: any[] = [];
@@ -252,35 +203,15 @@ router.get("/teacher/:uid", async (req, res) => {
       const first = classes[0] as any;
       const today = new Date().toISOString().substring(0, 10);
 
-      const [students, parents, grades, behavior, att, story, activity] =
-        await Promise.all([
-          safe(getDocs("users", first.studentUids || []), []),
-          safe(getDocs("users", first.parentUids || []), []),
-          safe(queryDocs(
-            "grades",
-            [{ field: "classId", op: "==", value: first.id }],
-            { field: "createdAt" }
-          ), []),
-          safe(queryDocs(
-            "behavior_points",
-            [{ field: "classId", op: "==", value: first.id }],
-            { field: "createdAt", direction: "desc" }
-          ), []),
-          safe(queryDocs("attendance", [
-            { field: "date", op: "==", value: today },
-          ]), []),
-          safe(queryDocs(
-            "stories",
-            [{ field: "classId", op: "==", value: first.id }],
-            { field: "createdAt", direction: "desc" }
-          ), []),
-          safe(queryDocs(
-            "activities",
-            [{ field: "classId", op: "==", value: first.id }],
-            { field: "createdAt", direction: "desc" },
-            10
-          ), []),
-        ]);
+      const [students, parents, grades, behavior, att, story, activity] = await Promise.all([
+        safe(getDocs(Collections.USERS, first.studentUids || []), []),
+        safe(getDocs(Collections.USERS, first.parentUids || []), []),
+        safe(queryDocs(Collections.GRADES, [{ field: "classId", op: "==", value: first.id }], { field: "createdAt" }), []),
+        safe(queryDocs(Collections.BEHAVIOR_POINTS, [{ field: "classId", op: "==", value: first.id }], { field: "createdAt", direction: "desc" }), []),
+        safe(queryDocs(Collections.ATTENDANCE, [{ field: "date", op: "==", value: today }]), []),
+        safe(queryDocs(Collections.STORIES, [{ field: "classId", op: "==", value: first.id }], { field: "createdAt", direction: "desc" }), []),
+        safe(queryDocs(Collections.ACTIVITIES, [{ field: "classId", op: "==", value: first.id }], { field: "createdAt", direction: "desc" }, Config.ACTIVITY_FEED_LIMIT), []),
+      ]);
 
       studentsInFirstClass = students;
       parentsInFirstClass = parents;
@@ -290,36 +221,32 @@ router.get("/teacher/:uid", async (req, res) => {
       classStory = story;
       activityFeed = activity;
 
-      // Fetch grades for ALL teacher classes
       const allClassIds = classes.map((c: any) => c.id);
-      const gradePromises = allClassIds.map((cid: string) =>
-        safe(queryDocs("grades", [{ field: "classId", op: "==", value: cid }], { field: "createdAt" }), [])
+      const gradeArrays = await Promise.all(
+        allClassIds.map((cid: string) =>
+          safe(queryDocs(Collections.GRADES, [{ field: "classId", op: "==", value: cid }], { field: "createdAt" }), [])
+        )
       );
-      const gradeArrays = await Promise.all(gradePromises);
       allTeacherGrades = gradeArrays.flat();
     }
 
     try {
-      const ttSnap = await db.collection("test_titles")
+      const ttSnap = await db.collection(Collections.TEST_TITLES)
         .where("teacherUid", "==", uid)
         .orderBy("createdAt", "desc")
         .get();
-      testTitles = ttSnap.docs.map(d => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate?.()?.toISOString?.() || null }));
+      testTitles = ttSnap.docs.map(d => serializeDoc({ id: d.id, ...d.data() }));
     } catch (err) {
-      console.warn("Non-fatal: test_titles query failed:", (err as any)?.message);
+      console.warn("Non-fatal: test_titles query failed:", (err as Error)?.message);
     }
 
     const [announcements, homework, allStudents] = await Promise.all([
       safe(fetchShared("announcements_all", () =>
-        queryDocs("announcements", [], { field: "createdAt", direction: "desc" }, 25)
+        queryDocs(Collections.ANNOUNCEMENTS, [], { field: "createdAt", direction: "desc" }, Config.ANNOUNCEMENTS_LIMIT)
       ), []),
-      safe(queryDocs(
-        "homework",
-        [{ field: "teacherUid", op: "==", value: uid }],
-        { field: "createdAt", direction: "desc" }
-      ), []),
+      safe(queryDocs(Collections.HOMEWORK, [{ field: "teacherUid", op: "==", value: uid }], { field: "createdAt", direction: "desc" }), []),
       safe(fetchShared("all_students", () =>
-        queryDocs("users", [{ field: "role", op: "==", value: "Student" }], { field: "name" })
+        queryDocs(Collections.USERS, [{ field: "role", op: "==", value: "Student" }], { field: "name" })
       ), []),
     ]);
 
@@ -342,84 +269,83 @@ router.get("/teacher/:uid", async (req, res) => {
 
     cacheSet(cacheKey, result, USER_TTL);
     res.json(result);
-  } catch (err: any) {
-    console.error("getTeacherDashboard error:", err);
-    res.status(500).json({ error: err.message || "Internal server error" });
-  }
-});
+  })
+);
 
 // ─── Parent Dashboard ───────────────────────────────────────────────────────
 
-router.get("/parent/:uid", async (req, res) => {
-  try {
-    const uid = req.params.uid || req.uid!;
+router.get(
+  "/parent/:uid",
+  asyncHandler(async (req, res) => {
+    const uid = (req.params.uid as string) || req.uid!;
     const callerUid = req.uid!;
     const role = req.role;
 
-    // Access: Parent=self, Principal=any
-    if (role !== "Principal" && callerUid !== uid) {
+    if (role !== "Principal" && callerUid !== uid)
       return res.status(403).json({ error: "Forbidden" });
-    }
-    if (role !== "Parent" && role !== "Principal") {
+    if (role !== "Parent" && role !== "Principal")
       return res.status(403).json({ error: "Forbidden: insufficient role" });
-    }
 
     const cacheKey = `parent_dash_${uid}`;
     const cached = cacheGet<any>(cacheKey);
     if (cached) return res.json(cached);
 
-    const user = await getDoc("users", uid);
+    const user = await getDoc(Collections.USERS, uid);
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    const children: any[] = user.children || [];
+    const children: Array<{ childName: string; classId: string }> = user.children || [];
     const classIdSet = new Set<string>();
     const childrenData: any[] = [];
 
-    const studentSnap = children.length > 0
-      ? await db
-          .collection("users")
-          .where("role", "==", "Student")
-          .get()
-      : null;
-
-    const allStudents = studentSnap
-      ? studentSnap.docs.map((d) => ({ id: d.id, ...d.data() }))
-      : [];
-
-    const classIds = children
-      .map((c: any) => c.classId)
-      .filter((id: string) => id);
-    const childClasses = classIds.length > 0
-      ? await getDocs("classes", classIds)
+    const classIdsFromChildren = children.map((c) => c.classId).filter(Boolean);
+    const childClasses = classIdsFromChildren.length > 0
+      ? await getDocs(Collections.CLASSES, classIdsFromChildren)
       : [];
     const classMap = new Map(childClasses.map((c: any) => [c.id, c]));
 
+    // Batch: collect all child names, find matching student UIDs in one pass
+    const childNames = children.map((c) => c.childName).filter(Boolean);
+    let allStudents: any[] = [];
+    if (childNames.length > 0) {
+      const nameChunks: string[][] = [];
+      for (let i = 0; i < childNames.length; i += Config.FIRESTORE_IN_LIMIT) {
+        nameChunks.push(childNames.slice(i, i + Config.FIRESTORE_IN_LIMIT));
+      }
+      const studentChunks = await Promise.all(
+        nameChunks.map((names) =>
+          queryDocs(Collections.USERS, [
+            { field: "role", op: "==", value: "Student" },
+            { field: "name", op: "in", value: names },
+          ])
+        )
+      );
+      allStudents = studentChunks.flat();
+    }
+    const studentNameMap = new Map(allStudents.map((s: any) => [s.name, s.id]));
+
+    // Batch: collect all child UIDs, query grades/behavior/attendance in bulk
+    const childUids: string[] = [];
+    for (const childInfo of children) {
+      const uid = studentNameMap.get(childInfo.childName) || "";
+      if (uid) childUids.push(uid);
+    }
+
+    const [allGrades, allBehavior, allAttendance] = childUids.length > 0
+      ? await Promise.all([
+          safe(queryDocs(Collections.GRADES, [{ field: "studentUid", op: "in", value: childUids.slice(0, Config.FIRESTORE_IN_LIMIT) }], { field: "createdAt" }), []),
+          safe(queryDocs(Collections.BEHAVIOR_POINTS, [{ field: "studentUid", op: "in", value: childUids.slice(0, Config.FIRESTORE_IN_LIMIT) }], { field: "createdAt", direction: "desc" }), []),
+          safe(queryDocs(Collections.ATTENDANCE, [{ field: "studentUid", op: "in", value: childUids.slice(0, Config.FIRESTORE_IN_LIMIT) }], { field: "date", direction: "desc" }), []),
+        ])
+      : [[], [], []];
+
     for (const childInfo of children) {
       if (childInfo.classId) classIdSet.add(childInfo.classId);
-
-      const match = allStudents.find(
-        (s: any) => s.name === childInfo.childName
-      );
-      const childUid = match ? match.id : "";
+      const childUid = studentNameMap.get(childInfo.childName) || "";
 
       if (childUid) {
-        const [grades, behavior, attendance] = await Promise.all([
-          safe(queryDocs(
-            "grades",
-            [{ field: "studentUid", op: "==", value: childUid }],
-            { field: "createdAt" }
-          ), []),
-          safe(queryDocs(
-            "behavior_points",
-            [{ field: "studentUid", op: "==", value: childUid }],
-            { field: "createdAt", direction: "desc" }
-          ), []),
-          safe(queryDocs(
-            "attendance",
-            [{ field: "studentUid", op: "==", value: childUid }],
-            { field: "date", direction: "desc" }
-          ), []),
-        ]);
+        const grades = (allGrades as any[]).filter((g: any) => g.studentUid === childUid);
+        const behavior = (allBehavior as any[]).filter((b: any) => b.studentUid === childUid);
+        const attendance = (allAttendance as any[]).filter((a: any) => a.studentUid === childUid);
 
         childrenData.push({
           info: childInfo,
@@ -444,54 +370,32 @@ router.get("/parent/:uid", async (req, res) => {
     }
 
     const classIdList = Array.from(classIdSet);
-    const firstChildUid =
-      childrenData.length > 0 ? childrenData[0].childUid : "";
+    const firstChildUid = childrenData.length > 0 ? childrenData[0].childUid : "";
 
-    const [announcements, votes, stories, activity, content] =
-      await Promise.all([
-        safe(fetchShared("announcements_all", () =>
-          queryDocs("announcements", [], { field: "createdAt", direction: "desc" }, 25)
-        ), []),
-        safe(fetchShared("votes_active", () =>
-          queryDocs("votes", [{ field: "active", op: "==", value: true }], {
-            field: "createdAt",
-            direction: "desc",
-          })
-        ), []),
-        safe(classIdList.length > 0
-          ? queryDocs(
-              "stories",
-              [
-                {
-                  field: "classId",
-                  op: "in",
-                  value: classIdList.slice(0, 30),
-                },
-              ],
-              { field: "createdAt", direction: "desc" }
-            )
-          : Promise.resolve([]), []),
-        safe(firstChildUid
-          ? queryDocs(
-              "activities",
-              [{ field: "targetUid", op: "==", value: firstChildUid }],
-              { field: "createdAt", direction: "desc" },
-              10
-            )
-          : Promise.resolve([]), []),
-        safe(fetchShared("content_all", () =>
-          queryDocs("content", [], { field: "createdAt", direction: "desc" })
-        ), []),
-      ]);
+    const [announcements, votes, stories, activity, content] = await Promise.all([
+      safe(fetchShared("announcements_all", () =>
+        queryDocs(Collections.ANNOUNCEMENTS, [], { field: "createdAt", direction: "desc" }, Config.ANNOUNCEMENTS_LIMIT)
+      ), []),
+      safe(fetchShared("votes_active", () =>
+        queryDocs(Collections.VOTES, [{ field: "active", op: "==", value: true }], { field: "createdAt", direction: "desc" })
+      ), []),
+      safe(classIdList.length > 0
+        ? queryDocs(Collections.STORIES, [{ field: "classId", op: "in", value: classIdList.slice(0, Config.FIRESTORE_IN_LIMIT) }], { field: "createdAt", direction: "desc" })
+        : Promise.resolve([]), []),
+      safe(firstChildUid
+        ? queryDocs(Collections.ACTIVITIES, [{ field: "targetUid", op: "==", value: firstChildUid }], { field: "createdAt", direction: "desc" }, Config.ACTIVITY_FEED_LIMIT)
+        : Promise.resolve([]), []),
+      safe(fetchShared("content_all", () =>
+        queryDocs(Collections.CONTENT, [], { field: "createdAt", direction: "desc" })
+      ), []),
+    ]);
 
-    const filteredAnnouncements = (announcements as any[]).filter((a: any) =>
-      isVisibleTo(a.audience, "parents")
-    );
+    const filteredAnnouncements = (announcements as any[]).filter((a: any) => isVisibleTo(a.audience, "parents"));
 
     const result = {
       user: serializeDoc(user),
       childrenData,
-      announcements: serializeDocs(filteredAnnouncements.slice(0, 20)),
+      announcements: serializeDocs(filteredAnnouncements.slice(0, Config.PRINCIPAL_ACTIVITY_LIMIT)),
       activeVotes: serializeDocs(votes),
       storyPosts: serializeDocs(stories as any[]),
       activityFeed: serializeDocs(activity as any[]),
@@ -500,65 +404,46 @@ router.get("/parent/:uid", async (req, res) => {
 
     cacheSet(cacheKey, result, USER_TTL);
     res.json(result);
-  } catch (err: any) {
-    console.error("getParentDashboard error:", err);
-    res.status(500).json({ error: err.message || "Internal server error" });
-  }
-});
+  })
+);
 
 // ─── Principal Dashboard ────────────────────────────────────────────────────
 
-router.get("/principal/:uid", async (req, res) => {
-  try {
-    const uid = req.params.uid || req.uid!;
+router.get(
+  "/principal/:uid",
+  asyncHandler(async (req, res) => {
+    const uid = (req.params.uid as string) || req.uid!;
     const callerUid = req.uid!;
     const role = req.role;
 
-    // Access: Principal only, self only
-    if (role !== "Principal") {
+    if (role !== "Principal")
       return res.status(403).json({ error: "Forbidden: principal access only" });
-    }
-    if (callerUid !== uid) {
+    if (callerUid !== uid)
       return res.status(403).json({ error: "Forbidden" });
-    }
 
     const cacheKey = `principal_dash_${uid}`;
     const cached = cacheGet<any>(cacheKey);
     if (cached) return res.json(cached);
 
-    const user = await getDoc("users", uid);
+    const user = await getDoc(Collections.USERS, uid);
     if (!user) return res.status(404).json({ error: "User not found" });
 
     const [
-      teacherSnap,
-      studentSnap,
-      parentSnap,
-      classSnap,
-      gradeSnap,
-      announcements,
-      votes,
-      activityFeed,
+      teacherSnap, studentSnap, parentSnap, classSnap, gradeSnap,
+      announcements, votes, activityFeed,
     ] = await Promise.all([
-      db.collection("users").where("role", "==", "Teacher").get(),
-      db.collection("users").where("role", "==", "Student").get(),
-      db.collection("users").where("role", "==", "Parent").get(),
-      db.collection("classes").get(),
-      db.collection("grades").get(),
+      db.collection(Collections.USERS).where("role", "==", "Teacher").get(),
+      db.collection(Collections.USERS).where("role", "==", "Student").get(),
+      db.collection(Collections.USERS).where("role", "==", "Parent").get(),
+      db.collection(Collections.CLASSES).get(),
+      db.collection(Collections.GRADES).get(),
       fetchShared("announcements_all", () =>
-        queryDocs("announcements", [], { field: "createdAt", direction: "desc" }, 25)
+        queryDocs(Collections.ANNOUNCEMENTS, [], { field: "createdAt", direction: "desc" }, Config.ANNOUNCEMENTS_LIMIT)
       ),
       fetchShared("votes_active", () =>
-        queryDocs("votes", [{ field: "active", op: "==", value: true }], {
-          field: "createdAt",
-          direction: "desc",
-        })
+        queryDocs(Collections.VOTES, [{ field: "active", op: "==", value: true }], { field: "createdAt", direction: "desc" })
       ),
-      queryDocs(
-        "activities",
-        [],
-        { field: "createdAt", direction: "desc" },
-        20
-      ),
+      queryDocs(Collections.ACTIVITIES, [], { field: "createdAt", direction: "desc" }, Config.PRINCIPAL_ACTIVITY_LIMIT),
     ]);
 
     const teachers = teacherSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -585,10 +470,7 @@ router.get("/principal/:uid", async (req, res) => {
 
     cacheSet(cacheKey, result, USER_TTL);
     res.json(result);
-  } catch (err: any) {
-    console.error("getPrincipalDashboard error:", err);
-    res.status(500).json({ error: err.message || "Internal server error" });
-  }
-});
+  })
+);
 
 export default router;

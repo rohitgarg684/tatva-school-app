@@ -3,8 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../repositories/auth_repository.dart';
-import '../../services/message_service.dart';
+import '../../services/api_service.dart';
 import '../../shared/animations/animations.dart';
+import '../../shared/theme/colors.dart';
 
 class MessagingScreen extends StatefulWidget {
   final String otherUserId;
@@ -32,30 +33,35 @@ class _MessagingScreenState extends State<MessagingScreen>
   final ScrollController _scrollController = ScrollController();
   bool _sending = false;
 
-  static const Color bg = Color(0xFFF4F9F4);
-  static const Color bgCard = Color(0xFFFFFFFF);
-  static const Color primary = Color(0xFF2E6B4F);
-  static const Color textDark = Color(0xFF1A2E22);
-  static const Color textLight = Color(0xFF8FAF8F);
+  static const Color bg = TatvaColors.bgLight;
+  static const Color bgCard = TatvaColors.bgCard;
+  static const Color primary = TatvaColors.primary;
+  static const Color textDark = TatvaColors.neutral900;
+  static const Color textLight = TatvaColors.neutral400;
 
-  final _msgSvc = MessageService();
+  final _api = ApiService();
   List<Map<String, dynamic>> _messages = [];
   Timer? _pollTimer;
   late String _myUid;
   late String _conversationId;
 
+  static String _makeConversationId(String uid1, String uid2) {
+    final sorted = [uid1, uid2]..sort();
+    return '${sorted[0]}_${sorted[1]}';
+  }
+
   @override
   void initState() {
     super.initState();
     _myUid = AuthRepository().currentUid ?? '';
-    _conversationId = _msgSvc.makeConversationId(_myUid, widget.otherUserId);
+    _conversationId = _makeConversationId(_myUid, widget.otherUserId);
     _loadMessages();
     _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _loadMessages());
   }
 
   Future<void> _loadMessages() async {
     try {
-      final msgs = await _msgSvc.getMessages(_conversationId);
+      final msgs = await _api.getMessages(_conversationId);
       if (mounted) {
         final changed = msgs.length != _messages.length;
         setState(() => _messages = msgs);
@@ -79,7 +85,7 @@ class _MessagingScreenState extends State<MessagingScreen>
     _msgController.clear();
     HapticFeedback.lightImpact();
 
-    await _msgSvc.send(
+    await _api.sendMessage(
       conversationId: _conversationId,
       receiverUid: widget.otherUserId,
       text: text,
@@ -133,7 +139,6 @@ class _MessagingScreenState extends State<MessagingScreen>
                   ? widget.otherUserName[0].toUpperCase()
                   : '?',
               style: TextStyle(
-                  fontFamily: 'Raleway',
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: widget.avatarColor),
@@ -143,13 +148,12 @@ class _MessagingScreenState extends State<MessagingScreen>
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(widget.otherUserName,
                 style: const TextStyle(
-                    fontFamily: 'Raleway',
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
                     color: textDark)),
             Text(widget.otherUserRole,
                 style: const TextStyle(
-                    fontFamily: 'Raleway', fontSize: 11, color: textLight)),
+fontSize: 11, color: textLight)),
           ]),
         ]),
         actions: [
@@ -158,7 +162,7 @@ class _MessagingScreenState extends State<MessagingScreen>
             onPressed: () =>
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: Text('Email: ${widget.otherUserEmail}',
-                  style: const TextStyle(fontFamily: 'Raleway')),
+                  style: const TextStyle()),
               backgroundColor: primary,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
@@ -200,7 +204,6 @@ class _MessagingScreenState extends State<MessagingScreen>
                                 ? widget.otherUserName[0].toUpperCase()
                                 : '?',
                             style: TextStyle(
-                                fontFamily: 'Raleway',
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
                                 color: widget.avatarColor),
@@ -235,7 +238,6 @@ class _MessagingScreenState extends State<MessagingScreen>
                               children: [
                                 Text(msg['text'] ?? '',
                                     style: TextStyle(
-                                        fontFamily: 'Raleway',
                                         fontSize: 14,
                                         color: isMe ? Colors.white : textDark,
                                         height: 1.4)),
@@ -244,7 +246,6 @@ class _MessagingScreenState extends State<MessagingScreen>
                                     _formatTime(
                                         msg['createdAt']?.toString()),
                                     style: TextStyle(
-                                        fontFamily: 'Raleway',
                                         fontSize: 10,
                                         color: isMe
                                             ? Colors.white.withOpacity(0.6)
@@ -285,13 +286,12 @@ class _MessagingScreenState extends State<MessagingScreen>
                     child: TextField(
                       controller: _msgController,
                       style: const TextStyle(
-                          fontFamily: 'Raleway', fontSize: 14, color: textDark),
+fontSize: 14, color: textDark),
                       maxLines: null,
                       textCapitalization: TextCapitalization.sentences,
                       decoration: const InputDecoration(
                         hintText: 'Type a message...',
                         hintStyle: TextStyle(
-                            fontFamily: 'Raleway',
                             fontSize: 13,
                             color: textLight),
                         border: InputBorder.none,

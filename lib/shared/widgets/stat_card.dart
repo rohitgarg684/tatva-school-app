@@ -40,7 +40,6 @@ class StatCard extends StatelessWidget {
           Text(
             value,
             style: TextStyle(
-              fontFamily: 'Raleway',
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: TatvaColors.neutral900,
@@ -51,7 +50,6 @@ class StatCard extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              fontFamily: 'Raleway',
               fontSize: 10,
               color: TatvaColors.neutral400,
               fontWeight: FontWeight.w500,
@@ -89,7 +87,6 @@ class MiniStatCard extends StatelessWidget {
           SlotNumber(
             value: double.tryParse(value) ?? 0,
             style: TextStyle(
-              fontFamily: 'Raleway',
               fontSize: 22,
               fontWeight: FontWeight.bold,
               color: color,
@@ -99,7 +96,6 @@ class MiniStatCard extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              fontFamily: 'Raleway',
               fontSize: 11,
               color: color.withOpacity(0.7),
               fontWeight: FontWeight.w600,

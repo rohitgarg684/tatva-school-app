@@ -70,7 +70,6 @@ class WelcomeScreen extends StatelessWidget {
                         errorBuilder: (_, __, ___) => Center(
                           child: Text('T',
                               style: TextStyle(
-                                  fontFamily: 'Raleway',
                                   fontSize: 22,
                                   fontWeight: FontWeight.w900,
                                   color: accent)),
@@ -85,13 +84,11 @@ class WelcomeScreen extends StatelessWidget {
                     children: [
                       Text('Tatva Academy',
                           style: TextStyle(
-                              fontFamily: 'Raleway',
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                               color: textW)),
                       Text('Academic Management',
                           style: TextStyle(
-                              fontFamily: 'Raleway',
                               fontSize: 10,
                               color: textMut,
                               fontWeight: FontWeight.w500,
@@ -101,7 +98,6 @@ class WelcomeScreen extends StatelessWidget {
               const SizedBox(height: 44),
               const Text('Choose a role\nto preview',
                   style: TextStyle(
-                      fontFamily: 'Raleway',
                       fontSize: 32,
                       fontWeight: FontWeight.w800,
                       color: textW,
@@ -110,7 +106,7 @@ class WelcomeScreen extends StatelessWidget {
               const SizedBox(height: 8),
               const Text('Explore each dashboard with sample data',
                   style: TextStyle(
-                      fontFamily: 'Raleway', fontSize: 14, color: textMut)),
+fontSize: 14, color: textMut)),
               const SizedBox(height: 36),
               _roleCard(context, '🎓', 'Student', 'Arjun Mehta · Grade 8-A',
                   const Color(0xFF1E88E5), const StudentDashboard()),
@@ -142,7 +138,6 @@ class WelcomeScreen extends StatelessWidget {
               Center(
                   child: Text('Swipe back anytime to switch roles',
                       style: TextStyle(
-                          fontFamily: 'Raleway',
                           fontSize: 12,
                           color: textMut.withOpacity(0.6)))),
             ]),
@@ -180,14 +175,13 @@ class WelcomeScreen extends StatelessWidget {
                   children: [
                 Text(role,
                     style: const TextStyle(
-                        fontFamily: 'Raleway',
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
                         color: textW)),
                 const SizedBox(height: 2),
                 Text(subtitle,
                     style: const TextStyle(
-                        fontFamily: 'Raleway', fontSize: 12, color: textMut)),
+fontSize: 12, color: textMut)),
               ])),
           Container(
             padding: const EdgeInsets.all(8),

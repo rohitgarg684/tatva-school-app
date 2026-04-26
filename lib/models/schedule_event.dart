@@ -43,7 +43,35 @@ class ScheduleEvent {
     );
   }
 
-  Map<String, dynamic> toMap() => {
+  ScheduleEvent copyWith({
+    String? id,
+    String? title,
+    String? description,
+    String? date,
+    String? startTime,
+    String? endTime,
+    String? type,
+    String? createdBy,
+    List<String>? affectedGrades,
+    bool? cancelsRegularSchedule,
+    DateTime? createdAt,
+  }) {
+    return ScheduleEvent(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      date: date ?? this.date,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      type: type ?? this.type,
+      createdBy: createdBy ?? this.createdBy,
+      affectedGrades: affectedGrades ?? this.affectedGrades,
+      cancelsRegularSchedule: cancelsRegularSchedule ?? this.cancelsRegularSchedule,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
         'title': title,
         'description': description,
         'date': date,

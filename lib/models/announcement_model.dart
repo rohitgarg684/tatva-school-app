@@ -39,7 +39,31 @@ class AnnouncementModel {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  AnnouncementModel copyWith({
+    String? id,
+    String? title,
+    String? body,
+    Audience? audience,
+    List<String>? classIds,
+    String? createdBy,
+    String? createdByName,
+    String? createdByRole,
+    DateTime? createdAt,
+  }) {
+    return AnnouncementModel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      body: body ?? this.body,
+      audience: audience ?? this.audience,
+      classIds: classIds ?? this.classIds,
+      createdBy: createdBy ?? this.createdBy,
+      createdByName: createdByName ?? this.createdByName,
+      createdByRole: createdByRole ?? this.createdByRole,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
     return {
       'title': title,
       'body': body,
@@ -48,7 +72,7 @@ class AnnouncementModel {
       'createdBy': createdBy,
       'createdByName': createdByName,
       'createdByRole': createdByRole,
-      'createdAt': DateTime.now().toIso8601String(),
+      'createdAt': (createdAt ?? DateTime.now()).toIso8601String(),
     };
   }
 }

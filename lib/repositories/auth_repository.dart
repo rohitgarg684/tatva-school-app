@@ -1,6 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
 
 class AuthRepository {
+  static final AuthRepository _instance = AuthRepository._();
+  factory AuthRepository() => _instance;
+  AuthRepository._();
+
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   User? get currentUser => _auth.currentUser;

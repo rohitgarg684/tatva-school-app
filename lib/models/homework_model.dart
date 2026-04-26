@@ -17,7 +17,19 @@ class HomeworkAttachment {
     );
   }
 
-  Map<String, dynamic> toMap() => {'url': url, 'name': name, 'type': type};
+  HomeworkAttachment copyWith({
+    String? url,
+    String? name,
+    String? type,
+  }) {
+    return HomeworkAttachment(
+      url: url ?? this.url,
+      name: name ?? this.name,
+      type: type ?? this.type,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {'url': url, 'name': name, 'type': type};
 }
 
 class HomeworkModel {
@@ -76,7 +88,37 @@ class HomeworkModel {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  HomeworkModel copyWith({
+    String? id,
+    String? title,
+    String? description,
+    String? subject,
+    String? classId,
+    String? className,
+    String? teacherUid,
+    String? teacherName,
+    String? dueDate,
+    List<String>? submittedBy,
+    List<HomeworkAttachment>? attachments,
+    DateTime? createdAt,
+  }) {
+    return HomeworkModel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      subject: subject ?? this.subject,
+      classId: classId ?? this.classId,
+      className: className ?? this.className,
+      teacherUid: teacherUid ?? this.teacherUid,
+      teacherName: teacherName ?? this.teacherName,
+      dueDate: dueDate ?? this.dueDate,
+      submittedBy: submittedBy ?? this.submittedBy,
+      attachments: attachments ?? this.attachments,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
     return {
       'title': title,
       'description': description,
@@ -87,8 +129,8 @@ class HomeworkModel {
       'teacherName': teacherName,
       'dueDate': dueDate,
       'submittedBy': submittedBy,
-      'attachments': attachments.map((a) => a.toMap()).toList(),
-      'createdAt': DateTime.now().toIso8601String(),
+      'attachments': attachments.map((a) => a.toJson()).toList(),
+      'createdAt': (createdAt ?? DateTime.now()).toIso8601String(),
     };
   }
 }

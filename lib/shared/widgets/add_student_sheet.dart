@@ -85,7 +85,7 @@ class _AddStudentSheetState extends State<AddStudentSheet> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('$name added successfully',
-              style: const TextStyle(fontFamily: 'Raleway')),
+              style: const TextStyle()),
           backgroundColor: TatvaColors.success,
           behavior: SnackBarBehavior.floating,
           shape:
@@ -146,7 +146,6 @@ class _AddStudentSheetState extends State<AddStudentSheet> {
                 const SizedBox(width: 10),
                 const Text('Add Student',
                     style: TextStyle(
-                        fontFamily: 'Raleway',
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: TatvaColors.neutral900)),
@@ -157,7 +156,6 @@ class _AddStudentSheetState extends State<AddStudentSheet> {
                     ? 'Student will be added to this class'
                     : 'Enroll a new student into the school',
                 style: const TextStyle(
-                    fontFamily: 'Raleway',
                     fontSize: 13,
                     color: TatvaColors.neutral400),
               ),
@@ -215,7 +213,6 @@ class _AddStudentSheetState extends State<AddStudentSheet> {
                   Expanded(
                     child: Text(_error,
                         style: const TextStyle(
-                            fontFamily: 'Raleway',
                             fontSize: 12,
                             color: TatvaColors.error)),
                   ),
@@ -251,7 +248,6 @@ class _AddStudentSheetState extends State<AddStudentSheet> {
                                 color: Colors.white, strokeWidth: 2))
                         : const Text('Add Student',
                             style: TextStyle(
-                                fontFamily: 'Raleway',
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white)),
@@ -267,7 +263,6 @@ class _AddStudentSheetState extends State<AddStudentSheet> {
 
   Widget _label(String text) => Text(text,
       style: const TextStyle(
-          fontFamily: 'Raleway',
           fontSize: 13,
           fontWeight: FontWeight.w600,
           color: TatvaColors.neutral900));
@@ -282,11 +277,10 @@ class _AddStudentSheetState extends State<AddStudentSheet> {
       controller: ctrl,
       keyboardType: keyboardType,
       style: const TextStyle(
-          fontFamily: 'Raleway', fontSize: 14, color: TatvaColors.neutral900),
+fontSize: 14, color: TatvaColors.neutral900),
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(
-            fontFamily: 'Raleway',
             fontSize: 13,
             color: Colors.grey.shade400),
         prefixIcon: Icon(icon, color: TatvaColors.neutral400, size: 18),
@@ -331,7 +325,6 @@ class _AddStudentSheetState extends State<AddStudentSheet> {
             ),
             child: Text(item,
                 style: TextStyle(
-                    fontFamily: 'Raleway',
                     fontSize: 13,
                     color: isSel ? Colors.white : TatvaColors.neutral400,
                     fontWeight: FontWeight.w600)),

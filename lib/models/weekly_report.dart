@@ -35,6 +35,42 @@ class WeeklyReport {
     this.teacherNotes = const [],
   });
 
+  WeeklyReport copyWith({
+    String? studentName,
+    String? className,
+    String? weekLabel,
+    int? behaviorPointsTotal,
+    int? positivePoints,
+    int? negativePoints,
+    Map<String, int>? topCategories,
+    int? daysPresent,
+    int? daysAbsent,
+    int? daysTardy,
+    int? totalSchoolDays,
+    int? homeworkCompleted,
+    int? homeworkTotal,
+    double? gradeAverage,
+    List<String>? teacherNotes,
+  }) {
+    return WeeklyReport(
+      studentName: studentName ?? this.studentName,
+      className: className ?? this.className,
+      weekLabel: weekLabel ?? this.weekLabel,
+      behaviorPointsTotal: behaviorPointsTotal ?? this.behaviorPointsTotal,
+      positivePoints: positivePoints ?? this.positivePoints,
+      negativePoints: negativePoints ?? this.negativePoints,
+      topCategories: topCategories ?? this.topCategories,
+      daysPresent: daysPresent ?? this.daysPresent,
+      daysAbsent: daysAbsent ?? this.daysAbsent,
+      daysTardy: daysTardy ?? this.daysTardy,
+      totalSchoolDays: totalSchoolDays ?? this.totalSchoolDays,
+      homeworkCompleted: homeworkCompleted ?? this.homeworkCompleted,
+      homeworkTotal: homeworkTotal ?? this.homeworkTotal,
+      gradeAverage: gradeAverage ?? this.gradeAverage,
+      teacherNotes: teacherNotes ?? this.teacherNotes,
+    );
+  }
+
   double get attendanceRate =>
       totalSchoolDays > 0 ? daysPresent / totalSchoolDays * 100 : 0;
 

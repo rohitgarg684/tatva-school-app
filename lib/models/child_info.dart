@@ -18,7 +18,7 @@ class ChildInfo {
     this.teacherEmail = '',
   });
 
-  factory ChildInfo.fromMap(Map<String, dynamic> data) {
+  factory ChildInfo.fromJson(Map<String, dynamic> data) {
     return ChildInfo(
       childName: data['childName'] as String? ?? '',
       classId: data['classId'] as String? ?? '',
@@ -30,7 +30,27 @@ class ChildInfo {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  ChildInfo copyWith({
+    String? childName,
+    String? classId,
+    String? className,
+    String? subject,
+    String? teacherName,
+    String? teacherUid,
+    String? teacherEmail,
+  }) {
+    return ChildInfo(
+      childName: childName ?? this.childName,
+      classId: classId ?? this.classId,
+      className: className ?? this.className,
+      subject: subject ?? this.subject,
+      teacherName: teacherName ?? this.teacherName,
+      teacherUid: teacherUid ?? this.teacherUid,
+      teacherEmail: teacherEmail ?? this.teacherEmail,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
     return {
       'childName': childName,
       'classId': classId,
