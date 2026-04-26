@@ -30,8 +30,15 @@ class TeacherGradesTab extends StatefulWidget {
 
 class _TeacherGradesTabState extends State<TeacherGradesTab> {
   final _api = ApiService();
+  final _searchCtrl = TextEditingController();
   String _gradeSelectedClassId = '';
   String _gradeSearch = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -108,6 +115,7 @@ class _TeacherGradesTabState extends State<TeacherGradesTab> {
                     onTap: () => setState(() {
                       _gradeSelectedClassId = cls.id;
                       _gradeSearch = '';
+                      _searchCtrl.clear();
                     }),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -133,34 +141,47 @@ class _TeacherGradesTabState extends State<TeacherGradesTab> {
               ),
             ),
           const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-                color: TatvaColors.bgCard,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade200)),
-            child: Row(children: [
-              Icon(Icons.search_rounded,
+          TextField(
+            controller: _searchCtrl,
+            onChanged: (v) => setState(() => _gradeSearch = v),
+            style: const TextStyle(
+                fontSize: 13, color: TatvaColors.neutral900),
+            cursorColor: TatvaColors.primary,
+            decoration: InputDecoration(
+              hintText: 'Search student or test...',
+              hintStyle: TextStyle(
+                  fontSize: 13,
+                  color: TatvaColors.neutral400.withOpacity(0.5)),
+              prefixIcon: Icon(Icons.search_rounded,
                   size: 18, color: TatvaColors.neutral400),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  onChanged: (v) => setState(() => _gradeSearch = v),
-                  style: const TextStyle(
-                      fontSize: 13, color: TatvaColors.neutral900),
-                  decoration: InputDecoration(
-                    hintText: 'Search student or test...',
-                    hintStyle: TextStyle(
-                        fontSize: 13,
-                        color: TatvaColors.neutral400.withOpacity(0.5)),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding:
-                        const EdgeInsets.symmetric(vertical: 10),
-                  ),
-                ),
-              ),
-            ]),
+              prefixIconConstraints:
+                  const BoxConstraints(minWidth: 40, minHeight: 0),
+              suffixIcon: _gradeSearch.isNotEmpty
+                  ? GestureDetector(
+                      onTap: () => setState(() {
+                        _searchCtrl.clear();
+                        _gradeSearch = '';
+                      }),
+                      child: Icon(Icons.close_rounded,
+                          size: 16, color: TatvaColors.neutral400),
+                    )
+                  : null,
+              filled: true,
+              fillColor: TatvaColors.bgLight,
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none),
+              focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide:
+                      BorderSide(color: TatvaColors.primary.withOpacity(0.3))),
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+            ),
           ),
           const SizedBox(height: 8),
           Row(children: [
@@ -180,29 +201,6 @@ class _TeacherGradesTabState extends State<TeacherGradesTab> {
                           70
                       ? TatvaColors.success
                       : TatvaColors.accent),
-            const Spacer(),
-            GestureDetector(
-              onTap: () => _showTestTitlesManager(),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                    color: TatvaColors.purple.withOpacity(0.06),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                        color: TatvaColors.purple.withOpacity(0.15))),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.list_alt_rounded,
-                      size: 14, color: TatvaColors.purple),
-                  const SizedBox(width: 4),
-                  Text('Tests',
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: TatvaColors.purple)),
-                ]),
-              ),
-            ),
           ]),
           const SizedBox(height: 14),
           GestureDetector(
@@ -853,14 +851,18 @@ class _TeacherGradesTabState extends State<TeacherGradesTab> {
                                 total: total,
                                 testDate: selectedDate,
                               );
-                              if (!widget.testTitles.any((t) =>
-                                  (t['title'] as String? ?? '')
-                                      .toLowerCase() ==
-                                  assessName.toLowerCase())) {
-                                await _api.addTestTitle(
-                                    title: assessName,
-                                    subject: subject,
-                                    total: total);
+                              final titleExists = widget.testTitles
+                                  .any((t) =>
+                                      (t['title'] as String? ?? '')
+                                          .toLowerCase() ==
+                                      assessName.toLowerCase());
+                              if (!titleExists) {
+                                try {
+                                  await _api.addTestTitle(
+                                      title: assessName,
+                                      subject: subject,
+                                      total: total);
+                                } catch (_) {}
                               }
                               widget.onRefresh();
                               if (context.mounted) {
@@ -909,136 +911,4 @@ class _TeacherGradesTabState extends State<TeacherGradesTab> {
     );
   }
 
-  void _showTestTitlesManager() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => StatefulBuilder(builder: (ctx, setSheet) {
-        return Container(
-          constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(ctx).size.height * 0.6),
-          decoration: const BoxDecoration(
-              color: TatvaColors.bgCard,
-              borderRadius:
-                  BorderRadius.vertical(top: Radius.circular(24))),
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-          child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                    child: Container(
-                        width: 36,
-                        height: 3,
-                        decoration: BoxDecoration(
-                            color: Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(2)))),
-                const SizedBox(height: 20),
-                const Text('Saved Test Titles',
-                    style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: TatvaColors.neutral900)),
-                const SizedBox(height: 4),
-                const Text(
-                    'These appear as suggestions when entering grades',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: TatvaColors.neutral400)),
-                const SizedBox(height: 16),
-                if (widget.testTitles.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Center(
-                        child: Text('No saved test titles yet',
-                            style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey.shade400))),
-                  )
-                else
-                  Flexible(
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: widget.testTitles.length,
-                      separatorBuilder: (_, __) => Divider(
-                          height: 1, color: Colors.grey.shade100),
-                      itemBuilder: (_, i) {
-                        final t = widget.testTitles[i];
-                        final title = t['title'] as String? ?? '';
-                        final ttSubject =
-                            t['subject'] as String? ?? '';
-                        final ttTotal =
-                            (t['total'] as num?)?.toInt() ?? 100;
-                        final ttId = t['id'] as String? ?? '';
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 10),
-                          child: Row(children: [
-                            Icon(Icons.description_outlined,
-                                size: 16,
-                                color: TatvaColors.purple),
-                            const SizedBox(width: 10),
-                            Expanded(
-                                child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                  Text(title,
-                                      style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                          color:
-                                              TatvaColors.neutral900)),
-                                  if (ttSubject.isNotEmpty)
-                                    Text('$ttSubject · /$ttTotal',
-                                        style: const TextStyle(
-                                            fontSize: 11,
-                                            color: TatvaColors
-                                                .neutral400)),
-                                ])),
-                            GestureDetector(
-                              onTap: () async {
-                                if (ttId.isEmpty) return;
-                                try {
-                                  await _api
-                                      .deleteTestTitle(ttId);
-                                  setSheet(() {
-                                    widget.testTitles.removeWhere(
-                                        (tt) =>
-                                            tt['id'] == ttId);
-                                  });
-                                  setState(() {});
-                                  if (context.mounted) {
-                                    TatvaSnackbar.show(context,
-                                        '"$title" removed');
-                                  }
-                                } catch (e) {
-                                  if (context.mounted) {
-                                    TatvaSnackbar.show(context,
-                                        'Failed to delete');
-                                  }
-                                }
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                    color: TatvaColors.error
-                                        .withOpacity(0.06),
-                                    shape: BoxShape.circle),
-                                child: Icon(Icons.close_rounded,
-                                    size: 14,
-                                    color: TatvaColors.error),
-                              ),
-                            ),
-                          ]),
-                        );
-                      },
-                    ),
-                  ),
-              ]),
-        );
-      }),
-    );
-  }
 }
