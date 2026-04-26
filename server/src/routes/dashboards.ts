@@ -55,6 +55,15 @@ async function fetchShared(key: string, fetcher: () => Promise<any>) {
   return data;
 }
 
+async function safe<T>(promise: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await promise;
+  } catch (err) {
+    console.warn("Non-fatal query error (using fallback):", (err as any)?.message || err);
+    return fallback;
+  }
+}
+
 function isVisibleTo(audience: string, roleAudience: string): boolean {
   const a = (audience || "").toLowerCase();
   const r = roleAudience.toLowerCase();
@@ -127,52 +136,52 @@ router.get("/student/:uid", async (req, res) => {
       activityFeed,
       contentItems,
     ] = await Promise.all([
-      classIds.length > 0 ? getDoc("classes", classIds[0]) : null,
-      queryDocs("grades", [{ field: "studentUid", op: "==", value: uid }], {
+      safe(classIds.length > 0 ? getDoc("classes", classIds[0]) : Promise.resolve(null), null),
+      safe(queryDocs("grades", [{ field: "studentUid", op: "==", value: uid }], {
         field: "createdAt",
-      }),
-      fetchShared("announcements_all", () =>
+      }), []),
+      safe(fetchShared("announcements_all", () =>
         queryDocs("announcements", [], { field: "createdAt", direction: "desc" }, 25)
-      ),
-      classIds.length > 0
+      ), []),
+      safe(classIds.length > 0
         ? queryDocs(
             "homework",
             [{ field: "classId", op: "in", value: classIds.slice(0, 30) }],
             { field: "createdAt", direction: "desc" }
           )
-        : [],
-      fetchShared("votes_active", () =>
+        : Promise.resolve([]), []),
+      safe(fetchShared("votes_active", () =>
         queryDocs("votes", [{ field: "active", op: "==", value: true }], {
           field: "createdAt",
           direction: "desc",
         })
-      ),
-      queryDocs(
+      ), []),
+      safe(queryDocs(
         "behavior_points",
         [{ field: "studentUid", op: "==", value: uid }],
         { field: "createdAt", direction: "desc" }
-      ),
-      queryDocs(
+      ), []),
+      safe(queryDocs(
         "attendance",
         [{ field: "studentUid", op: "==", value: uid }],
         { field: "date", direction: "desc" }
-      ),
-      classIds.length > 0
+      ), []),
+      safe(classIds.length > 0
         ? queryDocs(
             "stories",
             [{ field: "classId", op: "in", value: classIds.slice(0, 30) }],
             { field: "createdAt", direction: "desc" }
           )
-        : [],
-      queryDocs(
+        : Promise.resolve([]), []),
+      safe(queryDocs(
         "activities",
         [{ field: "targetUid", op: "==", value: uid }],
         { field: "createdAt", direction: "desc" },
         10
-      ),
-      fetchShared("content_all", () =>
+      ), []),
+      safe(fetchShared("content_all", () =>
         queryDocs("content", [], { field: "createdAt", direction: "desc" })
-      ),
+      ), []),
     ]);
 
     const filteredAnnouncements = (announcements as any[]).filter((a: any) =>
@@ -245,32 +254,32 @@ router.get("/teacher/:uid", async (req, res) => {
 
       const [students, parents, grades, behavior, att, story, activity] =
         await Promise.all([
-          getDocs("users", first.studentUids || []),
-          getDocs("users", first.parentUids || []),
-          queryDocs(
+          safe(getDocs("users", first.studentUids || []), []),
+          safe(getDocs("users", first.parentUids || []), []),
+          safe(queryDocs(
             "grades",
             [{ field: "classId", op: "==", value: first.id }],
             { field: "createdAt" }
-          ),
-          queryDocs(
+          ), []),
+          safe(queryDocs(
             "behavior_points",
             [{ field: "classId", op: "==", value: first.id }],
             { field: "createdAt", direction: "desc" }
-          ),
-          queryDocs("attendance", [
+          ), []),
+          safe(queryDocs("attendance", [
             { field: "date", op: "==", value: today },
-          ]),
-          queryDocs(
+          ]), []),
+          safe(queryDocs(
             "stories",
             [{ field: "classId", op: "==", value: first.id }],
             { field: "createdAt", direction: "desc" }
-          ),
-          queryDocs(
+          ), []),
+          safe(queryDocs(
             "activities",
             [{ field: "classId", op: "==", value: first.id }],
             { field: "createdAt", direction: "desc" },
             10
-          ),
+          ), []),
         ]);
 
       studentsInFirstClass = students;
@@ -284,33 +293,34 @@ router.get("/teacher/:uid", async (req, res) => {
       // Fetch grades for ALL teacher classes
       const allClassIds = classes.map((c: any) => c.id);
       const gradePromises = allClassIds.map((cid: string) =>
-        queryDocs("grades", [{ field: "classId", op: "==", value: cid }], { field: "createdAt" })
+        safe(queryDocs("grades", [{ field: "classId", op: "==", value: cid }], { field: "createdAt" }), [])
       );
       const gradeArrays = await Promise.all(gradePromises);
       allTeacherGrades = gradeArrays.flat();
     }
 
-    // Fetch test titles for this teacher
-    {
+    try {
       const ttSnap = await db.collection("test_titles")
         .where("teacherUid", "==", uid)
         .orderBy("createdAt", "desc")
         .get();
       testTitles = ttSnap.docs.map(d => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate?.()?.toISOString?.() || null }));
+    } catch (err) {
+      console.warn("Non-fatal: test_titles query failed:", (err as any)?.message);
     }
 
     const [announcements, homework, allStudents] = await Promise.all([
-      fetchShared("announcements_all", () =>
+      safe(fetchShared("announcements_all", () =>
         queryDocs("announcements", [], { field: "createdAt", direction: "desc" }, 25)
-      ),
-      queryDocs(
+      ), []),
+      safe(queryDocs(
         "homework",
         [{ field: "teacherUid", op: "==", value: uid }],
         { field: "createdAt", direction: "desc" }
-      ),
-      fetchShared("all_students", () =>
+      ), []),
+      safe(fetchShared("all_students", () =>
         queryDocs("users", [{ field: "role", op: "==", value: "Student" }], { field: "name" })
-      ),
+      ), []),
     ]);
 
     const result = {
@@ -394,21 +404,21 @@ router.get("/parent/:uid", async (req, res) => {
 
       if (childUid) {
         const [grades, behavior, attendance] = await Promise.all([
-          queryDocs(
+          safe(queryDocs(
             "grades",
             [{ field: "studentUid", op: "==", value: childUid }],
             { field: "createdAt" }
-          ),
-          queryDocs(
+          ), []),
+          safe(queryDocs(
             "behavior_points",
             [{ field: "studentUid", op: "==", value: childUid }],
             { field: "createdAt", direction: "desc" }
-          ),
-          queryDocs(
+          ), []),
+          safe(queryDocs(
             "attendance",
             [{ field: "studentUid", op: "==", value: childUid }],
             { field: "date", direction: "desc" }
-          ),
+          ), []),
         ]);
 
         childrenData.push({
@@ -439,16 +449,16 @@ router.get("/parent/:uid", async (req, res) => {
 
     const [announcements, votes, stories, activity, content] =
       await Promise.all([
-        fetchShared("announcements_all", () =>
+        safe(fetchShared("announcements_all", () =>
           queryDocs("announcements", [], { field: "createdAt", direction: "desc" }, 25)
-        ),
-        fetchShared("votes_active", () =>
+        ), []),
+        safe(fetchShared("votes_active", () =>
           queryDocs("votes", [{ field: "active", op: "==", value: true }], {
             field: "createdAt",
             direction: "desc",
           })
-        ),
-        classIdList.length > 0
+        ), []),
+        safe(classIdList.length > 0
           ? queryDocs(
               "stories",
               [
@@ -460,18 +470,18 @@ router.get("/parent/:uid", async (req, res) => {
               ],
               { field: "createdAt", direction: "desc" }
             )
-          : [],
-        firstChildUid
+          : Promise.resolve([]), []),
+        safe(firstChildUid
           ? queryDocs(
               "activities",
               [{ field: "targetUid", op: "==", value: firstChildUid }],
               { field: "createdAt", direction: "desc" },
               10
             )
-          : [],
-        fetchShared("content_all", () =>
+          : Promise.resolve([]), []),
+        safe(fetchShared("content_all", () =>
           queryDocs("content", [], { field: "createdAt", direction: "desc" })
-        ),
+        ), []),
       ]);
 
     const filteredAnnouncements = (announcements as any[]).filter((a: any) =>

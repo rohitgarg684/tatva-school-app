@@ -1,0 +1,21 @@
+---
+description: Data migration conventions for Firestore and Firebase
+alwaysApply: true
+---
+
+# Data Migrations
+
+All data migrations (Firestore document rewrites, UID remaps, schema changes, backfills, etc.) must be run as **one-time local scripts** — never as part of the deployed codebase.
+
+## Rules
+
+- Create a standalone Node.js script in `server/` (e.g. `server/migrate-xyz.js`)
+- Use `firebase-admin` SDK with local credentials (`GOOGLE_APPLICATION_CREDENTIALS` or gcloud default)
+- Run the script locally with `node migrate-xyz.js`
+- Make the script **idempotent** — safe to run multiple times without duplicating data
+- Log progress clearly so the operator can verify correctness
+- Delete the script after successful execution (do not commit it)
+
+## Why
+
+Embedding migration logic in application code (e.g. inside API endpoints or middleware) creates fragile, hard-to-remove code paths that run on every request. One-time scripts are simpler, auditable, and disposable.
