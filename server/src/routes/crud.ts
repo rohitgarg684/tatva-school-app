@@ -625,4 +625,166 @@ router.get("/schedule/:grade/:section", requireAuth, async (req, res) => {
   }
 });
 
+// ─── Teacher Weekly Calendar ─────────────────────────────────────────────────
+
+router.get(
+  "/teacher-calendar/:uid",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const uid = req.params.uid as string;
+      const weekStart = req.query.weekStart as string; // YYYY-MM-DD
+      const weekEnd = req.query.weekEnd as string; // YYYY-MM-DD
+
+      const userDoc = await getDoc("users", uid);
+      const teacherName = userDoc?.name || "";
+
+      const classSnap = await db
+        .collection("classes")
+        .where("teacherUid", "==", uid)
+        .get();
+      const teacherClasses = classSnap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }));
+
+      const gradeSections = new Set<string>();
+      for (const cls of teacherClasses) {
+        const name = (cls as any).name || "";
+        const match = name.match(/(\d+)\s*[—-]\s*Section\s*(\w+)/i);
+        if (match) gradeSections.add(`${match[1]}_${match[2]}`);
+      }
+
+      const schedulePromises = Array.from(gradeSections).map((gs) => {
+        const [grade, section] = gs.split("_");
+        return db
+          .collection("schedules")
+          .where("grade", "==", grade)
+          .where("section", "==", section)
+          .get();
+      });
+      const schedSnaps = await Promise.all(schedulePromises);
+
+      const classIdSet = new Set(teacherClasses.map((c: any) => c.id));
+      const myPeriods: any[] = [];
+      for (const snap of schedSnaps) {
+        for (const doc of snap.docs) {
+          const data = doc.data();
+          const periods = (data.periods || []) as any[];
+          for (const p of periods) {
+            if (classIdSet.has(p.classId) || p.teacherName === teacherName) {
+              myPeriods.push({
+                dayOfWeek: data.dayOfWeek,
+                grade: data.grade,
+                section: data.section,
+                ...p,
+              });
+            }
+          }
+        }
+      }
+
+      let events: any[] = [];
+      if (weekStart && weekEnd) {
+        const evSnap = await db
+          .collection("schedule_events")
+          .where("date", ">=", weekStart)
+          .where("date", "<=", weekEnd)
+          .get();
+        events = evSnap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            ...data,
+            createdAt: data.createdAt?.toDate?.()?.toISOString?.() || null,
+          };
+        });
+      }
+
+      res.json({ periods: myPeriods, events });
+    } catch (err: any) {
+      console.error("teacher-calendar error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
+// ─── Schedule Events (Special Days) ─────────────────────────────────────────
+
+router.post(
+  "/schedule-event",
+  requireRole("Teacher", "Principal"),
+  async (req, res) => {
+    try {
+      const { title, description, date, startTime, endTime, type, affectedGrades, cancelsRegularSchedule } =
+        req.body;
+      if (!title || !date)
+        return res.status(400).json({ error: "title, date required" });
+
+      const ref = await db.collection("schedule_events").add({
+        title,
+        description: description || "",
+        date,
+        startTime: startTime || "",
+        endTime: endTime || "",
+        type: type || "event",
+        createdBy: req.uid,
+        affectedGrades: Array.isArray(affectedGrades) ? affectedGrades : [],
+        cancelsRegularSchedule: cancelsRegularSchedule === true,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+
+      cacheDeletePrefix("teacher_dash_");
+      res.json({ id: ref.id, created: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
+router.delete(
+  "/schedule-event/:id",
+  requireRole("Teacher", "Principal"),
+  async (req, res) => {
+    try {
+      const docId = req.params.id as string;
+      const ref = db.collection("schedule_events").doc(docId);
+      const snap = await ref.get();
+      if (!snap.exists) return res.status(404).json({ error: "Not found" });
+      await ref.delete();
+      res.json({ deleted: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
+router.get("/schedule-events", requireAuth, async (req, res) => {
+  try {
+    const start = req.query.start as string;
+    const end = req.query.end as string;
+    if (!start || !end)
+      return res.status(400).json({ error: "start, end required" });
+
+    const snap = await db
+      .collection("schedule_events")
+      .where("date", ">=", start)
+      .where("date", "<=", end)
+      .orderBy("date", "asc")
+      .get();
+
+    const events = snap.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        createdAt: data.createdAt?.toDate?.()?.toISOString?.() || null,
+      };
+    });
+    res.json({ events });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

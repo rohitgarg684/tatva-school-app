@@ -26,6 +26,7 @@ import '../../models/attendance_record.dart';
 import '../../models/attendance_status.dart';
 import '../../models/story_post.dart';
 import '../../models/schedule_model.dart';
+import '../../models/schedule_event.dart';
 import '../../models/activity_event.dart';
 
 class TeacherDashboard extends StatefulWidget {
@@ -75,6 +76,14 @@ class _TeacherDashboardState extends State<TeacherDashboard>
   int _tSchedDay = 0;
   String _tSchedSelectedGS = '';
   String _storySelectedClassId = '';
+
+  // ── MY WEEK CALENDAR STATE
+  int _schedViewMode = 0; // 0=My Week, 1=Edit Timetable
+  List<Map<String, dynamic>> _calPeriods = [];
+  List<Map<String, dynamic>> _calEvents = [];
+  bool _calLoading = false;
+  bool _calLoaded = false;
+  DateTime _calWeekStart = DateTime.now();
 
   @override
   void initState() {
@@ -1943,7 +1952,481 @@ class _TeacherDashboardState extends State<TeacherDashboard>
     if (mounted) setState(() { _tSchedLoading = false; _tSchedLoaded = true; });
   }
 
+  String _dateStr(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  DateTime _mondayOf(DateTime d) =>
+      DateTime(d.year, d.month, d.day - (d.weekday - 1));
+
+  void _loadCalendar() async {
+    if (_calLoading) return;
+    setState(() => _calLoading = true);
+    final ws = _mondayOf(_calWeekStart);
+    final we = ws.add(const Duration(days: 4));
+    try {
+      final data = await _api.getTeacherCalendar(
+          _uid, _dateStr(ws), _dateStr(we));
+      _calPeriods =
+          (data['periods'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      _calEvents =
+          (data['events'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    } catch (e) {
+      debugPrint('Calendar load error: $e');
+      _calPeriods = [];
+      _calEvents = [];
+    }
+    if (mounted) setState(() { _calLoading = false; _calLoaded = true; });
+  }
+
   Widget _buildScheduleTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const SizedBox(height: 8),
+        FadeSlideIn(
+            child: const Text('Schedule',
+                style: TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: textDark,
+                    letterSpacing: -0.8))),
+        const SizedBox(height: 12),
+        // View mode toggle
+        Container(
+          decoration: BoxDecoration(
+              color: bg, borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.all(3),
+          child: Row(children: [
+            _schedModeBtn('My Week', 0),
+            _schedModeBtn('Edit Timetable', 1),
+          ]),
+        ),
+        const SizedBox(height: 16),
+        if (_schedViewMode == 0)
+          _buildMyWeekCalendar()
+        else
+          _buildTimetableEditor(),
+      ]),
+    );
+  }
+
+  Widget _schedModeBtn(String label, int mode) => Expanded(
+        child: GestureDetector(
+          onTap: () => setState(() => _schedViewMode = mode),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+                color: _schedViewMode == mode ? primary : Colors.transparent,
+                borderRadius: BorderRadius.circular(10)),
+            child: Center(
+                child: Text(label,
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _schedViewMode == mode
+                            ? Colors.white
+                            : textLight))),
+          ),
+        ),
+      );
+
+  // ─── MY WEEK CALENDAR (Outlook-style) ─────────────────────────────────────
+
+  Widget _buildMyWeekCalendar() {
+    if (!_calLoaded && !_calLoading) {
+      _calWeekStart = _mondayOf(DateTime.now());
+      Future.microtask(_loadCalendar);
+    }
+
+    final ws = _mondayOf(_calWeekStart);
+    final weekLabel =
+        '${_monthName(ws.month)} ${ws.day} — ${_monthName(ws.add(const Duration(days: 4)).month)} ${ws.add(const Duration(days: 4)).day}';
+
+    // Build time grid: 8am–4pm
+    const startHour = 8;
+    const endHour = 16;
+    const hourHeight = 60.0;
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      // Week navigation
+      Row(children: [
+        GestureDetector(
+          onTap: () {
+            _calWeekStart = ws.subtract(const Duration(days: 7));
+            _calLoaded = false;
+            _loadCalendar();
+          },
+          child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                  color: bgCard,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade200)),
+              child: Icon(Icons.chevron_left_rounded,
+                  size: 20, color: textLight)),
+        ),
+        Expanded(
+            child: Center(
+                child: Text(weekLabel,
+                    style: const TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: textDark)))),
+        GestureDetector(
+          onTap: () {
+            _calWeekStart = ws.add(const Duration(days: 7));
+            _calLoaded = false;
+            _loadCalendar();
+          },
+          child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                  color: bgCard,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade200)),
+              child: Icon(Icons.chevron_right_rounded,
+                  size: 20, color: textLight)),
+        ),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: () {
+            _calWeekStart = _mondayOf(DateTime.now());
+            _calLoaded = false;
+            _loadCalendar();
+          },
+          child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                  color: primary.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8)),
+              child: Text('Today',
+                  style: TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: primary))),
+        ),
+      ]),
+      const SizedBox(height: 12),
+      // Events banner
+      if (_calEvents.isNotEmpty)
+        ..._calEvents.map((ev) {
+          final evDate = ev['date'] as String? ?? '';
+          final evTitle = ev['title'] as String? ?? '';
+          final evType = ev['type'] as String? ?? 'event';
+          final cancels = ev['cancelsRegularSchedule'] == true;
+          final c = evType == 'holiday'
+              ? danger
+              : evType == 'ptm'
+                  ? purple
+                  : accent;
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+                color: c.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: c.withOpacity(0.2))),
+            child: Row(children: [
+              Icon(
+                  evType == 'holiday'
+                      ? Icons.wb_sunny_outlined
+                      : evType == 'ptm'
+                          ? Icons.people_outline
+                          : Icons.event_outlined,
+                  size: 16,
+                  color: c),
+              const SizedBox(width: 8),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(evTitle,
+                        style: TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: c)),
+                    Text(
+                        '${evDate}${cancels ? ' · Regular schedule cancelled' : ''}',
+                        style: const TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 10,
+                            color: textLight)),
+                  ])),
+              GestureDetector(
+                onTap: () async {
+                  final id = ev['id'] as String? ?? '';
+                  if (id.isEmpty) return;
+                  await _api.deleteScheduleEvent(id);
+                  _calLoaded = false;
+                  _loadCalendar();
+                },
+                child: Icon(Icons.close_rounded, size: 16, color: textLight),
+              ),
+            ]),
+          );
+        }),
+      // Add event button
+      GestureDetector(
+        onTap: () => _showAddEventSheet(ws),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+              color: accent.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: accent.withOpacity(0.15))),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.add_rounded, size: 16, color: accent),
+            const SizedBox(width: 4),
+            Text('Add Special Event',
+                style: TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: accent)),
+          ]),
+        ),
+      ),
+      const SizedBox(height: 12),
+      if (_calLoading && !_calLoaded)
+        const Center(
+            child: Padding(
+                padding: EdgeInsets.all(32),
+                child: CircularProgressIndicator(strokeWidth: 2)))
+      else
+        // Outlook-style week grid
+        SizedBox(
+          height: (endHour - startHour) * hourHeight + 36,
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // Time gutter
+            SizedBox(
+              width: 40,
+              child: Column(children: [
+                const SizedBox(height: 36),
+                ...List.generate(endHour - startHour, (i) => SizedBox(
+                      height: hourHeight,
+                      child: Align(
+                          alignment: Alignment.topRight,
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: Text(
+                                '${(startHour + i).toString().padLeft(2, '0')}:00',
+                                style: const TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 9,
+                                    color: textLight)),
+                          )),
+                    )),
+              ]),
+            ),
+            // Day columns
+            ...List.generate(5, (dayIdx) {
+              final day = dayIdx + 1;
+              final dateOfDay = ws.add(Duration(days: dayIdx));
+              final isToday = _dateStr(dateOfDay) == _dateStr(DateTime.now());
+
+              final dayPeriods = _calPeriods
+                  .where((p) => (p['dayOfWeek'] as num?)?.toInt() == day)
+                  .toList();
+
+              // Check if events cancel this day
+              final dayCancelled = _calEvents.any((ev) =>
+                  ev['date'] == _dateStr(dateOfDay) &&
+                  ev['cancelsRegularSchedule'] == true);
+
+              return Expanded(
+                child: Column(children: [
+                  // Day header
+                  Container(
+                    height: 36,
+                    decoration: BoxDecoration(
+                        color: isToday
+                            ? primary.withOpacity(0.08)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(6)),
+                    child: Center(
+                        child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                          Text(ScheduleModel.dayNames[day],
+                              style: TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: isToday ? primary : textLight)),
+                          Text('${dateOfDay.day}',
+                              style: TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: isToday ? primary : textDark)),
+                        ])),
+                  ),
+                  // Time grid
+                  Container(
+                    height: (endHour - startHour) * hourHeight,
+                    decoration: BoxDecoration(
+                        border: Border(
+                            left: BorderSide(
+                                color: Colors.grey.shade100, width: 0.5))),
+                    child: Stack(children: [
+                      // Hour gridlines
+                      ...List.generate(
+                          endHour - startHour,
+                          (i) => Positioned(
+                                top: i * hourHeight,
+                                left: 0,
+                                right: 0,
+                                child: Container(
+                                    height: 0.5,
+                                    color: Colors.grey.shade100),
+                              )),
+                      if (dayCancelled)
+                        Positioned.fill(
+                          child: Container(
+                            decoration: BoxDecoration(
+                                color: danger.withOpacity(0.03)),
+                            child: Center(
+                                child: Text('Cancelled',
+                                    style: TextStyle(
+                                        fontFamily: 'Raleway',
+                                        fontSize: 10,
+                                        color: danger.withOpacity(0.3)))),
+                          ),
+                        )
+                      else
+                        // Period blocks
+                        ...dayPeriods.map((p) {
+                          final st = p['startTime'] as String? ?? '08:00';
+                          final et = p['endTime'] as String? ?? '08:45';
+                          final subj = p['subject'] as String? ?? '';
+                          final grade = p['grade'] as String? ?? '';
+                          final section = p['section'] as String? ?? '';
+
+                          final stParts = st.split(':');
+                          final etParts = et.split(':');
+                          final stMin = (int.tryParse(stParts[0]) ?? startHour) * 60 +
+                              (stParts.length > 1
+                                  ? int.tryParse(stParts[1]) ?? 0
+                                  : 0);
+                          final etMin = (int.tryParse(etParts[0]) ?? startHour) * 60 +
+                              (etParts.length > 1
+                                  ? int.tryParse(etParts[1]) ?? 0
+                                  : 0);
+                          final top =
+                              (stMin - startHour * 60) * hourHeight / 60;
+                          final height =
+                              (etMin - stMin) * hourHeight / 60;
+
+                          final colors = [
+                            primary, info, accent, purple, success
+                          ];
+                          final c =
+                              colors[subj.hashCode.abs() % colors.length];
+
+                          return Positioned(
+                            top: top.clamp(0, double.infinity),
+                            left: 1,
+                            right: 1,
+                            height: height.clamp(20, double.infinity),
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(
+                                  horizontal: 1, vertical: 0.5),
+                              padding: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                  color: c.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border:
+                                      Border.all(color: c.withOpacity(0.3))),
+                              child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(subj,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                            fontFamily: 'Raleway',
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                            color: c)),
+                                    if (height > 28)
+                                      Text('$grade-$section',
+                                          style: TextStyle(
+                                              fontFamily: 'Raleway',
+                                              fontSize: 8,
+                                              color: c.withOpacity(0.7))),
+                                  ]),
+                            ),
+                          );
+                        }),
+                      // Event blocks
+                      ..._calEvents
+                          .where((ev) =>
+                              ev['date'] == _dateStr(dateOfDay) &&
+                              (ev['startTime'] as String? ?? '').isNotEmpty)
+                          .map((ev) {
+                        final st = ev['startTime'] as String? ?? '09:00';
+                        final et = ev['endTime'] as String? ?? '10:00';
+                        final stParts = st.split(':');
+                        final etParts = et.split(':');
+                        final stMin = (int.tryParse(stParts[0]) ?? 9) * 60 +
+                            (stParts.length > 1
+                                ? int.tryParse(stParts[1]) ?? 0
+                                : 0);
+                        final etMin = (int.tryParse(etParts[0]) ?? 10) * 60 +
+                            (etParts.length > 1
+                                ? int.tryParse(etParts[1]) ?? 0
+                                : 0);
+                        final top =
+                            (stMin - startHour * 60) * hourHeight / 60;
+                        final height = (etMin - stMin) * hourHeight / 60;
+                        return Positioned(
+                          top: top.clamp(0, double.infinity),
+                          left: 1,
+                          right: 1,
+                          height: height.clamp(20, double.infinity),
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(
+                                horizontal: 1, vertical: 0.5),
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                                color: accent.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                    color: accent.withOpacity(0.4),
+                                    width: 1.5)),
+                            child: Text(
+                                ev['title'] as String? ?? '',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: accent)),
+                          ),
+                        );
+                      }),
+                    ]),
+                  ),
+                ]),
+              );
+            }),
+          ]),
+        ),
+      const SizedBox(height: 24),
+    ]);
+  }
+
+  // ─── TIMETABLE EDITOR (existing) ──────────────────────────────────────────
+
+  Widget _buildTimetableEditor() {
     if (!_tSchedLoaded && !_tSchedLoading) {
       _tSchedDay = DateTime.now().weekday.clamp(1, 5);
       Future.microtask(_loadTeacherSchedule);
@@ -1959,137 +2442,428 @@ class _TeacherDashboardState extends State<TeacherDashboard>
         .toList();
     final periods = daySchedule.isNotEmpty ? daySchedule.first.periods : <PeriodSlot>[];
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const SizedBox(height: 8),
-        FadeSlideIn(
-            child: const Text('Class Schedule',
-                style: TextStyle(
-                    fontFamily: 'Raleway',
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: textDark,
-                    letterSpacing: -0.8))),
-        const SizedBox(height: 4),
-        FadeSlideIn(
-            delayMs: 60,
-            child: const Text('Define weekly timetable for each grade',
-                style: TextStyle(
-                    fontFamily: 'Raleway', fontSize: 13, color: textLight))),
-        const SizedBox(height: 16),
-        if (gradeSections.length > 1)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-                color: bgCard,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200)),
-            child: DropdownButton<String>(
-              value: _tSchedSelectedGS,
-              isExpanded: true,
-              underline: const SizedBox.shrink(),
-              style: const TextStyle(
-                  fontFamily: 'Raleway', fontSize: 14, color: textDark),
-              items: gradeSections
-                  .map((gs) => DropdownMenuItem(value: gs, child: Text(gs)))
-                  .toList(),
-              onChanged: (v) {
-                if (v != null) {
-                  _tSchedSelectedGS = v;
-                  _tSchedLoaded = false;
-                  _loadTeacherSchedule();
-                }
-              },
-            ),
-          ),
-        const SizedBox(height: 16),
-        Row(
-          children: List.generate(5, (i) {
-            final day = i + 1;
-            final isActive = day == _tSchedDay;
-            return Expanded(
-              child: GestureDetector(
-                onTap: () => setState(() => _tSchedDay = day),
-                child: Container(
-                  margin: EdgeInsets.only(right: i < 4 ? 6 : 0),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                      color: isActive ? primary : bgCard,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                          color: isActive
-                              ? primary
-                              : Colors.grey.shade200)),
-                  child: Center(
-                      child: Text(ScheduleModel.dayNames[day],
-                          style: TextStyle(
-                              fontFamily: 'Raleway',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: isActive
-                                  ? Colors.white
-                                  : textLight))),
-                ),
-              ),
-            );
-          }),
-        ),
-        const SizedBox(height: 16),
-        if (_tSchedLoading && !_tSchedLoaded)
-          const Center(child: CircularProgressIndicator())
-        else ...[
-          ...List.generate(
-            periods.isEmpty ? 6 : periods.length,
-            (i) {
-              final slot = i < periods.length
-                  ? periods[i]
-                  : PeriodSlot(
-                      period: i + 1,
-                      startTime: _defaultStartTime(i),
-                      endTime: _defaultEndTime(i),
-                    );
-              return _periodSlotCard(slot, i, _tSchedDay, _tSchedSelectedGS, gsMap,
-                  periods);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('Edit timetable for a specific grade',
+          style: TextStyle(
+              fontFamily: 'Raleway', fontSize: 13, color: textLight)),
+      const SizedBox(height: 12),
+      if (gradeSections.length > 1)
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+              color: bgCard,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade200)),
+          child: DropdownButton<String>(
+            value: _tSchedSelectedGS,
+            isExpanded: true,
+            underline: const SizedBox.shrink(),
+            dropdownColor: Colors.white,
+            style: const TextStyle(
+                fontFamily: 'Raleway', fontSize: 14, color: textDark),
+            items: gradeSections
+                .map((gs) => DropdownMenuItem(
+                    value: gs,
+                    child: Text(gs,
+                        style: const TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 14,
+                            color: textDark))))
+                .toList(),
+            onChanged: (v) {
+              if (v != null) {
+                _tSchedSelectedGS = v;
+                _tSchedLoaded = false;
+                _loadTeacherSchedule();
+              }
             },
           ),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  final newPeriod = PeriodSlot(
-                    period: periods.length + 1,
-                    startTime: _defaultStartTime(periods.length),
-                    endTime: _defaultEndTime(periods.length),
-                  );
-                  final updated = [...periods, newPeriod];
-                  _saveScheduleDay(
-                      gsMap[_tSchedSelectedGS]!, _tSchedDay, updated);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                      color: info.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: info.withOpacity(0.2))),
-                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Icon(Icons.add_rounded, color: info, size: 18),
-                    const SizedBox(width: 6),
-                    Text('Add Period',
+        ),
+      const SizedBox(height: 16),
+      Row(
+        children: List.generate(5, (i) {
+          final day = i + 1;
+          final isActive = day == _tSchedDay;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _tSchedDay = day),
+              child: Container(
+                margin: EdgeInsets.only(right: i < 4 ? 6 : 0),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                    color: isActive ? primary : bgCard,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: isActive ? primary : Colors.grey.shade200)),
+                child: Center(
+                    child: Text(ScheduleModel.dayNames[day],
                         style: TextStyle(
                             fontFamily: 'Raleway',
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: info)),
-                  ]),
-                ),
+                            color: isActive ? Colors.white : textLight))),
               ),
             ),
-          ]),
-        ],
-        const SizedBox(height: 24),
-      ]),
+          );
+        }),
+      ),
+      const SizedBox(height: 16),
+      if (_tSchedLoading && !_tSchedLoaded)
+        const Center(child: CircularProgressIndicator())
+      else ...[
+        ...List.generate(
+          periods.isEmpty ? 6 : periods.length,
+          (i) {
+            final slot = i < periods.length
+                ? periods[i]
+                : PeriodSlot(
+                    period: i + 1,
+                    startTime: _defaultStartTime(i),
+                    endTime: _defaultEndTime(i),
+                  );
+            return _periodSlotCard(slot, i, _tSchedDay, _tSchedSelectedGS, gsMap,
+                periods);
+          },
+        ),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                final newPeriod = PeriodSlot(
+                  period: periods.length + 1,
+                  startTime: _defaultStartTime(periods.length),
+                  endTime: _defaultEndTime(periods.length),
+                );
+                final updated = [...periods, newPeriod];
+                _saveScheduleDay(
+                    gsMap[_tSchedSelectedGS]!, _tSchedDay, updated);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                    color: info.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: info.withOpacity(0.2))),
+                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Icon(Icons.add_rounded, color: info, size: 18),
+                  const SizedBox(width: 6),
+                  Text('Add Period',
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: info)),
+                ]),
+              ),
+            ),
+          ),
+        ]),
+      ],
+      const SizedBox(height: 24),
+    ]);
+  }
+
+  void _showAddEventSheet(DateTime weekStart) {
+    final titleCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    DateTime selectedDate = DateTime.now();
+    String startTime = '09:00';
+    String endTime = '10:00';
+    String eventType = 'event';
+    bool cancels = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setModal) => Padding(
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+                color: bgCard,
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(28))),
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                      child: Container(
+                          width: 36,
+                          height: 3,
+                          decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(2)))),
+                  const SizedBox(height: 16),
+                  const Text('Add Special Event',
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: textDark)),
+                  const SizedBox(height: 16),
+                  // Event type
+                  const Text('Type',
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: textLight)),
+                  const SizedBox(height: 6),
+                  Wrap(spacing: 8, runSpacing: 6, children: [
+                    _eventTypeChip('event', 'Special Event', Icons.event_outlined,
+                        accent, eventType, (v) => setModal(() => eventType = v)),
+                    _eventTypeChip('ptm', 'PTM', Icons.people_outline,
+                        purple, eventType, (v) => setModal(() => eventType = v)),
+                    _eventTypeChip('holiday', 'Holiday', Icons.wb_sunny_outlined,
+                        danger, eventType, (v) => setModal(() => eventType = v)),
+                    _eventTypeChip('override', 'Override', Icons.swap_horiz_rounded,
+                        info, eventType, (v) => setModal(() => eventType = v)),
+                  ]),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: titleCtrl,
+                    style: const TextStyle(
+                        fontFamily: 'Raleway', fontSize: 14, color: textDark),
+                    decoration: _hwFieldDecor('Event title'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: descCtrl,
+                    maxLines: 2,
+                    style: const TextStyle(
+                        fontFamily: 'Raleway', fontSize: 14, color: textDark),
+                    decoration: _hwFieldDecor('Description (optional)'),
+                  ),
+                  const SizedBox(height: 10),
+                  // Date picker
+                  GestureDetector(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate:
+                            DateTime.now().subtract(const Duration(days: 30)),
+                        lastDate:
+                            DateTime.now().add(const Duration(days: 365)),
+                        builder: (ctx2, child) => Theme(
+                          data: Theme.of(ctx2).copyWith(
+                              colorScheme:
+                                  ColorScheme.light(primary: accent)),
+                          child: child!,
+                        ),
+                      );
+                      if (picked != null) {
+                        setModal(() => selectedDate = picked);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 14),
+                      decoration: BoxDecoration(
+                          color: bg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade200)),
+                      child: Row(children: [
+                        Icon(Icons.calendar_today_rounded,
+                            size: 16, color: textLight),
+                        const SizedBox(width: 8),
+                        Text(_dateStr(selectedDate),
+                            style: const TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 14,
+                                color: textDark)),
+                      ]),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  // Time range
+                  Row(children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final t = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay(
+                                hour: int.tryParse(startTime.split(':')[0]) ?? 9,
+                                minute: int.tryParse(startTime.split(':')[1]) ?? 0),
+                          );
+                          if (t != null) {
+                            setModal(() => startTime =
+                                '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}');
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 14),
+                          decoration: BoxDecoration(
+                              color: bg,
+                              borderRadius: BorderRadius.circular(12),
+                              border:
+                                  Border.all(color: Colors.grey.shade200)),
+                          child: Row(children: [
+                            Icon(Icons.schedule_rounded,
+                                size: 14, color: textLight),
+                            const SizedBox(width: 6),
+                            Text(startTime,
+                                style: const TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 14,
+                                    color: textDark)),
+                          ]),
+                        ),
+                      ),
+                    ),
+                    const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: Text('—',
+                            style: TextStyle(color: textLight))),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final t = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay(
+                                hour: int.tryParse(endTime.split(':')[0]) ?? 10,
+                                minute: int.tryParse(endTime.split(':')[1]) ?? 0),
+                          );
+                          if (t != null) {
+                            setModal(() => endTime =
+                                '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}');
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 14),
+                          decoration: BoxDecoration(
+                              color: bg,
+                              borderRadius: BorderRadius.circular(12),
+                              border:
+                                  Border.all(color: Colors.grey.shade200)),
+                          child: Row(children: [
+                            Icon(Icons.schedule_rounded,
+                                size: 14, color: textLight),
+                            const SizedBox(width: 6),
+                            Text(endTime,
+                                style: const TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 14,
+                                    color: textDark)),
+                          ]),
+                        ),
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(height: 10),
+                  // Cancels regular schedule toggle
+                  GestureDetector(
+                    onTap: () => setModal(() => cancels = !cancels),
+                    child: Row(children: [
+                      Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                            color: cancels
+                                ? danger
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                                color: cancels
+                                    ? danger
+                                    : Colors.grey.shade300)),
+                        child: cancels
+                            ? const Icon(Icons.check_rounded,
+                                size: 14, color: Colors.white)
+                            : null,
+                      ),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                          child: Text(
+                              'Cancels regular classes for the day',
+                              style: TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 13,
+                                  color: textDark))),
+                    ]),
+                  ),
+                  const SizedBox(height: 20),
+                  GestureDetector(
+                    onTap: () async {
+                      final title = titleCtrl.text.trim();
+                      if (title.isEmpty) return;
+                      await _api.createScheduleEvent(
+                        title: title,
+                        date: _dateStr(selectedDate),
+                        description: descCtrl.text.trim(),
+                        startTime: startTime,
+                        endTime: endTime,
+                        type: eventType,
+                        cancelsRegularSchedule: cancels,
+                      );
+                      if (!context.mounted) return;
+                      Navigator.pop(context);
+                      _calLoaded = false;
+                      _loadCalendar();
+                      _snack('Event added!');
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      height: 50,
+                      decoration: BoxDecoration(
+                          color: accent,
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                                color: accent.withOpacity(0.35),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4))
+                          ]),
+                      child: const Center(
+                          child: Text('Add Event',
+                              style: TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white))),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _eventTypeChip(String type, String label, IconData icon, Color c,
+      String current, ValueChanged<String> onTap) {
+    final active = type == current;
+    return GestureDetector(
+      onTap: () => onTap(type),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+            color: active ? c.withOpacity(0.12) : bgCard,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+                color: active ? c : Colors.grey.shade200, width: active ? 1.5 : 1)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 14, color: active ? c : textLight),
+          const SizedBox(width: 4),
+          Text(label,
+              style: TextStyle(
+                  fontFamily: 'Raleway',
+                  fontSize: 12,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                  color: active ? c : textLight)),
+        ]),
+      ),
     );
   }
 

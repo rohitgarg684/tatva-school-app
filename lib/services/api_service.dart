@@ -445,4 +445,42 @@ class ApiService {
         'dayOfWeek': dayOfWeek,
         'periods': periods,
       });
+
+  // ─── Teacher Calendar ─────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getTeacherCalendar(
+      String uid, String weekStart, String weekEnd) =>
+      _get('/teacher-calendar/$uid?weekStart=$weekStart&weekEnd=$weekEnd');
+
+  // ─── Schedule Events ──────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> createScheduleEvent({
+    required String title,
+    required String date,
+    String description = '',
+    String startTime = '',
+    String endTime = '',
+    String type = 'event',
+    List<String> affectedGrades = const [],
+    bool cancelsRegularSchedule = false,
+  }) =>
+      _post('/schedule-event', {
+        'title': title,
+        'date': date,
+        'description': description,
+        'startTime': startTime,
+        'endTime': endTime,
+        'type': type,
+        'affectedGrades': affectedGrades,
+        'cancelsRegularSchedule': cancelsRegularSchedule,
+      });
+
+  Future<Map<String, dynamic>> deleteScheduleEvent(String id) =>
+      _delete('/schedule-event/$id');
+
+  Future<List<Map<String, dynamic>>> getScheduleEvents(
+      String start, String end) async {
+    final data = await _get('/schedule-events?start=$start&end=$end');
+    return (data['events'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+  }
 }
