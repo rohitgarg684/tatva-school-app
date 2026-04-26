@@ -242,15 +242,12 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
       );
 
   void _showNewAnnouncement() {
-    final fromClasses = (_data?.allClasses ?? [])
+    final grades = (_data?.allClasses ?? [])
         .map((c) => c.grade)
         .where((g) => g.isNotEmpty)
         .toSet()
         .toList()
       ..sort();
-    final grades = fromClasses.isEmpty
-        ? List.generate(12, (i) => '${i + 1}')
-        : fromClasses;
     NewAnnouncementSheet.show(
       context,
       api: _api,

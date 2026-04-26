@@ -15,7 +15,7 @@ router.post(
   "/class",
   requireRole("Teacher", "Principal"),
   asyncHandler(async (req, res) => {
-    const { name, subject, classCode } = req.body;
+    const { name, subject, classCode, grade, section } = req.body;
     if (!name || !subject || !classCode)
       return res.status(400).json({ error: "name, subject, classCode required" });
 
@@ -31,6 +31,8 @@ router.post(
 
     const ref = await db.collection(Collections.CLASSES).add({
       name, subject, classCode,
+      grade: grade || "",
+      section: section || "",
       teacherUid: uid,
       teacherName,
       teacherEmail,

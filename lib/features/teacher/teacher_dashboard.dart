@@ -297,13 +297,12 @@ class _TeacherDashboardState extends State<TeacherDashboard>
   }
 
   List<String> get _availableGrades {
-    final fromClasses = (_data?.classes ?? [])
+    return (_data?.classes ?? [])
         .map((c) => c.grade)
         .where((g) => g.isNotEmpty)
         .toSet()
         .toList()
       ..sort();
-    return fromClasses.isEmpty ? List.generate(12, (i) => '${i + 1}') : fromClasses;
   }
 
   void _showNewAnnouncement() {
