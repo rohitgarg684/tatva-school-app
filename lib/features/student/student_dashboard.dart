@@ -1,5 +1,7 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../shared/animations/animations.dart';
 import '../../shared/theme/colors.dart';
 import '../../shared/widgets/logout_sheet.dart';
@@ -1780,49 +1782,320 @@ class _StudentDashboardState extends State<StudentDashboard>
                         fontFamily: 'Raleway', fontSize: 11, color: textLight)),
               ]),
               const SizedBox(height: 12),
-              GestureDetector(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  setState(() {
-                    if (isDone) {
-                      _completedIds.remove(hw.id);
-                    } else {
-                      _completedIds.add(hw.id);
-                      _api.submitHomework(hw.id);
-                    }
-                  });
-                  if (!isDone) _snack('Marked as done! Great work 🎉');
-                },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                      color: isDone
-                          ? Colors.grey.shade50
-                          : color.withOpacity(0.07),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                          color: isDone
-                              ? Colors.grey.shade200
-                              : color.withOpacity(0.2))),
-                  child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(isDone ? Icons.undo_rounded : Icons.check_rounded,
-                            size: 16, color: isDone ? textLight : color),
-                        const SizedBox(width: 6),
-                        Text(isDone ? 'Mark as Incomplete' : 'Mark as Done',
-                            style: TextStyle(
-                                fontFamily: 'Raleway',
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: isDone ? textLight : color)),
-                      ]),
+              if (!isDone)
+                Row(children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _showSubmitWorkSheet(hw, color),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                            color: color.withOpacity(0.07),
+                            borderRadius: BorderRadius.circular(10),
+                            border:
+                                Border.all(color: color.withOpacity(0.2))),
+                        child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.upload_file_rounded,
+                                  size: 16, color: color),
+                              const SizedBox(width: 6),
+                              Text('Submit Work',
+                                  style: TextStyle(
+                                      fontFamily: 'Raleway',
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: color)),
+                            ]),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      setState(() {
+                        _completedIds.add(hw.id);
+                        _api.submitHomework(hw.id);
+                      });
+                      _snack('Marked as done! 🎉');
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 12, horizontal: 16),
+                      decoration: BoxDecoration(
+                          color: success.withOpacity(0.07),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: success.withOpacity(0.2))),
+                      child: Icon(Icons.check_rounded,
+                          size: 16, color: success),
+                    ),
+                  ),
+                ])
+              else
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    setState(() => _completedIds.remove(hw.id));
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.grey.shade200)),
+                    child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.undo_rounded,
+                              size: 16, color: textLight),
+                          const SizedBox(width: 6),
+                          Text('Mark as Incomplete',
+                              style: TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: textLight)),
+                        ]),
+                  ),
                 ),
-              ),
             ]),
           ),
         ]),
+      ),
+    );
+  }
+
+  void _showSubmitWorkSheet(HomeworkModel hw, Color color) {
+    final noteCtrl = TextEditingController();
+    final pickedFiles = <MapEntry<String, Uint8List>>[];
+    bool isSubmitting = false;
+
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setModal) => Padding(
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+                color: bgCard,
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(28))),
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                      child: Container(
+                          width: 36,
+                          height: 3,
+                          decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(2)))),
+                  const SizedBox(height: 16),
+                  Text('Submit: ${hw.title}',
+                      style: const TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: textDark)),
+                  Text('${hw.subject} · ${hw.className}',
+                      style: const TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 12,
+                          color: textLight)),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: noteCtrl,
+                    maxLines: 3,
+                    style: const TextStyle(
+                        fontFamily: 'Raleway', fontSize: 14, color: textDark),
+                    decoration: InputDecoration(
+                      hintText: 'Add a note (optional)...',
+                      hintStyle: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 13,
+                          color: Colors.grey.shade400),
+                      filled: true,
+                      fillColor: bg,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 14),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              BorderSide(color: Colors.grey.shade200)),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                              color: color.withOpacity(0.5), width: 1.5)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Attach Files',
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: textLight)),
+                  const SizedBox(height: 8),
+                  ...pickedFiles.asMap().entries.map((e) {
+                    final f = e.value;
+                    final ext =
+                        f.key.split('.').last.toLowerCase();
+                    final isImg =
+                        ['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext);
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                          color:
+                              (isImg ? info : danger).withOpacity(0.04),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: (isImg ? info : danger)
+                                  .withOpacity(0.15))),
+                      child: Row(children: [
+                        Icon(
+                            isImg
+                                ? Icons.image_rounded
+                                : Icons.picture_as_pdf_rounded,
+                            size: 16,
+                            color: isImg ? info : danger),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(f.key,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: isImg ? info : danger)),
+                        ),
+                        Text(
+                            '${(f.value.length / 1024).toStringAsFixed(0)} KB',
+                            style: const TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 10,
+                                color: textLight)),
+                        const SizedBox(width: 6),
+                        GestureDetector(
+                          onTap: () =>
+                              setModal(() => pickedFiles.removeAt(e.key)),
+                          child: Icon(Icons.close_rounded,
+                              size: 16, color: textLight),
+                        ),
+                      ]),
+                    );
+                  }),
+                  GestureDetector(
+                    onTap: () async {
+                      final result = await FilePicker.platform.pickFiles(
+                        allowMultiple: true,
+                        type: FileType.custom,
+                        allowedExtensions: [
+                          'pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp',
+                          'docx', 'xlsx', 'pptx'
+                        ],
+                        withData: true,
+                      );
+                      if (result == null) return;
+                      setModal(() {
+                        for (final f in result.files) {
+                          if (f.bytes != null) {
+                            pickedFiles
+                                .add(MapEntry(f.name, f.bytes!));
+                          }
+                        }
+                      });
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                          color: color.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: color.withOpacity(0.2))),
+                      child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.upload_file_rounded,
+                                size: 16, color: color),
+                            const SizedBox(width: 6),
+                            Text('Choose Files',
+                                style: TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: color)),
+                          ]),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  GestureDetector(
+                    onTap: isSubmitting
+                        ? null
+                        : () async {
+                            setModal(() => isSubmitting = true);
+                            final resp = await _api.submitHomeworkFiles(
+                              hw.id,
+                              pickedFiles,
+                              note: noteCtrl.text.trim(),
+                            );
+                            if (!context.mounted) return;
+                            Navigator.pop(context);
+                            if (resp['error'] == null) {
+                              setState(() => _completedIds.add(hw.id));
+                              _snack('Submitted! 🎉');
+                            } else {
+                              _snack('Failed to submit');
+                            }
+                          },
+                    child: Container(
+                      width: double.infinity,
+                      height: 50,
+                      decoration: BoxDecoration(
+                          color: color,
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                                color: color.withOpacity(0.35),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4))
+                          ]),
+                      child: Center(
+                          child: isSubmitting
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: Colors.white))
+                              : const Text('Submit',
+                                  style: TextStyle(
+                                      fontFamily: 'Raleway',
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white))),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

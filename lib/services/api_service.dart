@@ -178,6 +178,67 @@ class ApiService {
           Uint8List bytes, String classId, String fileName) =>
       _uploadMultipart('/document/upload', bytes, classId, fileName);
 
+  Future<List<Map<String, dynamic>>> uploadHomeworkFiles(
+      String homeworkId, List<MapEntry<String, Uint8List>> files) async {
+    try {
+      final token = await _getToken();
+      final uri = Uri.parse('$_baseUrl/homework/$homeworkId/upload');
+      final request = http.MultipartRequest('POST', uri)
+        ..headers['Authorization'] = 'Bearer $token';
+      for (final entry in files) {
+        request.files.add(
+            http.MultipartFile.fromBytes('files', entry.value,
+                filename: entry.key));
+      }
+      final response =
+          await request.send().timeout(const Duration(seconds: 120));
+      if (response.statusCode != 200) return [];
+      final body = await response.stream.bytesToString();
+      final data = json.decode(body) as Map<String, dynamic>;
+      return (data['uploaded'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> submitHomeworkFiles(
+      String homeworkId,
+      List<MapEntry<String, Uint8List>> files,
+      {String note = ''}) async {
+    try {
+      final token = await _getToken();
+      final uri = Uri.parse('$_baseUrl/homework/$homeworkId/submit-files');
+      final request = http.MultipartRequest('POST', uri)
+        ..headers['Authorization'] = 'Bearer $token'
+        ..fields['note'] = note;
+      for (final entry in files) {
+        request.files.add(
+            http.MultipartFile.fromBytes('files', entry.value,
+                filename: entry.key));
+      }
+      final response =
+          await request.send().timeout(const Duration(seconds: 120));
+      final body = await response.stream.bytesToString();
+      return json.decode(body) as Map<String, dynamic>;
+    } catch (e) {
+      return {'error': e.toString()};
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getHomeworkSubmissions(
+      String homeworkId) async {
+    final data = await _get('/homework/$homeworkId/submissions');
+    return (data['submissions'] as List?)
+            ?.cast<Map<String, dynamic>>() ??
+        [];
+  }
+
+  Future<Map<String, dynamic>?> getMyHomeworkSubmission(
+      String homeworkId) async {
+    final data = await _get('/homework/$homeworkId/my-submission');
+    return data['submission'] as Map<String, dynamic>?;
+  }
+
   // ─── CRUD ─────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getUser(String uid) => _get('/user/$uid');

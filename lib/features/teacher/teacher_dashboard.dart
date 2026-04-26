@@ -1,6 +1,8 @@
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
 import '../messaging/messaging_screen.dart';
 import '../../shared/animations/animations.dart';
 import '../auth/welcome_screen.dart';
@@ -2748,11 +2750,225 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                   ),
                 ),
               ),
+              if (subs > 0) ...[
+                const SizedBox(height: 10),
+                GestureDetector(
+                  onTap: () => _showSubmissions(hw),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                        color: info.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: info.withOpacity(0.15))),
+                    child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.visibility_rounded,
+                              size: 14, color: info),
+                          const SizedBox(width: 6),
+                          Text('View $subs Submission${subs > 1 ? 's' : ''}',
+                              style: TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: info)),
+                        ]),
+                  ),
+                ),
+              ],
             ]),
           ),
         ]),
       ),
     );
+  }
+
+  void _showSubmissions(HomeworkModel hw) async {
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.7),
+        decoration: const BoxDecoration(
+            color: bgCard,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+        child: FutureBuilder<List<Map<String, dynamic>>>(
+          future: _api.getHomeworkSubmissions(hw.id),
+          builder: (ctx, snap) {
+            final subs = snap.data ?? [];
+            return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                      child: Container(
+                          width: 36,
+                          height: 3,
+                          decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(2)))),
+                  const SizedBox(height: 16),
+                  Text('Submissions — ${hw.title}',
+                      style: const TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: textDark)),
+                  const SizedBox(height: 4),
+                  Text('${subs.length} student${subs.length != 1 ? 's' : ''} submitted',
+                      style: const TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 12,
+                          color: textLight)),
+                  const SizedBox(height: 16),
+                  if (snap.connectionState == ConnectionState.waiting)
+                    const Center(
+                        child: Padding(
+                            padding: EdgeInsets.all(24),
+                            child: CircularProgressIndicator(strokeWidth: 2)))
+                  else if (subs.isEmpty)
+                    const Center(
+                        child: Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Text('No submissions yet',
+                                style: TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 14,
+                                    color: textLight))))
+                  else
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: subs.length,
+                        itemBuilder: (_, i) {
+                          final s = subs[i];
+                          final files =
+                              (s['files'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+                          final name = s['studentName'] as String? ?? 'Student';
+                          final note = s['note'] as String? ?? '';
+                          final at = s['submittedAt'] as String?;
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                                color: bg,
+                                borderRadius: BorderRadius.circular(12),
+                                border:
+                                    Border.all(color: Colors.grey.shade100)),
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(children: [
+                                    CircleAvatar(
+                                        radius: 14,
+                                        backgroundColor:
+                                            info.withOpacity(0.1),
+                                        child: Text(
+                                            name.isNotEmpty
+                                                ? name[0].toUpperCase()
+                                                : '?',
+                                            style: TextStyle(
+                                                fontFamily: 'Raleway',
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                                color: info))),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                        child: Text(name,
+                                            style: const TextStyle(
+                                                fontFamily: 'Raleway',
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: textDark))),
+                                    if (at != null)
+                                      Text(
+                                          _submissionTimeLabel(at),
+                                          style: const TextStyle(
+                                              fontFamily: 'Raleway',
+                                              fontSize: 10,
+                                              color: textLight)),
+                                  ]),
+                                  if (note.isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    Text(note,
+                                        style: const TextStyle(
+                                            fontFamily: 'Raleway',
+                                            fontSize: 12,
+                                            color: textMid)),
+                                  ],
+                                  if (files.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    Wrap(
+                                        spacing: 6,
+                                        runSpacing: 4,
+                                        children: files.map((f) {
+                                          final fType =
+                                              f['type'] as String? ?? 'document';
+                                          final fName =
+                                              f['name'] as String? ?? 'File';
+                                          final ic = fType == 'pdf'
+                                              ? Icons.picture_as_pdf_rounded
+                                              : fType == 'image'
+                                                  ? Icons.image_rounded
+                                                  : Icons.insert_drive_file_rounded;
+                                          final fc = fType == 'pdf'
+                                              ? danger
+                                              : fType == 'image'
+                                                  ? info
+                                                  : accent;
+                                          return Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                                color: fc.withOpacity(0.06),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                border: Border.all(
+                                                    color:
+                                                        fc.withOpacity(0.15))),
+                                            child: Row(
+                                                mainAxisSize:
+                                                    MainAxisSize.min,
+                                                children: [
+                                                  Icon(ic,
+                                                      size: 13, color: fc),
+                                                  const SizedBox(width: 4),
+                                                  Text(fName,
+                                                      style: TextStyle(
+                                                          fontFamily:
+                                                              'Raleway',
+                                                          fontSize: 11,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          color: fc)),
+                                                ]),
+                                          );
+                                        }).toList()),
+                                  ],
+                                ]),
+                          );
+                        },
+                      ),
+                    ),
+                ]);
+          },
+        ),
+      ),
+    );
+  }
+
+  String _submissionTimeLabel(String iso) {
+    final dt = DateTime.tryParse(iso);
+    if (dt == null) return '';
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${dt.month}/${dt.day}';
   }
 
   void _deleteHomework(HomeworkModel hw) {
@@ -2794,6 +3010,8 @@ class _TeacherDashboardState extends State<TeacherDashboard>
     String selectedSubject = _classes[0].subject;
     DateTime dueDate = DateTime.now().add(const Duration(days: 7));
     final attachments = <HomeworkAttachment>[];
+    final pickedFiles = <MapEntry<String, Uint8List>>[];
+    bool isSubmitting = false;
 
     showModalBottomSheet(
       context: context,
@@ -2987,53 +3205,139 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                       ]),
                     );
                   }),
+                  // Picked files preview
+                  ...pickedFiles.asMap().entries.map((e) {
+                    final f = e.value;
+                    final ext = f.key.split('.').last.toLowerCase();
+                    final isImg = ['jpg', 'jpeg', 'png', 'gif', 'webp']
+                        .contains(ext);
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                          color: (isImg ? info : danger).withOpacity(0.04),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: (isImg ? info : danger)
+                                  .withOpacity(0.15))),
+                      child: Row(children: [
+                        Icon(
+                            isImg
+                                ? Icons.image_rounded
+                                : Icons.picture_as_pdf_rounded,
+                            size: 16,
+                            color: isImg ? info : danger),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(f.key,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: isImg ? info : danger)),
+                        ),
+                        Text(
+                            '${(f.value.length / 1024).toStringAsFixed(0)} KB',
+                            style: const TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 10,
+                                color: textLight)),
+                        const SizedBox(width: 6),
+                        GestureDetector(
+                          onTap: () =>
+                              setModal(() => pickedFiles.removeAt(e.key)),
+                          child: Icon(Icons.close_rounded,
+                              size: 16, color: textLight),
+                        ),
+                      ]),
+                    );
+                  }),
                   Row(children: [
-                    _attachBtn('Link', Icons.link_rounded, primary, () =>
-                        _addAttachment(setModal, attachments, 'link')),
+                    _attachBtn('Upload\nFiles', Icons.upload_file_rounded,
+                        accent, () async {
+                      final result = await FilePicker.platform.pickFiles(
+                        allowMultiple: true,
+                        type: FileType.custom,
+                        allowedExtensions: [
+                          'pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp',
+                          'docx', 'xlsx', 'pptx'
+                        ],
+                        withData: true,
+                      );
+                      if (result == null) return;
+                      setModal(() {
+                        for (final f in result.files) {
+                          if (f.bytes != null) {
+                            pickedFiles.add(
+                                MapEntry(f.name, f.bytes!));
+                          }
+                        }
+                      });
+                    }),
                     const SizedBox(width: 8),
-                    _attachBtn('PDF', Icons.picture_as_pdf_rounded, danger, () =>
-                        _addAttachment(setModal, attachments, 'pdf')),
-                    const SizedBox(width: 8),
-                    _attachBtn('Image', Icons.image_rounded, info, () =>
-                        _addAttachment(setModal, attachments, 'image')),
+                    _attachBtn('Add\nLink', Icons.link_rounded, primary,
+                        () => _addAttachment(setModal, attachments, 'link')),
                   ]),
                   const SizedBox(height: 20),
                   GestureDetector(
-                    onTap: () async {
-                      final title = titleCtrl.text.trim();
-                      if (title.isEmpty) return;
-                      final dueDateStr =
-                          '${dueDate.year}-${dueDate.month.toString().padLeft(2, '0')}-${dueDate.day.toString().padLeft(2, '0')}';
-                      final resp = await _api.createHomework(
-                        title: title,
-                        classId: selectedClassId,
-                        description: descCtrl.text.trim(),
-                        subject: selectedSubject,
-                        className: selectedClassName,
-                        dueDate: dueDateStr,
-                        attachments:
-                            attachments.map((a) => a.toMap()).toList(),
-                      );
-                      final newId = resp['id'] as String? ?? '';
-                      if (!context.mounted) return;
-                      Navigator.pop(context);
-                      setState(() => _homework.insert(
-                          0,
-                          HomeworkModel(
-                            id: newId,
-                            title: title,
-                            description: descCtrl.text.trim(),
-                            subject: selectedSubject,
-                            classId: selectedClassId,
-                            className: selectedClassName,
-                            teacherUid: _uid,
-                            teacherName: _user?.name ?? '',
-                            dueDate: dueDateStr,
-                            attachments: attachments,
-                            createdAt: DateTime.now(),
-                          )));
-                      _snack('Homework posted!');
-                    },
+                    onTap: isSubmitting
+                        ? null
+                        : () async {
+                            final title = titleCtrl.text.trim();
+                            if (title.isEmpty) return;
+                            setModal(() => isSubmitting = true);
+                            final dueDateStr =
+                                '${dueDate.year}-${dueDate.month.toString().padLeft(2, '0')}-${dueDate.day.toString().padLeft(2, '0')}';
+                            final resp = await _api.createHomework(
+                              title: title,
+                              classId: selectedClassId,
+                              description: descCtrl.text.trim(),
+                              subject: selectedSubject,
+                              className: selectedClassName,
+                              dueDate: dueDateStr,
+                              attachments:
+                                  attachments.map((a) => a.toMap()).toList(),
+                            );
+                            final newId = resp['id'] as String? ?? '';
+
+                            List<HomeworkAttachment> uploadedAtts = [
+                              ...attachments
+                            ];
+                            if (pickedFiles.isNotEmpty && newId.isNotEmpty) {
+                              final uploaded =
+                                  await _api.uploadHomeworkFiles(
+                                      newId, pickedFiles);
+                              for (final u in uploaded) {
+                                uploadedAtts.add(HomeworkAttachment(
+                                  url: u['url'] as String? ?? '',
+                                  name: u['name'] as String? ?? '',
+                                  type: u['type'] as String? ?? 'document',
+                                ));
+                              }
+                            }
+
+                            if (!context.mounted) return;
+                            Navigator.pop(context);
+                            setState(() => _homework.insert(
+                                0,
+                                HomeworkModel(
+                                  id: newId,
+                                  title: title,
+                                  description: descCtrl.text.trim(),
+                                  subject: selectedSubject,
+                                  classId: selectedClassId,
+                                  className: selectedClassName,
+                                  teacherUid: _uid,
+                                  teacherName: _user?.name ?? '',
+                                  dueDate: dueDateStr,
+                                  attachments: uploadedAtts,
+                                  createdAt: DateTime.now(),
+                                )));
+                            _snack('Homework posted!');
+                          },
                     child: Container(
                       width: double.infinity,
                       height: 50,
@@ -3046,8 +3350,15 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                                 blurRadius: 12,
                                 offset: const Offset(0, 4))
                           ]),
-                      child: const Center(
-                          child: Text('Post Homework',
+                      child: Center(
+                          child: isSubmitting
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: Colors.white))
+                              : const Text('Post Homework',
                               style: TextStyle(
                                   fontFamily: 'Raleway',
                                   fontSize: 15,

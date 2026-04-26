@@ -123,11 +123,11 @@ function handleMulterError(err: any, res: Response): boolean {
 
 const router = Router();
 router.use(requireAuth);
-router.use(requireRole("Teacher", "Principal"));
 
-// POST /api/story/upload  (multipart: file + classId)
+// POST /api/story/upload  (multipart: file + classId) — Teacher, Principal
 router.post(
   "/story/upload",
+  requireRole("Teacher", "Principal"),
   imageUpload.single("file"),
   async (req: Request, res: Response) => {
     try {
@@ -162,9 +162,10 @@ router.post(
   }
 );
 
-// POST /api/document/upload  (multipart: file + classId)
+// POST /api/document/upload  (multipart: file + classId) — Teacher, Principal
 router.post(
   "/document/upload",
+  requireRole("Teacher", "Principal"),
   docUpload.single("file"),
   async (req: Request, res: Response) => {
     try {
@@ -194,6 +195,204 @@ router.post(
     } catch (err: any) {
       if (handleMulterError(err, res)) return;
       console.error("document upload error:", err);
+      res.status(500).json({ error: err.message || "Internal server error" });
+    }
+  }
+);
+
+// ─── Homework file uploads ───────────────────────────────────────────────────
+
+import { db, getDoc, serializeDocs } from "../lib/firestore-helpers";
+import { cacheDeletePrefix } from "../lib/cache";
+
+// POST /api/homework/:id/upload  — Teacher uploads attachment files
+router.post(
+  "/homework/:id/upload",
+  requireRole("Teacher", "Principal"),
+  docUpload.array("files", 10),
+  async (req: Request, res: Response) => {
+    try {
+      const homeworkId = sanitizeId(req.params.id as string);
+      const files = req.files as Express.Multer.File[];
+      if (!files || files.length === 0) {
+        return res.status(400).json({ error: "No files uploaded" });
+      }
+
+      const uploaded: { url: string; name: string; type: string }[] = [];
+      for (const file of files) {
+        if (!isValidDocument(file.buffer)) {
+          return res.status(400).json({
+            error: `File "${file.originalname}" has invalid content`,
+          });
+        }
+        const ext = file.originalname.split(".").pop()?.toLowerCase() || "";
+        const fileType = ["pdf"].includes(ext)
+          ? "pdf"
+          : ["jpg", "jpeg", "png", "gif", "webp"].includes(ext)
+          ? "image"
+          : "document";
+        const storagePath = `homework/${homeworkId}/attachments/${generateFileName(file.mimetype)}`;
+        const url = await uploadToStorage(file.buffer, storagePath, file.mimetype);
+        uploaded.push({ url, name: file.originalname, type: fileType });
+      }
+
+      const hwRef = db.collection("homework").doc(homeworkId);
+      await hwRef.update({
+        attachments: admin.firestore.FieldValue.arrayUnion(...uploaded),
+      });
+
+      cacheDeletePrefix("teacher_dash_");
+      cacheDeletePrefix("student_dash_");
+      res.json({ uploaded });
+    } catch (err: any) {
+      if (handleMulterError(err, res)) return;
+      console.error("homework upload error:", err);
+      res.status(500).json({ error: err.message || "Internal server error" });
+    }
+  }
+);
+
+// POST /api/homework/:id/submit-files  — Student uploads submission files
+router.post(
+  "/homework/:id/submit-files",
+  requireRole("Student"),
+  docUpload.array("files", 10),
+  async (req: Request, res: Response) => {
+    try {
+      const homeworkId = sanitizeId(req.params.id as string);
+      const uid = req.uid!;
+      const files = req.files as Express.Multer.File[];
+      const note = (req.body.note as string) || "";
+
+      const fileUrls: { url: string; name: string; type: string }[] = [];
+      if (files && files.length > 0) {
+        for (const file of files) {
+          if (!isValidDocument(file.buffer)) {
+            return res.status(400).json({
+              error: `File "${file.originalname}" has invalid content`,
+            });
+          }
+          const ext = file.originalname.split(".").pop()?.toLowerCase() || "";
+          const fileType = ["pdf"].includes(ext)
+            ? "pdf"
+            : ["jpg", "jpeg", "png", "gif", "webp"].includes(ext)
+            ? "image"
+            : "document";
+          const storagePath = `homework/${homeworkId}/submissions/${sanitizeId(uid)}/${generateFileName(file.mimetype)}`;
+          const url = await uploadToStorage(file.buffer, storagePath, file.mimetype);
+          fileUrls.push({ url, name: file.originalname, type: fileType });
+        }
+      }
+
+      const subRef = db
+        .collection("homework_submissions")
+        .doc(`${homeworkId}_${uid}`);
+      await subRef.set(
+        {
+          homeworkId,
+          studentUid: uid,
+          files: admin.firestore.FieldValue.arrayUnion(...(fileUrls.length > 0 ? fileUrls : [])),
+          note,
+          submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      await db
+        .collection("homework")
+        .doc(homeworkId)
+        .update({
+          submittedBy: admin.firestore.FieldValue.arrayUnion(uid),
+        });
+
+      cacheDeletePrefix("student_dash_");
+      cacheDeletePrefix("teacher_dash_");
+      res.json({ submitted: true, files: fileUrls });
+    } catch (err: any) {
+      if (handleMulterError(err, res)) return;
+      console.error("homework submit error:", err);
+      res.status(500).json({ error: err.message || "Internal server error" });
+    }
+  }
+);
+
+// GET /api/homework/:id/submissions  — Teacher sees all submissions
+router.get(
+  "/homework/:id/submissions",
+  requireRole("Teacher", "Principal"),
+  async (req: Request, res: Response) => {
+    try {
+      const homeworkId = req.params.id as string;
+      const snaps = await db
+        .collection("homework_submissions")
+        .where("homeworkId", "==", homeworkId)
+        .get();
+
+      const submissions = snaps.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          ...data,
+          submittedAt: data.submittedAt?.toDate?.()?.toISOString?.() || null,
+        };
+      });
+
+      const studentUids = submissions.map((s: any) => s.studentUid).filter(Boolean);
+      const userMap: Record<string, string> = {};
+      if (studentUids.length > 0) {
+        const chunks = [];
+        for (let i = 0; i < studentUids.length; i += 10) {
+          chunks.push(studentUids.slice(i, i + 10));
+        }
+        for (const chunk of chunks) {
+          const snap = await db
+            .collection("users")
+            .where(admin.firestore.FieldPath.documentId(), "in", chunk)
+            .get();
+          snap.docs.forEach((d) => {
+            userMap[d.id] = d.data().name || d.id;
+          });
+        }
+      }
+
+      const enriched = submissions.map((s: any) => ({
+        ...s,
+        studentName: userMap[s.studentUid] || s.studentUid,
+      }));
+
+      res.json({ submissions: enriched });
+    } catch (err: any) {
+      console.error("getSubmissions error:", err);
+      res.status(500).json({ error: err.message || "Internal server error" });
+    }
+  }
+);
+
+// GET /api/homework/:id/my-submission  — Student sees their own submission
+router.get(
+  "/homework/:id/my-submission",
+  requireRole("Student"),
+  async (req: Request, res: Response) => {
+    try {
+      const homeworkId = req.params.id as string;
+      const uid = req.uid!;
+      const docRef = db
+        .collection("homework_submissions")
+        .doc(`${homeworkId}_${uid}`);
+      const snap = await docRef.get();
+      if (!snap.exists) {
+        return res.json({ submission: null });
+      }
+      const data = snap.data()!;
+      res.json({
+        submission: {
+          id: snap.id,
+          ...data,
+          submittedAt: data.submittedAt?.toDate?.()?.toISOString?.() || null,
+        },
+      });
+    } catch (err: any) {
+      console.error("getMySubmission error:", err);
       res.status(500).json({ error: err.message || "Internal server error" });
     }
   }
