@@ -438,7 +438,7 @@ class _StudentDashboardState extends State<StudentDashboard>
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: GestureDetector(
-                  onTap: () => _switchTab(1),
+                  onTap: () => _switchTab(2),
                   child: Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
@@ -1410,18 +1410,65 @@ class _StudentDashboardState extends State<StudentDashboard>
     return '${months[weekStart.month]} ${weekStart.day} - ${months[weekEnd.month]} ${weekEnd.day}';
   }
 
-  // ─── HOMEWORK TAB ──────────────────────────────────────────────────────────
+  // ─── HOMEWORK TAB (Action Items) ───────────────────────────────────────────
+
+  DateTime? _parseDueDate(String dueDate) => DateTime.tryParse(dueDate);
+
+  /// Sorts pending homework by due date ascending and returns urgency bucket
+  /// 0 = overdue, 1 = due today/within 24h, 2 = due this week, 3 = later
+  int _hwUrgency(HomeworkModel hw) {
+    final due = _parseDueDate(hw.dueDate);
+    if (due == null) return 3;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dueDay = DateTime(due.year, due.month, due.day);
+    final diff = dueDay.difference(today).inDays;
+    if (diff < 0) return 0;
+    if (diff == 0) return 1;
+    if (diff <= 7) return 2;
+    return 3;
+  }
+
+  String _hwDueLabel(HomeworkModel hw) {
+    final due = _parseDueDate(hw.dueDate);
+    if (due == null) return hw.dueDate;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dueDay = DateTime(due.year, due.month, due.day);
+    final diff = dueDay.difference(today).inDays;
+    if (diff < 0) return 'Overdue by ${-diff} day${diff == -1 ? '' : 's'}';
+    if (diff == 0) return 'Due today';
+    if (diff == 1) return 'Due tomorrow';
+    if (diff <= 7) return 'Due in $diff days';
+    return 'Due ${hw.dueDate}';
+  }
+
   Widget _buildHomeworkTab() {
     final pending =
         _homework.where((h) => !_completedIds.contains(h.id)).toList();
     final done =
         _homework.where((h) => _completedIds.contains(h.id)).toList();
+
+    pending.sort((a, b) {
+      final ua = _hwUrgency(a);
+      final ub = _hwUrgency(b);
+      if (ua != ub) return ua.compareTo(ub);
+      final da = _parseDueDate(a.dueDate) ?? DateTime(2099);
+      final db = _parseDueDate(b.dueDate) ?? DateTime(2099);
+      return da.compareTo(db);
+    });
+
+    final overdue = pending.where((h) => _hwUrgency(h) == 0).toList();
+    final urgent = pending.where((h) => _hwUrgency(h) == 1).toList();
+    final thisWeek = pending.where((h) => _hwUrgency(h) == 2).toList();
+    final later = pending.where((h) => _hwUrgency(h) == 3).toList();
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const SizedBox(height: 8),
         FadeSlideIn(
-            child: const Text('Homework',
+            child: const Text('Action Items',
                 style: TextStyle(
                     fontFamily: 'Raleway',
                     fontSize: 28,
@@ -1431,11 +1478,12 @@ class _StudentDashboardState extends State<StudentDashboard>
         const SizedBox(height: 4),
         FadeSlideIn(
             delayMs: 60,
-            child: Text('${pending.length} pending · ${done.length} done',
+            child: Text(
+                '${pending.length} pending · ${done.length} done · all subjects',
                 style: const TextStyle(
                     fontFamily: 'Raleway', fontSize: 13, color: textLight))),
         const SizedBox(height: 20),
-        // Summary strip
+        // Progress strip
         FadeSlideIn(
           delayMs: 80,
           child: Container(
@@ -1481,7 +1529,7 @@ class _StudentDashboardState extends State<StudentDashboard>
               Text(
                   _homework.isEmpty
                       ? '—'
-                      : '${(_homework.isEmpty ? 0 : done.length / _homework.length * 100).toStringAsFixed(0)}%',
+                      : '${(done.length / _homework.length * 100).toStringAsFixed(0)}%',
                   style: TextStyle(
                       fontFamily: 'Raleway',
                       fontSize: 26,
@@ -1490,32 +1538,63 @@ class _StudentDashboardState extends State<StudentDashboard>
             ]),
           ),
         ),
+        // Urgency summary chips
         if (pending.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          FadeSlideIn(
+            delayMs: 100,
+            child: Wrap(spacing: 8, runSpacing: 6, children: [
+              if (overdue.isNotEmpty)
+                _urgencyChip('${overdue.length} overdue', danger),
+              if (urgent.isNotEmpty)
+                _urgencyChip('${urgent.length} due today', accent),
+              if (thisWeek.isNotEmpty)
+                _urgencyChip('${thisWeek.length} this week', info),
+              if (later.isNotEmpty)
+                _urgencyChip('${later.length} upcoming', textLight),
+            ]),
+          ),
+        ],
+        // Overdue section
+        if (overdue.isNotEmpty) ...[
           const SizedBox(height: 24),
-          const Text('To Do',
-              style: TextStyle(
-                  fontFamily: 'Raleway',
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: textDark)),
-          const SizedBox(height: 12),
-          ...pending
-              .asMap()
-              .entries
-              .map((e) => _hwStudentCard(e.value, e.key, false)),
+          _hwSectionHeader('Overdue', Icons.warning_amber_rounded, danger),
+          const SizedBox(height: 10),
+          ...overdue.asMap().entries
+              .map((e) => _hwStudentCard(e.value, e.key, false, urgency: 0)),
+        ],
+        // Due today section
+        if (urgent.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _hwSectionHeader(
+              'Due Today', Icons.schedule_rounded, accent),
+          const SizedBox(height: 10),
+          ...urgent.asMap().entries
+              .map((e) => _hwStudentCard(e.value, e.key, false, urgency: 1)),
+        ],
+        // This week section
+        if (thisWeek.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _hwSectionHeader(
+              'This Week', Icons.date_range_rounded, info),
+          const SizedBox(height: 10),
+          ...thisWeek.asMap().entries
+              .map((e) => _hwStudentCard(e.value, e.key, false, urgency: 2)),
+        ],
+        // Later section
+        if (later.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _hwSectionHeader('Upcoming', Icons.event_outlined, textLight),
+          const SizedBox(height: 10),
+          ...later.asMap().entries
+              .map((e) => _hwStudentCard(e.value, e.key, false, urgency: 3)),
         ],
         if (done.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          const Text('Completed ✓',
-              style: TextStyle(
-                  fontFamily: 'Raleway',
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: success)),
-          const SizedBox(height: 12),
-          ...done
-              .asMap()
-              .entries
+          const SizedBox(height: 24),
+          _hwSectionHeader(
+              'Completed (${done.length})', Icons.check_circle_rounded, success),
+          const SizedBox(height: 10),
+          ...done.asMap().entries
               .map((e) => _hwStudentCard(e.value, e.key, true)),
         ],
         const SizedBox(height: 28),
@@ -1523,8 +1602,48 @@ class _StudentDashboardState extends State<StudentDashboard>
     );
   }
 
-  Widget _hwStudentCard(HomeworkModel hw, int idx, bool isDone) {
-    final color = isDone ? success : info;
+  Widget _urgencyChip(String label, Color c) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+            color: c.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: c.withOpacity(0.2))),
+        child: Text(label,
+            style: TextStyle(
+                fontFamily: 'Raleway',
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: c)),
+      );
+
+  Widget _hwSectionHeader(String title, IconData icon, Color c) => Row(
+        children: [
+          Icon(icon, size: 16, color: c),
+          const SizedBox(width: 6),
+          Text(title,
+              style: TextStyle(
+                  fontFamily: 'Raleway',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: c)),
+        ],
+      );
+
+  Widget _hwStudentCard(HomeworkModel hw, int idx, bool isDone,
+      {int urgency = 3}) {
+    final isUrgent = !isDone && urgency <= 1;
+    final Color color;
+    if (isDone) {
+      color = success;
+    } else if (urgency == 0) {
+      color = danger;
+    } else if (urgency == 1) {
+      color = accent;
+    } else {
+      color = info;
+    }
+    final dueLabel = _hwDueLabel(hw);
+
     return StaggeredItem(
       index: idx,
       child: Container(
@@ -1533,14 +1652,21 @@ class _StudentDashboardState extends State<StudentDashboard>
             color: bgCard,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-                color:
-                    isDone ? success.withOpacity(0.15) : Colors.grey.shade100)),
+                color: isUrgent
+                    ? color.withOpacity(0.4)
+                    : isDone
+                        ? success.withOpacity(0.15)
+                        : Colors.grey.shade100,
+                width: isUrgent ? 1.5 : 1),
+            boxShadow: isUrgent
+                ? [BoxShadow(color: color.withOpacity(0.08), blurRadius: 8)]
+                : null),
         child: Column(children: [
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
                 gradient: LinearGradient(
-                    colors: [color.withOpacity(0.08), color.withOpacity(0.02)]),
+                    colors: [color.withOpacity(0.10), color.withOpacity(0.02)]),
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(16))),
             child: Row(children: [
@@ -1552,7 +1678,9 @@ class _StudentDashboardState extends State<StudentDashboard>
                   child: Icon(
                       isDone
                           ? Icons.check_circle_rounded
-                          : Icons.assignment_outlined,
+                          : isUrgent
+                              ? Icons.priority_high_rounded
+                              : Icons.assignment_outlined,
                       color: color,
                       size: 18)),
               const SizedBox(width: 12),
@@ -1569,12 +1697,25 @@ class _StudentDashboardState extends State<StudentDashboard>
                             decoration:
                                 isDone ? TextDecoration.lineThrough : null,
                             decorationColor: textLight)),
-                    Text(hw.subject,
+                    Text('${hw.subject} · ${hw.className}',
                         style: const TextStyle(
                             fontFamily: 'Raleway',
                             fontSize: 11,
                             color: textLight)),
                   ])),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8)),
+                child: Text(dueLabel,
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: color)),
+              ),
             ]),
           ),
           Padding(
@@ -1583,6 +1724,8 @@ class _StudentDashboardState extends State<StudentDashboard>
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               if (hw.description.isNotEmpty)
                 Text(hw.description,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                         fontFamily: 'Raleway',
                         fontSize: 12,
@@ -1590,47 +1733,46 @@ class _StudentDashboardState extends State<StudentDashboard>
                         height: 1.5)),
               if (hw.attachments.isNotEmpty) ...[
                 const SizedBox(height: 8),
-                Wrap(spacing: 6, runSpacing: 6, children: hw.attachments.map((a) {
-                  IconData aIcon;
-                  Color ac;
-                  switch (a.type) {
-                    case 'pdf':
-                      aIcon = Icons.picture_as_pdf_rounded;
-                      ac = danger;
-                    case 'image':
-                      aIcon = Icons.image_rounded;
-                      ac = info;
-                    default:
-                      aIcon = Icons.link_rounded;
-                      ac = primary;
-                  }
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                        color: ac.withOpacity(0.06),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: ac.withOpacity(0.15))),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(aIcon, size: 14, color: ac),
-                      const SizedBox(width: 4),
-                      Text(a.name.isNotEmpty ? a.name : 'Attachment',
-                          style: TextStyle(
-                              fontFamily: 'Raleway',
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: ac)),
-                    ]),
-                  );
-                }).toList()),
+                Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: hw.attachments.map((a) {
+                      IconData aIcon;
+                      Color ac;
+                      switch (a.type) {
+                        case 'pdf':
+                          aIcon = Icons.picture_as_pdf_rounded;
+                          ac = danger;
+                        case 'image':
+                          aIcon = Icons.image_rounded;
+                          ac = info;
+                        default:
+                          aIcon = Icons.link_rounded;
+                          ac = primary;
+                      }
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                            color: ac.withOpacity(0.06),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: ac.withOpacity(0.15))),
+                        child:
+                            Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(aIcon, size: 14, color: ac),
+                          const SizedBox(width: 4),
+                          Text(a.name.isNotEmpty ? a.name : 'Attachment',
+                              style: TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: ac)),
+                        ]),
+                      );
+                    }).toList()),
               ],
               const SizedBox(height: 12),
               Row(children: [
-                Icon(Icons.calendar_today_outlined, size: 12, color: textLight),
-                const SizedBox(width: 4),
-                Text('Due ${hw.dueDate}',
-                    style: const TextStyle(
-                        fontFamily: 'Raleway', fontSize: 11, color: textLight)),
-                const SizedBox(width: 12),
                 Icon(Icons.person_outline, size: 12, color: textLight),
                 const SizedBox(width: 4),
                 Text(hw.teacherName,
@@ -1655,25 +1797,26 @@ class _StudentDashboardState extends State<StudentDashboard>
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                      color:
-                          isDone ? Colors.grey.shade50 : info.withOpacity(0.07),
+                      color: isDone
+                          ? Colors.grey.shade50
+                          : color.withOpacity(0.07),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                           color: isDone
                               ? Colors.grey.shade200
-                              : info.withOpacity(0.2))),
+                              : color.withOpacity(0.2))),
                   child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(isDone ? Icons.undo_rounded : Icons.check_rounded,
-                            size: 16, color: isDone ? textLight : info),
+                            size: 16, color: isDone ? textLight : color),
                         const SizedBox(width: 6),
                         Text(isDone ? 'Mark as Incomplete' : 'Mark as Done',
                             style: TextStyle(
                                 fontFamily: 'Raleway',
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: isDone ? textLight : info)),
+                                color: isDone ? textLight : color)),
                       ]),
                 ),
               ),
