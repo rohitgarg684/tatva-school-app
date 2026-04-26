@@ -9,6 +9,9 @@ env:
   PROJECT_ID: tatva-school-app
   REGION: us-central1
   SERVICE_NAME: tatva-api
+  STORAGE_BUCKET: tatva-school-app.firebasestorage.app
+  CORS_ORIGINS: "https://tatva-school-app.web.app,https://tatva-school-app.firebaseapp.com"
+  BACKEND_URL: "https://tatva-api-859841471446.us-central1.run.app"
 
 jobs:
   build-and-deploy:
@@ -69,7 +72,7 @@ jobs:
             --memory=512Mi \
             --min-instances=0 \
             --max-instances=10 \
-            --set-env-vars="NODE_ENV=production"
+            --set-env-vars="NODE_ENV=production,STORAGE_BUCKET=${{ env.STORAGE_BUCKET }},CORS_ORIGINS=${{ env.CORS_ORIGINS }}"
 
       # ─── Flutter Web Build ───────────────────────────────────────────
       - uses: subosito/flutter-action@v2
@@ -79,7 +82,7 @@ jobs:
 
       - run: flutter pub get
 
-      - run: flutter build web --release
+      - run: flutter build web --release --dart-define=BACKEND_URL=${{ env.BACKEND_URL }}
 
       # ─── Deploy Hosting + Firestore + Storage rules ─────────────────
       - name: Deploy to Firebase (Hosting + Firestore + Storage)

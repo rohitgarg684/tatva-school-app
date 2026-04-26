@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import '../env_config.dart';
 
 String _mimeFromFilename(String filename) {
   final ext = filename.split('.').last.toLowerCase();
@@ -26,14 +27,11 @@ class ApiService {
   factory ApiService() => _instance;
   ApiService._();
 
-  static const _cloudRunUrl =
-      'https://tatva-api-859841471446.us-central1.run.app';
-
   String get _baseUrl {
     if (kIsWeb) {
       return '/api';
     }
-    return '$_cloudRunUrl/api';
+    return '${EnvConfig.backendUrl}/api';
   }
 
   Future<String> _getToken() async {
