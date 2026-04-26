@@ -46,7 +46,22 @@ router.post(
         submittedBy: admin.firestore.FieldValue.arrayUnion(uid),
       });
 
+      const subRef = db
+        .collection("homework_submissions")
+        .doc(`${homeworkId}_${uid}`);
+      const subSnap = await subRef.get();
+      if (!subSnap.exists) {
+        await subRef.set({
+          homeworkId,
+          studentUid: uid,
+          files: [],
+          note: "",
+          submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
       cacheDeletePrefix("student_dash_");
+      cacheDeletePrefix("teacher_dash_");
       res.json({ homeworkId, submitted: true });
     } catch (err: any) {
       console.error("submitHomework error:", err);
