@@ -1,4 +1,5 @@
 import 'audience.dart';
+import 'attachment.dart';
 
 class AnnouncementModel {
   final String id;
@@ -12,6 +13,7 @@ class AnnouncementModel {
   final String createdByRole;
   final List<String> likedBy;
   final int commentCount;
+  final List<Attachment> attachments;
   final DateTime? createdAt;
 
   const AnnouncementModel({
@@ -26,6 +28,7 @@ class AnnouncementModel {
     required this.createdByRole,
     this.likedBy = const [],
     this.commentCount = 0,
+    this.attachments = const [],
     this.createdAt,
   });
 
@@ -44,6 +47,10 @@ class AnnouncementModel {
       createdByRole: data['createdByRole'] as String? ?? '',
       likedBy: List<String>.from(data['likedBy'] ?? []),
       commentCount: (data['commentCount'] as num?)?.toInt() ?? 0,
+      attachments: (data['attachments'] as List<dynamic>?)
+              ?.map((e) => Attachment.fromJson(Map<String, dynamic>.from(e as Map)))
+              .toList() ??
+          [],
       createdAt: data['createdAt'] != null
           ? DateTime.tryParse(data['createdAt'] as String)
           : null,
@@ -62,6 +69,7 @@ class AnnouncementModel {
     String? createdByRole,
     List<String>? likedBy,
     int? commentCount,
+    List<Attachment>? attachments,
     DateTime? createdAt,
   }) {
     return AnnouncementModel(
@@ -76,6 +84,7 @@ class AnnouncementModel {
       createdByRole: createdByRole ?? this.createdByRole,
       likedBy: likedBy ?? this.likedBy,
       commentCount: commentCount ?? this.commentCount,
+      attachments: attachments ?? this.attachments,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -92,6 +101,7 @@ class AnnouncementModel {
       'createdByRole': createdByRole,
       'likedBy': likedBy,
       'commentCount': commentCount,
+      'attachments': attachments.map((a) => a.toJson()).toList(),
       'createdAt': (createdAt ?? DateTime.now()).toIso8601String(),
     };
   }

@@ -2,6 +2,8 @@ class ClassModel {
   final String id;
   final String name;
   final String subject;
+  final String grade;
+  final String section;
   final String teacherUid;
   final String teacherName;
   final String teacherEmail;
@@ -14,6 +16,8 @@ class ClassModel {
     required this.id,
     required this.name,
     required this.subject,
+    this.grade = '',
+    this.section = '',
     required this.teacherUid,
     required this.teacherName,
     required this.teacherEmail,
@@ -32,6 +36,8 @@ class ClassModel {
       id: data['id'] as String? ?? '',
       name: data['name'] as String? ?? '',
       subject: data['subject'] as String? ?? '',
+      grade: data['grade'] as String? ?? '',
+      section: data['section'] as String? ?? '',
       teacherUid: data['teacherUid'] as String? ?? '',
       teacherName: data['teacherName'] as String? ?? '',
       teacherEmail: data['teacherEmail'] as String? ?? '',
@@ -48,6 +54,8 @@ class ClassModel {
     String? id,
     String? name,
     String? subject,
+    String? grade,
+    String? section,
     String? teacherUid,
     String? teacherName,
     String? teacherEmail,
@@ -60,6 +68,8 @@ class ClassModel {
       id: id ?? this.id,
       name: name ?? this.name,
       subject: subject ?? this.subject,
+      grade: grade ?? this.grade,
+      section: section ?? this.section,
       teacherUid: teacherUid ?? this.teacherUid,
       teacherName: teacherName ?? this.teacherName,
       teacherEmail: teacherEmail ?? this.teacherEmail,

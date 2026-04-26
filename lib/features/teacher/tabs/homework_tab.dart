@@ -305,7 +305,9 @@ class TeacherHomeworkTab extends StatelessWidget {
           builder: (ctx, snap) {
             final subs = snap.data ?? [];
             return Column(
-                mainAxisSize: MainAxisSize.min,
+                mainAxisSize: subs.isEmpty && !snap.hasError
+                    ? MainAxisSize.min
+                    : MainAxisSize.max,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Center(
@@ -332,6 +334,14 @@ class TeacherHomeworkTab extends StatelessWidget {
                         child: Padding(
                             padding: EdgeInsets.all(24),
                             child: CircularProgressIndicator(strokeWidth: 2)))
+                  else if (snap.hasError)
+                    Center(
+                        child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Text('Failed to load submissions',
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    color: TatvaColors.error))))
                   else if (subs.isEmpty)
                     const Center(
                         child: Padding(

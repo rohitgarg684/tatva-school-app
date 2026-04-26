@@ -13,6 +13,7 @@ import '../../models/user_model.dart';
 import '../../models/class_model.dart';
 import '../../models/grade_model.dart';
 import '../../models/announcement_model.dart';
+import '../../models/attachment.dart';
 import '../../models/audience.dart';
 import '../../models/homework_model.dart';
 import '../../models/behavior_point.dart';
@@ -295,15 +296,18 @@ class _TeacherDashboardState extends State<TeacherDashboard>
         items: _tabs, currentIndex: _currentTab, onTap: _switchTab);
   }
 
-  void _showNewAnnouncement() {
-    final teacherGrades = (_data?.classes ?? [])
-        .map((c) => c.name.split(' ').first)
+  List<String> get _availableGrades {
+    final fromClasses = (_data?.classes ?? [])
+        .map((c) => c.grade)
+        .where((g) => g.isNotEmpty)
         .toSet()
         .toList()
       ..sort();
-    final grades = teacherGrades.isEmpty
-        ? List.generate(12, (i) => '${i + 1}')
-        : teacherGrades;
+    return fromClasses.isEmpty ? List.generate(12, (i) => '${i + 1}') : fromClasses;
+  }
+
+  void _showNewAnnouncement() {
+    final grades = _availableGrades;
     NewAnnouncementSheet.show(
       context,
       api: _api,
@@ -331,20 +335,13 @@ class _TeacherDashboardState extends State<TeacherDashboard>
   }
 
   void _editAnnouncement(AnnouncementModel ann) {
-    final teacherGrades = (_data?.classes ?? [])
-        .map((c) => c.name.split(' ').first)
-        .toSet()
-        .toList()
-      ..sort();
-    final grades = teacherGrades.isEmpty
-        ? List.generate(12, (i) => '${i + 1}')
-        : teacherGrades;
     EditAnnouncementSheet.show(
       context,
       announcement: ann,
-      availableGrades: grades,
-      onSave: (title, body, newGrades) async {
-        await _api.updateAnnouncement(ann.id, title: title, body: body, grades: newGrades);
+      availableGrades: _availableGrades,
+      api: _api,
+      onSave: (title, body, newGrades, attachments) async {
+        await _api.updateAnnouncement(ann.id, title: title, body: body, grades: newGrades, attachments: attachments);
         setState(() {
           final idx = _announcements.indexWhere((a) => a.id == ann.id);
           if (idx >= 0) {
@@ -353,6 +350,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
               body: body,
               grades: newGrades,
               audience: newGrades.isEmpty ? Audience.everyone : Audience.grades,
+              attachments: attachments.map((a) => Attachment.fromJson(a)).toList(),
             );
           }
         });

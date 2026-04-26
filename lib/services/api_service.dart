@@ -348,11 +348,13 @@ class ApiService {
     required String title,
     required String body,
     List<String> grades = const [],
+    List<Map<String, dynamic>> attachments = const [],
   }) =>
       _post('/announcement', {
         'title': title,
         'body': body,
         'grades': grades,
+        'attachments': attachments,
       });
 
   Future<Map<String, dynamic>> toggleAnnouncementLike(String id) =>
@@ -363,12 +365,34 @@ class ApiService {
     String? title,
     String? body,
     List<String>? grades,
+    List<Map<String, dynamic>>? attachments,
   }) =>
       _put('/announcement/$id', {
         if (title != null) 'title': title,
         if (body != null) 'body': body,
         if (grades != null) 'grades': grades,
+        if (attachments != null) 'attachments': attachments,
       });
+
+  Future<List<Map<String, dynamic>>> uploadAnnouncementFiles(
+      List<Uint8List> files, List<String> fileNames) async {
+    final headers = await _authHeaders();
+    headers.remove('content-type');
+    final request = http.MultipartRequest(
+        'POST', Uri.parse('$_baseUrl/announcement/upload'));
+    request.headers.addAll(headers);
+    for (int i = 0; i < files.length; i++) {
+      request.files.add(http.MultipartFile.fromBytes('files', files[i],
+          filename: fileNames[i]));
+    }
+    final response =
+        await http.Response.fromStream(await request.send());
+    if (response.statusCode != 200) {
+      throw Exception('Upload failed ${response.statusCode}: ${response.body}');
+    }
+    final data = json.decode(response.body) as Map<String, dynamic>;
+    return List<Map<String, dynamic>>.from(data['attachments'] ?? []);
+  }
 
   Future<Map<String, dynamic>> deleteAnnouncement(String id) =>
       _delete('/announcement/$id');

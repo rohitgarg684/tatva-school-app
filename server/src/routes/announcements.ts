@@ -16,7 +16,7 @@ router.post(
   "/announcement",
   requireRole("Teacher", "Principal"),
   asyncHandler(async (req, res) => {
-    const { title, body: bodyText, audience, grades } = req.body;
+    const { title, body: bodyText, audience, grades, attachments } = req.body;
     if (!title || !bodyText)
       return res.status(400).json({ error: "title, body required" });
 
@@ -34,6 +34,7 @@ router.post(
       createdByRole: req.role || "",
       likedBy: [],
       commentCount: 0,
+      attachments: Array.isArray(attachments) ? attachments : [],
       createdAt: FieldValue.serverTimestamp(),
     });
 
@@ -110,7 +111,7 @@ router.put(
   asyncHandler(async (req, res) => {
     const uid = req.uid!;
     const id = req.params.id as string;
-    const { title, body: bodyText, grades } = req.body;
+    const { title, body: bodyText, grades, attachments } = req.body;
 
     const ref = db.collection(Collections.ANNOUNCEMENTS).doc(id);
     const snap = await ref.get();
@@ -128,6 +129,9 @@ router.put(
     if (grades !== undefined) {
       updates.grades = Array.isArray(grades) ? grades : [];
       updates.audience = Array.isArray(grades) && grades.length > 0 ? "Grades" : "Everyone";
+    }
+    if (attachments !== undefined) {
+      updates.attachments = Array.isArray(attachments) ? attachments : [];
     }
 
     await ref.update(updates);

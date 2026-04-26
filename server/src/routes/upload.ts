@@ -62,6 +62,16 @@ function generateFileName(mimetype: string): string {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+    "video/mp4": "mp4",
+    "video/quicktime": "mov",
+    "video/x-msvideo": "avi",
+    "video/webm": "webm",
+    "audio/mpeg": "mp3",
+    "audio/wav": "wav",
+    "audio/aac": "aac",
+    "audio/ogg": "ogg",
+    "audio/mp4": "m4a",
+    "audio/flac": "flac",
   };
   const ext = extMap[mimetype] || "bin";
   return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
@@ -78,12 +88,33 @@ async function uploadToStorage(buffer: Buffer, storagePath: string, contentType:
   return signedUrl;
 }
 
-function classifyFileType(originalname: string): "pdf" | "image" | "document" {
+function classifyFileType(originalname: string): string {
   const ext = originalname.split(".").pop()?.toLowerCase() || "";
   if (ext === "pdf") return "pdf";
-  if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) return "image";
+  if (["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext)) return "image";
+  if (["mp4", "mov", "avi", "mkv", "webm"].includes(ext)) return "video";
+  if (["mp3", "wav", "aac", "ogg", "m4a", "flac"].includes(ext)) return "audio";
   return "document";
 }
+
+const ATTACHMENT_MIME_TYPES = [
+  ...IMAGE_MIME_TYPES,
+  "application/pdf",
+  "video/mp4", "video/quicktime", "video/x-msvideo", "video/webm",
+  "audio/mpeg", "audio/wav", "audio/aac", "audio/ogg", "audio/mp4", "audio/flac",
+];
+
+const attachmentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (ATTACHMENT_MIME_TYPES.includes(file.mimetype) || file.mimetype === "application/octet-stream") {
+      cb(null, true);
+    } else {
+      cb(new Error(`Invalid file type: ${file.mimetype}.`));
+    }
+  },
+});
 
 function handleMulterError(err: any, res: Response): boolean {
   if (err instanceof multer.MulterError) {
@@ -124,6 +155,32 @@ router.post(
     } catch (err: any) {
       if (handleMulterError(err, res)) return;
       console.error("document upload error:", err);
+      res.status(500).json({ error: err.message || "Internal server error" });
+    }
+  }
+);
+
+router.post(
+  "/announcement/upload",
+  requireRole("Teacher", "Principal"),
+  attachmentUpload.array("files", 10),
+  async (req: Request, res: Response) => {
+    try {
+      const files = req.files as Express.Multer.File[];
+      if (!files || files.length === 0)
+        return res.status(400).json({ error: "No files uploaded" });
+
+      const uploaded: { url: string; name: string; type: string }[] = [];
+      for (const file of files) {
+        const storagePath = `announcements/${generateFileName(file.mimetype)}`;
+        const url = await uploadToStorage(file.buffer, storagePath, file.mimetype);
+        uploaded.push({ url, name: file.originalname, type: classifyFileType(file.originalname) });
+      }
+
+      res.json({ attachments: uploaded });
+    } catch (err: any) {
+      if (handleMulterError(err, res)) return;
+      console.error("announcement upload error:", err);
       res.status(500).json({ error: err.message || "Internal server error" });
     }
   }
