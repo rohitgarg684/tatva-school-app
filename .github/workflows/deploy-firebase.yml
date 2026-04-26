@@ -72,7 +72,7 @@ jobs:
             --memory=512Mi \
             --min-instances=0 \
             --max-instances=10 \
-            --set-env-vars="NODE_ENV=production,STORAGE_BUCKET=${{ env.STORAGE_BUCKET }},CORS_ORIGINS=${{ env.CORS_ORIGINS }}"
+            --set-env-vars='^##^NODE_ENV=production##STORAGE_BUCKET=${{ env.STORAGE_BUCKET }}##CORS_ORIGINS=${{ env.CORS_ORIGINS }}'
 
       # ─── Flutter Web Build ───────────────────────────────────────────
       - uses: subosito/flutter-action@v2
