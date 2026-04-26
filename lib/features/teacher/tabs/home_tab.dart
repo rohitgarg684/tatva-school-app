@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../../shared/animations/animations.dart';
 import '../../../shared/theme/colors.dart';
+import '../../../shared/widgets/announcement_card.dart';
 import '../../parent/parent_helpers.dart';
 import '../../../shared/utils/greeting.dart';
 import '../../../models/user_model.dart';
 import '../../../models/class_model.dart';
+import '../../../models/announcement_model.dart';
 import '../../../models/homework_model.dart';
 import '../../../models/activity_event.dart';
 
@@ -12,6 +14,8 @@ class TeacherHomeTab extends StatelessWidget {
   final UserModel? user;
   final List<ClassModel> classes;
   final List<HomeworkModel> homework;
+  final List<AnnouncementModel> announcements;
+  final String uid;
   final List<ActivityEvent> activityFeed;
   final Animation<double> greetingFade;
   final Animation<Offset> greetingSlide;
@@ -20,12 +24,16 @@ class TeacherHomeTab extends StatelessWidget {
   final ValueChanged<int> onSwitchTab;
   final void Function(ClassModel) onViewClassStudents;
   final void Function(ClassModel) onDeleteClass;
+  final VoidCallback onNewAnnouncement;
+  final void Function(AnnouncementModel) onToggleAnnouncementLike;
 
   const TeacherHomeTab({
     super.key,
     required this.user,
     required this.classes,
     required this.homework,
+    required this.announcements,
+    required this.uid,
     required this.activityFeed,
     required this.greetingFade,
     required this.greetingSlide,
@@ -34,6 +42,8 @@ class TeacherHomeTab extends StatelessWidget {
     required this.onSwitchTab,
     required this.onViewClassStudents,
     required this.onDeleteClass,
+    required this.onNewAnnouncement,
+    required this.onToggleAnnouncementLike,
   });
 
   @override
@@ -90,6 +100,55 @@ class TeacherHomeTab extends StatelessWidget {
                 _qaBtn('Messages', Icons.chat_outlined, TatvaColors.purple,
                     () => onSwitchTab(8)),
               ])),
+          const SizedBox(height: 24),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(children: [
+              const Expanded(
+                child: Text('Announcements',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: TatvaColors.neutral900)),
+              ),
+              GestureDetector(
+                onTap: onNewAnnouncement,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: TatvaColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.add, size: 14, color: TatvaColors.primary),
+                    const SizedBox(width: 4),
+                    Text('New',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: TatvaColors.primary)),
+                  ]),
+                ),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 12),
+          if (announcements.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text('No announcements yet',
+                  style: TextStyle(fontSize: 13, color: TatvaColors.neutral400)),
+            )
+          else
+            ...announcements.take(3).toList().asMap().entries.map((e) => Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: AnnouncementCard(
+                    announcement: e.value,
+                    currentUid: uid,
+                    isFirst: e.key == 0,
+                    onLike: () => onToggleAnnouncementLike(e.value),
+                  ),
+                )),
           if (activityFeed.isNotEmpty) ...[
             const SizedBox(height: 28),
             Padding(

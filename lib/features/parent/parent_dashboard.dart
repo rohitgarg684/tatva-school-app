@@ -14,7 +14,6 @@ import '../../models/user_model.dart';
 import '../../models/child_info.dart';
 import '../../models/announcement_model.dart';
 import '../../models/vote_model.dart';
-import '../../models/story_post.dart';
 import '../../models/activity_event.dart';
 import '../../models/content_item.dart';
 import '../../models/weekly_report.dart';
@@ -25,7 +24,6 @@ import 'tabs/schedule_tab.dart';
 import 'tabs/progress_tab.dart';
 import 'tabs/behavior_tab.dart';
 import 'tabs/learn_tab.dart';
-import 'tabs/story_tab.dart';
 import 'tabs/vote_tab.dart';
 import 'tabs/profile_tab.dart';
 
@@ -44,7 +42,6 @@ class _ParentDashboardState extends State<ParentDashboard>
     TabItem(icon: Icons.bar_chart_outlined, activeIcon: Icons.bar_chart_rounded, label: 'Progress'),
     TabItem(icon: Icons.emoji_events_outlined, activeIcon: Icons.emoji_events_rounded, label: 'Behavior'),
     TabItem(icon: Icons.lightbulb_outline, activeIcon: Icons.lightbulb_rounded, label: 'Learn'),
-    TabItem(icon: Icons.auto_stories_outlined, activeIcon: Icons.auto_stories_rounded, label: 'Story'),
     TabItem(icon: Icons.how_to_vote_outlined, activeIcon: Icons.how_to_vote_rounded, label: 'Vote'),
     TabItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Profile'),
   ];
@@ -58,7 +55,7 @@ class _ParentDashboardState extends State<ParentDashboard>
 
   ParentDashboardData? _data;
   int _selectedChildIndex = 0;
-  List<StoryPost> _storyPosts = [];
+  List<AnnouncementModel> _announcements = [];
   List<VoteModel> _activeVotes = [];
 
   late AnimationController _shimmerController;
@@ -113,7 +110,7 @@ class _ParentDashboardState extends State<ParentDashboard>
       final data = await _dashSvc.loadParentDashboard(overrideUid: _uid, forceRefresh: true);
       _data = data;
       _activeVotes = List.of(data.activeVotes);
-      _storyPosts = List.of(data.storyPosts);
+      _announcements = List.of(data.announcements);
       if (_selectedChildIndex >= data.childrenData.length) {
         _selectedChildIndex = 0;
       }
@@ -185,32 +182,18 @@ class _ParentDashboardState extends State<ParentDashboard>
     );
   }
 
-  void _toggleStoryLike(String postId) {
+  void _toggleAnnouncementLike(AnnouncementModel ann) {
+    if (ann.id.isEmpty) return;
     setState(() {
-      _storyPosts = [
-        for (final p in _storyPosts)
-          if (p.id == postId)
-            StoryPost(
-              id: p.id,
-              authorUid: p.authorUid,
-              authorName: p.authorName,
-              authorRole: p.authorRole,
-              classId: p.classId,
-              className: p.className,
-              text: p.text,
-              mediaUrls: p.mediaUrls,
-              mediaType: p.mediaType,
-              likedBy: p.isLikedBy(_uid)
-                  ? p.likedBy.where((uid) => uid != _uid).toList()
-                  : [...p.likedBy, _uid],
-              commentCount: p.commentCount,
-              createdAt: p.createdAt,
-            )
-          else
-            p,
-      ];
+      final idx = _announcements.indexWhere((a) => a.id == ann.id);
+      if (idx < 0) return;
+      final current = _announcements[idx];
+      final liked = current.likedBy.contains(_uid);
+      final newLikedBy = List<String>.from(current.likedBy);
+      liked ? newLikedBy.remove(_uid) : newLikedBy.add(_uid);
+      _announcements[idx] = current.copyWith(likedBy: newLikedBy);
     });
-    _api.toggleStoryLike(postId);
+    _api.toggleAnnouncementLike(ann.id);
   }
 
   void _logout() {
@@ -404,7 +387,7 @@ class _ParentDashboardState extends State<ParentDashboard>
               currentChild: _currentChild,
               childrenData: _data?.childrenData ?? [],
               selectedChildIndex: _selectedChildIndex,
-              announcements: _data?.announcements ?? [],
+              announcements: _announcements,
               activityFeed: _data?.activityFeed ?? [],
               greetingFade: _greetingFade,
               greetingSlide: _greetingSlide,
@@ -413,6 +396,8 @@ class _ParentDashboardState extends State<ParentDashboard>
               onSwitchTab: _switchTab,
               onRefresh: _loadData,
               childSwitcher: _childSwitcher(),
+              uid: _uid,
+              onToggleAnnouncementLike: _toggleAnnouncementLike,
             ),
             ParentScheduleTab(
               childrenData: _data?.childrenData ?? [],
@@ -425,11 +410,6 @@ class _ParentDashboardState extends State<ParentDashboard>
               currentChild: _currentChild,
               contentItems: _data?.contentItems ?? [],
               childSwitcher: _childSwitcher(),
-            ),
-            ParentStoryTab(
-              storyPosts: _storyPosts,
-              uid: _uid,
-              onToggleLike: _toggleStoryLike,
             ),
             ParentVoteTab(
               activeVotes: _activeVotes,

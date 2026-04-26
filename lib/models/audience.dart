@@ -1,38 +1,22 @@
-/// Strongly-typed audience for announcements.
 enum Audience {
   everyone,
-  students,
-  parents,
-  teachers;
+  grades;
 
   String get label {
     switch (this) {
       case Audience.everyone:
         return 'Everyone';
-      case Audience.students:
-        return 'Students';
-      case Audience.parents:
-        return 'Parents';
-      case Audience.teachers:
-        return 'Teachers';
+      case Audience.grades:
+        return 'Grades';
     }
   }
 
   factory Audience.fromString(String value) {
     switch (value.toLowerCase()) {
-      case 'students':
-        return Audience.students;
-      case 'parents':
-        return Audience.parents;
-      case 'teachers':
-        return Audience.teachers;
+      case 'grades':
+        return Audience.grades;
       default:
         return Audience.everyone;
     }
-  }
-
-  /// Whether this audience should be visible to a given role audience.
-  bool isVisibleTo(Audience roleAudience) {
-    return this == Audience.everyone || this == roleAudience;
   }
 }

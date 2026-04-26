@@ -123,9 +123,6 @@ class ApiService {
 
   // ─── Actions ──────────────────────────────────────────────────────────
 
-  Future<Map<String, dynamic>> toggleStoryLike(String storyId) =>
-      _post('/story/$storyId/like', {});
-
   Future<Map<String, dynamic>> submitHomework(String homeworkId) =>
       _post('/homework/$homeworkId/submit', {});
 
@@ -189,10 +186,6 @@ class ApiService {
       return null;
     }
   }
-
-  Future<String?> uploadStoryImage(
-          Uint8List bytes, String classId, String fileName) =>
-      _uploadMultipart('/story/upload', bytes, classId, fileName);
 
   Future<String?> uploadDocument(
           Uint8List bytes, String classId, String fileName) =>
@@ -354,31 +347,22 @@ class ApiService {
   Future<Map<String, dynamic>> createAnnouncement({
     required String title,
     required String body,
-    String audience = 'Everyone',
+    List<String> grades = const [],
   }) =>
       _post('/announcement', {
         'title': title,
         'body': body,
-        'audience': audience,
+        'grades': grades,
       });
+
+  Future<Map<String, dynamic>> toggleAnnouncementLike(String id) =>
+      _post('/announcement/$id/like', {});
+
+  Future<Map<String, dynamic>> deleteAnnouncement(String id) =>
+      _delete('/announcement/$id');
 
   Future<Map<String, dynamic>> createVote({required String question}) =>
       _post('/vote', {'question': question});
-
-  Future<Map<String, dynamic>> createStoryPost({
-    required String classId,
-    required String text,
-    String className = '',
-    List<String> mediaUrls = const [],
-    String mediaType = 'none',
-  }) =>
-      _post('/story', {
-        'classId': classId,
-        'text': text,
-        'className': className,
-        'mediaUrls': mediaUrls,
-        'mediaType': mediaType,
-      });
 
   Future<Map<String, dynamic>> enterGrade({
     required String studentUid,

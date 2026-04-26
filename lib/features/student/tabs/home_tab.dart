@@ -3,6 +3,7 @@ import '../../../shared/animations/animations.dart';
 import '../../../shared/theme/colors.dart';
 import '../../../shared/utils/greeting.dart';
 import '../../../shared/widgets/attendance_detail_sheet.dart';
+import '../../../shared/widgets/announcement_card.dart';
 import '../../../models/user_model.dart';
 import '../../../models/class_model.dart';
 import '../../../models/grade_model.dart';
@@ -30,8 +31,10 @@ class StudentHomeTab extends StatelessWidget {
   final Animation<double> greetingFade;
   final Animation<Offset> greetingSlide;
   final Animation<double> greetingScale;
+  final String uid;
   final VoidCallback onSwitchToHomework;
   final Future<void> Function() onRefresh;
+  final void Function(AnnouncementModel) onToggleAnnouncementLike;
 
   const StudentHomeTab({
     super.key,
@@ -51,6 +54,8 @@ class StudentHomeTab extends StatelessWidget {
     required this.greetingScale,
     required this.onSwitchToHomework,
     required this.onRefresh,
+    required this.uid,
+    required this.onToggleAnnouncementLike,
   });
 
   @override
@@ -385,65 +390,13 @@ class StudentHomeTab extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       itemCount: announcements.length,
       itemBuilder: (context, index) {
-        final a = announcements[index];
         return StaggeredItem(
           index: index,
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-                color: TatvaColors.bgCard,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                    color: index == 0
-                        ? TatvaColors.info.withOpacity(0.2)
-                        : Colors.grey.shade100)),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(
-                  padding: const EdgeInsets.all(9),
-                  decoration: BoxDecoration(
-                      color: TatvaColors.info.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(10)),
-                  child: Icon(Icons.campaign_outlined, color: TatvaColors.info, size: 16)),
-              const SizedBox(width: 12),
-              Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    Row(children: [
-                      Expanded(
-                          child: Text(a.title,
-                              style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: TatvaColors.neutral900))),
-                      if (index == 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                              color: TatvaColors.error.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(6)),
-                          child: const Text('New',
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  color: TatvaColors.error,
-                                  fontWeight: FontWeight.w700)),
-                        ),
-                    ]),
-                    const SizedBox(height: 5),
-                    Text(a.body,
-                        style: const TextStyle(
-                            fontSize: 12,
-                            color: TatvaColors.neutral600,
-                            height: 1.55)),
-                    const SizedBox(height: 4),
-                    Text('By ${a.createdByName}',
-                        style: const TextStyle(
-                            fontSize: 10,
-                            color: TatvaColors.neutral400)),
-                  ])),
-            ]),
+          child: AnnouncementCard(
+            announcement: announcements[index],
+            currentUid: uid,
+            isFirst: index == 0,
+            onLike: () => onToggleAnnouncementLike(announcements[index]),
           ),
         );
       },

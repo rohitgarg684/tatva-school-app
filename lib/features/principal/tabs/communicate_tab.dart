@@ -92,7 +92,7 @@ class CommunicateTab extends StatelessWidget {
                                   color: Colors.white)),
                           SizedBox(height: 2),
                           Text(
-                              'Send to everyone,\nparents or teachers',
+                              'Send to everyone\nor specific grades',
                               style: TextStyle(
                                   fontSize: 10,
                                   color: Colors.white

@@ -241,14 +241,26 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
         onGenerateReport: _generateReport,
       );
 
-  void _showNewAnnouncement() => NewAnnouncementSheet.show(
-        context,
-        api: _api,
-        uid: _uid,
-        userName: _data?.user?.name ?? '',
-        onAnnouncementCreated: (ann) =>
-            setState(() => _announcementModels.insert(0, ann)),
-      );
+  void _showNewAnnouncement() {
+    final allGrades = (_data?.allClasses ?? [])
+        .map((c) => c.name.split(' ').first)
+        .toSet()
+        .toList()
+      ..sort();
+    final grades = allGrades.isEmpty
+        ? List.generate(12, (i) => '${i + 1}')
+        : allGrades;
+    NewAnnouncementSheet.show(
+      context,
+      api: _api,
+      uid: _uid,
+      userName: _data?.user?.name ?? '',
+      userRole: 'Principal',
+      availableGrades: grades,
+      onAnnouncementCreated: (ann) =>
+          setState(() => _announcementModels.insert(0, ann)),
+    );
+  }
 
   void _showCreateVote() => CreateVoteSheet.show(
         context,

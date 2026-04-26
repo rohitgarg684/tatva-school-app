@@ -16,8 +16,8 @@ import '../../models/announcement_model.dart';
 import '../../models/homework_model.dart';
 import '../../models/behavior_point.dart';
 import '../../models/attendance_record.dart';
-import '../../models/story_post.dart';
 import '../../models/activity_event.dart';
+import '../principal/widgets/new_announcement_sheet.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/classes_tab.dart';
 import 'tabs/behavior_tab.dart';
@@ -25,7 +25,6 @@ import 'tabs/attendance_tab.dart';
 import 'tabs/schedule_tab.dart';
 import 'tabs/grades_tab.dart';
 import 'tabs/homework_tab.dart';
-import 'tabs/story_tab.dart';
 import 'tabs/messages_tab.dart';
 import 'tabs/profile_tab.dart';
 
@@ -46,7 +45,6 @@ class _TeacherDashboardState extends State<TeacherDashboard>
     TabItem(icon: Icons.calendar_view_week_outlined, activeIcon: Icons.calendar_view_week_rounded, label: 'Schedule'),
     TabItem(icon: Icons.grade_outlined, activeIcon: Icons.grade_rounded, label: 'Grades'),
     TabItem(icon: Icons.assignment_outlined, activeIcon: Icons.assignment_rounded, label: 'Homework'),
-    TabItem(icon: Icons.auto_stories_outlined, activeIcon: Icons.auto_stories_rounded, label: 'Story'),
     TabItem(icon: Icons.chat_outlined, activeIcon: Icons.chat_rounded, label: 'Messages'),
     TabItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Profile'),
   ];
@@ -60,9 +58,9 @@ class _TeacherDashboardState extends State<TeacherDashboard>
 
   TeacherDashboardData? _data;
   List<HomeworkModel> _homework = [];
+  List<AnnouncementModel> _announcements = [];
   List<BehaviorPoint> _classBehavior = [];
   List<AttendanceRecord> _todayAttendance = [];
-  List<StoryPost> _classStory = [];
 
   // ── ANIMATIONS
   late AnimationController _shimmerController;
@@ -124,9 +122,9 @@ class _TeacherDashboardState extends State<TeacherDashboard>
       final data = await _dashSvc.loadTeacherDashboard(overrideUid: _uid, forceRefresh: true);
       _data = data;
       _homework = List.of(data.homework);
+      _announcements = List.of(data.announcements);
       _classBehavior = List.of(data.classBehavior);
       _todayAttendance = List.of(data.todayAttendance);
-      _classStory = List.of(data.classStory);
     } catch (e) {
       debugPrint('TeacherDashboard._loadData error: $e');
     }
@@ -220,6 +218,8 @@ class _TeacherDashboardState extends State<TeacherDashboard>
               user: _data?.user,
               classes: _data?.classes ?? [],
               homework: _homework,
+              announcements: _announcements,
+              uid: _uid,
               activityFeed: _data?.activityFeed ?? [],
               greetingFade: _greetingFade,
               greetingSlide: _greetingSlide,
@@ -228,6 +228,8 @@ class _TeacherDashboardState extends State<TeacherDashboard>
               onSwitchTab: _switchTab,
               onViewClassStudents: (cls) => _showClassStudents(cls),
               onDeleteClass: (cls) => _confirmDeleteClass(cls),
+              onNewAnnouncement: _showNewAnnouncement,
+              onToggleAnnouncementLike: _toggleAnnouncementLike,
             ),
             TeacherClassesTab(
               classes: _data?.classes ?? [],
@@ -276,16 +278,6 @@ class _TeacherDashboardState extends State<TeacherDashboard>
               onHomeworkDeleted: (id) =>
                   setState(() => _homework.removeWhere((h) => h.id == id)),
             ),
-            TeacherStoryTab(
-              classStory: _classStory,
-              classes: _data?.classes ?? [],
-              uid: _uid,
-              user: _data?.user,
-              onStoryAdded: (post) =>
-                  setState(() => _classStory.insert(0, post)),
-              onStoryUpdated: (i, post) =>
-                  setState(() => _classStory[i] = post),
-            ),
             TeacherMessagesTab(parents: _data?.parentsInFirstClass ?? []),
             TeacherProfileTab(
               user: _data?.user,
@@ -297,6 +289,41 @@ class _TeacherDashboardState extends State<TeacherDashboard>
   Widget _buildBottomNav() {
     return TatvaBottomNavBar(
         items: _tabs, currentIndex: _currentTab, onTap: _switchTab);
+  }
+
+  void _showNewAnnouncement() {
+    final teacherGrades = (_data?.classes ?? [])
+        .map((c) => c.name.split(' ').first)
+        .toSet()
+        .toList()
+      ..sort();
+    final grades = teacherGrades.isEmpty
+        ? List.generate(12, (i) => '${i + 1}')
+        : teacherGrades;
+    NewAnnouncementSheet.show(
+      context,
+      api: _api,
+      uid: _uid,
+      userName: _data?.user?.name ?? '',
+      userRole: 'Teacher',
+      availableGrades: grades,
+      onAnnouncementCreated: (ann) =>
+          setState(() => _announcements.insert(0, ann)),
+    );
+  }
+
+  void _toggleAnnouncementLike(AnnouncementModel ann) {
+    if (ann.id.isEmpty) return;
+    setState(() {
+      final idx = _announcements.indexWhere((a) => a.id == ann.id);
+      if (idx < 0) return;
+      final current = _announcements[idx];
+      final liked = current.likedBy.contains(_uid);
+      final newLikedBy = List<String>.from(current.likedBy);
+      liked ? newLikedBy.remove(_uid) : newLikedBy.add(_uid);
+      _announcements[idx] = current.copyWith(likedBy: newLikedBy);
+    });
+    _api.toggleAnnouncementLike(ann.id);
   }
 
   // ─── SHARED SHEETS (used by HomeTab callbacks) ────────────────────────────

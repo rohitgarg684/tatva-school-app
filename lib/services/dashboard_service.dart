@@ -7,7 +7,6 @@ import '../models/homework_model.dart';
 import '../models/vote_model.dart';
 import '../models/behavior_point.dart';
 import '../models/attendance_record.dart';
-import '../models/story_post.dart';
 import '../models/activity_event.dart';
 import '../models/content_item.dart';
 import '../models/child_info.dart';
@@ -25,7 +24,6 @@ class StudentDashboardData {
   final List<BehaviorPoint> behaviorPoints;
   final int behaviorScore;
   final List<AttendanceRecord> attendance;
-  final List<StoryPost> storyPosts;
   final List<ActivityEvent> activityFeed;
   final List<ContentItem> contentItems;
 
@@ -39,7 +37,6 @@ class StudentDashboardData {
     this.behaviorPoints = const [],
     this.behaviorScore = 0,
     this.attendance = const [],
-    this.storyPosts = const [],
     this.activityFeed = const [],
     this.contentItems = const [],
   });
@@ -58,7 +55,6 @@ class TeacherDashboardData {
   final List<HomeworkModel> homework;
   final List<BehaviorPoint> classBehavior;
   final List<AttendanceRecord> todayAttendance;
-  final List<StoryPost> classStory;
   final List<ActivityEvent> activityFeed;
   final List<UserModel> allStudents;
 
@@ -74,7 +70,6 @@ class TeacherDashboardData {
     this.homework = const [],
     this.classBehavior = const [],
     this.todayAttendance = const [],
-    this.classStory = const [],
     this.activityFeed = const [],
     this.allStudents = const [],
   });
@@ -107,7 +102,6 @@ class ParentDashboardData {
   final List<ChildDashboardData> childrenData;
   final List<AnnouncementModel> announcements;
   final List<VoteModel> activeVotes;
-  final List<StoryPost> storyPosts;
   final List<ActivityEvent> activityFeed;
   final List<ContentItem> contentItems;
 
@@ -116,7 +110,6 @@ class ParentDashboardData {
     this.childrenData = const [],
     this.announcements = const [],
     this.activeVotes = const [],
-    this.storyPosts = const [],
     this.activityFeed = const [],
     this.contentItems = const [],
   });
@@ -229,7 +222,6 @@ class DashboardService {
           _parseList(json['behaviorPoints'], BehaviorPoint.fromJson),
       behaviorScore: (json['behaviorScore'] as num?)?.toInt() ?? 0,
       attendance: _parseList(json['attendance'], AttendanceRecord.fromJson),
-      storyPosts: _parseList(json['storyPosts'], StoryPost.fromJson),
       activityFeed: _parseList(json['activityFeed'], ActivityEvent.fromJson),
       contentItems: _parseList(json['contentItems'], ContentItem.fromJson),
     );
@@ -276,7 +268,6 @@ class DashboardService {
           _parseList(json['classBehavior'], BehaviorPoint.fromJson),
       todayAttendance:
           _parseList(json['todayAttendance'], AttendanceRecord.fromJson),
-      classStory: _parseList(json['classStory'], StoryPost.fromJson),
       activityFeed: _parseList(json['activityFeed'], ActivityEvent.fromJson),
       allStudents: _parseList(json['allStudents'], UserModel.fromJson),
     );
@@ -324,7 +315,6 @@ class DashboardService {
       announcements:
           _parseList(json['announcements'], AnnouncementModel.fromJson),
       activeVotes: _parseList(json['activeVotes'], VoteModel.fromJson),
-      storyPosts: _parseList(json['storyPosts'], StoryPost.fromJson),
       activityFeed: _parseList(json['activityFeed'], ActivityEvent.fromJson),
       contentItems: _parseList(json['contentItems'], ContentItem.fromJson),
     );

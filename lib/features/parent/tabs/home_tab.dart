@@ -4,6 +4,7 @@ import '../../../shared/theme/colors.dart';
 import '../../../shared/animations/animations.dart';
 import '../../../shared/utils/greeting.dart';
 import '../../../shared/widgets/attendance_detail_sheet.dart';
+import '../../../shared/widgets/announcement_card.dart';
 import '../../../models/user_model.dart';
 import '../../../models/child_info.dart';
 import '../../../models/announcement_model.dart';
@@ -20,10 +21,12 @@ class ParentHomeTab extends StatelessWidget {
   final Animation<double> greetingFade;
   final Animation<Offset> greetingSlide;
   final Animation<double> greetingScale;
+  final String uid;
   final VoidCallback onShowTeacherProfile;
   final ValueChanged<int> onSwitchTab;
   final Future<void> Function() onRefresh;
   final Widget childSwitcher;
+  final void Function(AnnouncementModel) onToggleAnnouncementLike;
 
   const ParentHomeTab({
     super.key,
@@ -40,6 +43,8 @@ class ParentHomeTab extends StatelessWidget {
     required this.onSwitchTab,
     required this.onRefresh,
     required this.childSwitcher,
+    required this.uid,
+    required this.onToggleAnnouncementLike,
   });
 
   @override
@@ -290,50 +295,14 @@ class ParentHomeTab extends StatelessWidget {
                         color: TatvaColors.neutral900,
                         letterSpacing: -0.3))),
             const SizedBox(height: 12),
-            ...announcements.asMap().entries.map((e) => Container(
-                  margin: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                      color: TatvaColors.bgCard,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                          color: e.key == 0
-                              ? TatvaColors.purple.withOpacity(0.2)
-                              : Colors.grey.shade100)),
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(children: [
-                          Expanded(
-                              child: Text(e.value.title,
-                                  style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      color: TatvaColors.neutral900))),
-                          if (e.key == 0)
-                            Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                    color: TatvaColors.error.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(6)),
-                                child: const Text('New',
-                                    style: TextStyle(
-                                        fontSize: 10,
-                                        color: TatvaColors.error,
-                                        fontWeight: FontWeight.w700))),
-                        ]),
-                        const SizedBox(height: 5),
-                        Text(e.value.body,
-                            style: const TextStyle(
-                                fontSize: 12,
-                                color: TatvaColors.neutral600,
-                                height: 1.55)),
-                        const SizedBox(height: 4),
-                        Text('By ${e.value.createdByName}',
-                            style: const TextStyle(
-                                fontSize: 10, color: TatvaColors.neutral400)),
-                      ]),
+            ...announcements.asMap().entries.map((e) => Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: AnnouncementCard(
+                    announcement: e.value,
+                    currentUid: uid,
+                    isFirst: e.key == 0,
+                    onLike: () => onToggleAnnouncementLike(e.value),
+                  ),
                 )),
             if (activityFeed.isNotEmpty) ...[
               const SizedBox(height: 24),

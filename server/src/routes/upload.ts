@@ -105,31 +105,6 @@ const router = Router();
 router.use(requireAuth);
 
 router.post(
-  "/story/upload",
-  requireRole("Teacher", "Principal"),
-  imageUpload.single("file"),
-  async (req: Request, res: Response) => {
-    try {
-      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      if (!isValidImage(req.file.buffer))
-        return res.status(400).json({ error: "File content does not match a valid image format" });
-
-      const classId = req.body.classId;
-      if (!classId || typeof classId !== "string")
-        return res.status(400).json({ error: "classId required" });
-
-      const storagePath = `stories/${sanitizeId(classId)}/${generateFileName(req.file.mimetype)}`;
-      const url = await uploadToStorage(req.file.buffer, storagePath, req.file.mimetype);
-      res.json({ url, path: storagePath });
-    } catch (err: any) {
-      if (handleMulterError(err, res)) return;
-      console.error("story upload error:", err);
-      res.status(500).json({ error: err.message || "Internal server error" });
-    }
-  }
-);
-
-router.post(
   "/document/upload",
   requireRole("Teacher", "Principal"),
   docUpload.single("file"),

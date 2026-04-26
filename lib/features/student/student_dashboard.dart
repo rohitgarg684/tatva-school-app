@@ -17,14 +17,12 @@ import '../../models/vote_model.dart';
 import '../../models/class_model.dart';
 import '../../models/behavior_point.dart';
 import '../../models/attendance_record.dart';
-import '../../models/story_post.dart';
 import '../../models/activity_event.dart';
 import '../../models/content_item.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/schedule_tab.dart';
 import 'tabs/homework_tab.dart';
 import 'tabs/grades_tab.dart';
-import 'tabs/story_tab.dart';
 import 'tabs/learn_tab.dart';
 import 'tabs/profile_tab.dart';
 
@@ -42,7 +40,6 @@ class _StudentDashboardState extends State<StudentDashboard>
     TabItem(icon: Icons.calendar_view_week_outlined, activeIcon: Icons.calendar_view_week_rounded, label: 'Schedule'),
     TabItem(icon: Icons.assignment_outlined, activeIcon: Icons.assignment_rounded, label: 'Homework'),
     TabItem(icon: Icons.bar_chart_outlined, activeIcon: Icons.bar_chart_rounded, label: 'Grades'),
-    TabItem(icon: Icons.auto_stories_outlined, activeIcon: Icons.auto_stories_rounded, label: 'Story'),
     TabItem(icon: Icons.lightbulb_outline_rounded, activeIcon: Icons.lightbulb_rounded, label: 'Learn'),
     TabItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Profile'),
   ];
@@ -55,6 +52,7 @@ class _StudentDashboardState extends State<StudentDashboard>
   String _uid = '';
 
   StudentDashboardData? _data;
+  List<AnnouncementModel> _announcements = [];
   final Set<String> _completedIds = {};
 
   late AnimationController _shimmerController;
@@ -112,6 +110,7 @@ class _StudentDashboardState extends State<StudentDashboard>
       _uid = AuthRepository().currentUid ?? '';
       final data = await _dashSvc.loadStudentDashboard(overrideUid: _uid, forceRefresh: true);
       _data = data;
+      _announcements = List.of(data.announcements);
       _completedIds.clear();
       for (final hw in data.homework) {
         if (hw.isSubmittedBy(_uid)) _completedIds.add(hw.id);
@@ -158,15 +157,18 @@ class _StudentDashboardState extends State<StudentDashboard>
     setState(() => _completedIds.remove(hwId));
   }
 
-  void _handleToggleLike(StoryPost post) {
+  void _handleToggleAnnouncementLike(AnnouncementModel ann) {
+    if (ann.id.isEmpty) return;
     setState(() {
-      if (post.likedBy.contains(_uid)) {
-        post.likedBy.remove(_uid);
-      } else {
-        post.likedBy.add(_uid);
-      }
+      final idx = _announcements.indexWhere((a) => a.id == ann.id);
+      if (idx < 0) return;
+      final current = _announcements[idx];
+      final liked = current.likedBy.contains(_uid);
+      final newLikedBy = List<String>.from(current.likedBy);
+      liked ? newLikedBy.remove(_uid) : newLikedBy.add(_uid);
+      _announcements[idx] = current.copyWith(likedBy: newLikedBy);
     });
-    _api.toggleStoryLike(post.id);
+    _api.toggleAnnouncementLike(ann.id);
   }
 
   void _handleMarkCompleted(ContentItem item) {
@@ -247,7 +249,7 @@ class _StudentDashboardState extends State<StudentDashboard>
           primaryClass: _data?.primaryClass,
           pendingHomeworkCount: (_data?.homework ?? []).where((h) => !_completedIds.contains(h.id)).length,
           grades: _data?.grades ?? [],
-          announcements: _data?.announcements ?? [],
+          announcements: _announcements,
           behaviorPoints: _data?.behaviorPoints ?? [],
           behaviorScore: _data?.behaviorScore ?? 0,
           attendance: _data?.attendance ?? [],
@@ -259,6 +261,8 @@ class _StudentDashboardState extends State<StudentDashboard>
           greetingScale: _greetingScale,
           onSwitchToHomework: () => _switchTab(2),
           onRefresh: _loadUser,
+          uid: _uid,
+          onToggleAnnouncementLike: _handleToggleAnnouncementLike,
         ),
         StudentScheduleTab(
           primaryClass: _data?.primaryClass,
@@ -273,11 +277,6 @@ class _StudentDashboardState extends State<StudentDashboard>
           onMarkIncomplete: _handleMarkIncomplete,
         ),
         StudentGradesTab(grades: _data?.grades ?? []),
-        StudentStoryTab(
-          storyPosts: _data?.storyPosts ?? [],
-          uid: _uid,
-          onToggleLike: _handleToggleLike,
-        ),
         StudentLearnTab(
           contentItems: _data?.contentItems ?? [],
           uid: _uid,

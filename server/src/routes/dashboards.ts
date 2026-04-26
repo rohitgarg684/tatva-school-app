@@ -56,10 +56,14 @@ async function safe<T>(promise: Promise<T>, fallback: T): Promise<T> {
   }
 }
 
-function isVisibleTo(audience: string, roleAudience: string): boolean {
-  const a = (audience || "").toLowerCase();
-  const r = roleAudience.toLowerCase();
-  return a === "everyone" || a === r;
+function filterAnnouncementsByGrade(announcements: any[], userGrades: string[]): any[] {
+  return announcements.filter((a: any) => {
+    if ((a.audience || "").toLowerCase() === "everyone") return true;
+    if (Array.isArray(a.grades) && a.grades.length > 0) {
+      return a.grades.some((g: string) => userGrades.includes(g));
+    }
+    return true;
+  });
 }
 
 function computeBehaviorScore(points: any[]): number {
@@ -119,7 +123,7 @@ router.get(
 
     const [
       primaryClass, grades, announcements, homework, votes,
-      behaviorPoints, attendance, stories, activityFeed, contentItems,
+      behaviorPoints, attendance, activityFeed, contentItems,
     ] = await Promise.all([
       safe(classIds.length > 0 ? getDoc(Collections.CLASSES, classIds[0]) : Promise.resolve(null), null),
       safe(queryDocs(Collections.GRADES, [{ field: "studentUid", op: "==", value: uid }], { field: "createdAt" }), []),
@@ -134,16 +138,15 @@ router.get(
       ), []),
       safe(queryDocs(Collections.BEHAVIOR_POINTS, [{ field: "studentUid", op: "==", value: uid }], { field: "createdAt", direction: "desc" }), []),
       safe(queryDocs(Collections.ATTENDANCE, [{ field: "studentUid", op: "==", value: uid }], { field: "date", direction: "desc" }), []),
-      safe(classIds.length > 0
-        ? queryDocs(Collections.STORIES, [{ field: "classId", op: "in", value: inLimit }], { field: "createdAt", direction: "desc" })
-        : Promise.resolve([]), []),
       safe(queryDocs(Collections.ACTIVITIES, [{ field: "targetUid", op: "==", value: uid }], { field: "createdAt", direction: "desc" }, Config.ACTIVITY_FEED_LIMIT), []),
       safe(fetchShared("content_all", () =>
         queryDocs(Collections.CONTENT, [], { field: "createdAt", direction: "desc" })
       ), []),
     ]);
 
-    const filteredAnnouncements = (announcements as any[]).filter((a: any) => isVisibleTo(a.audience, "students"));
+    const userGrade = (primaryClass as any)?.grade || "";
+    const userGrades = userGrade ? [userGrade] : [];
+    const filteredAnnouncements = filterAnnouncementsByGrade(announcements as any[], userGrades);
 
     const result = {
       user: serializeDoc(user),
@@ -155,7 +158,6 @@ router.get(
       behaviorPoints: serializeDocs(behaviorPoints),
       behaviorScore: computeBehaviorScore(behaviorPoints),
       attendance: serializeDocs(attendance),
-      storyPosts: serializeDocs(stories as any[]),
       activityFeed: serializeDocs(activityFeed),
       contentItems: serializeDocs(contentItems),
     };
@@ -194,7 +196,6 @@ router.get(
     let gradesInFirstClass: any[] = [];
     let classBehavior: any[] = [];
     let todayAttendance: any[] = [];
-    let classStory: any[] = [];
     let activityFeed: any[] = [];
     let allTeacherGrades: any[] = [];
     let testTitles: any[] = [];
@@ -203,13 +204,12 @@ router.get(
       const first = classes[0] as any;
       const today = new Date().toISOString().substring(0, 10);
 
-      const [students, parents, grades, behavior, att, story, activity] = await Promise.all([
+      const [students, parents, grades, behavior, att, activity] = await Promise.all([
         safe(getDocs(Collections.USERS, first.studentUids || []), []),
         safe(getDocs(Collections.USERS, first.parentUids || []), []),
         safe(queryDocs(Collections.GRADES, [{ field: "classId", op: "==", value: first.id }], { field: "createdAt" }), []),
         safe(queryDocs(Collections.BEHAVIOR_POINTS, [{ field: "classId", op: "==", value: first.id }], { field: "createdAt", direction: "desc" }), []),
         safe(queryDocs(Collections.ATTENDANCE, [{ field: "date", op: "==", value: today }]), []),
-        safe(queryDocs(Collections.STORIES, [{ field: "classId", op: "==", value: first.id }], { field: "createdAt", direction: "desc" }), []),
         safe(queryDocs(Collections.ACTIVITIES, [{ field: "classId", op: "==", value: first.id }], { field: "createdAt", direction: "desc" }, Config.ACTIVITY_FEED_LIMIT), []),
       ]);
 
@@ -218,7 +218,6 @@ router.get(
       gradesInFirstClass = grades;
       classBehavior = behavior;
       todayAttendance = att;
-      classStory = story;
       activityFeed = activity;
 
       const allClassIds = classes.map((c: any) => c.id);
@@ -250,6 +249,9 @@ router.get(
       ), []),
     ]);
 
+    const teacherGrades = classes.map((c: any) => c.grade).filter(Boolean);
+    const filteredAnnouncements = filterAnnouncementsByGrade(announcements as any[], teacherGrades);
+
     const result = {
       user: serializeDoc(user),
       classes: serializeDocs(classes),
@@ -258,11 +260,10 @@ router.get(
       gradesInFirstClass: serializeDocs(gradesInFirstClass),
       allTeacherGrades: serializeDocs(allTeacherGrades),
       testTitles,
-      announcements: serializeDocs(announcements),
+      announcements: serializeDocs(filteredAnnouncements),
       homework: serializeDocs(homework),
       classBehavior: serializeDocs(classBehavior),
       todayAttendance: serializeDocs(todayAttendance),
-      classStory: serializeDocs(classStory),
       activityFeed: serializeDocs(activityFeed),
       allStudents: serializeDocs(allStudents),
     };
@@ -372,16 +373,15 @@ router.get(
     const classIdList = Array.from(classIdSet);
     const firstChildUid = childrenData.length > 0 ? childrenData[0].childUid : "";
 
-    const [announcements, votes, stories, activity, content] = await Promise.all([
+    const childGrades = childClasses.map((c: any) => c.grade).filter(Boolean);
+
+    const [announcements, votes, activity, content] = await Promise.all([
       safe(fetchShared("announcements_all", () =>
         queryDocs(Collections.ANNOUNCEMENTS, [], { field: "createdAt", direction: "desc" }, Config.ANNOUNCEMENTS_LIMIT)
       ), []),
       safe(fetchShared("votes_active", () =>
         queryDocs(Collections.VOTES, [{ field: "active", op: "==", value: true }], { field: "createdAt", direction: "desc" })
       ), []),
-      safe(classIdList.length > 0
-        ? queryDocs(Collections.STORIES, [{ field: "classId", op: "in", value: classIdList.slice(0, Config.FIRESTORE_IN_LIMIT) }], { field: "createdAt", direction: "desc" })
-        : Promise.resolve([]), []),
       safe(firstChildUid
         ? queryDocs(Collections.ACTIVITIES, [{ field: "targetUid", op: "==", value: firstChildUid }], { field: "createdAt", direction: "desc" }, Config.ACTIVITY_FEED_LIMIT)
         : Promise.resolve([]), []),
@@ -390,14 +390,13 @@ router.get(
       ), []),
     ]);
 
-    const filteredAnnouncements = (announcements as any[]).filter((a: any) => isVisibleTo(a.audience, "parents"));
+    const filteredAnnouncements = filterAnnouncementsByGrade(announcements as any[], childGrades);
 
     const result = {
       user: serializeDoc(user),
       childrenData,
       announcements: serializeDocs(filteredAnnouncements.slice(0, Config.PRINCIPAL_ACTIVITY_LIMIT)),
       activeVotes: serializeDocs(votes),
-      storyPosts: serializeDocs(stories as any[]),
       activityFeed: serializeDocs(activity as any[]),
       contentItems: serializeDocs(content),
     };
