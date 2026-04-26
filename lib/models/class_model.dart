@@ -23,6 +23,10 @@ class ClassModel {
     this.createdAt,
   });
 
+  factory ClassModel.empty() => const ClassModel(
+      id: '', name: '', subject: '', teacherUid: '',
+      teacherName: '', teacherEmail: '', classCode: '');
+
   factory ClassModel.fromJson(Map<String, dynamic> data) {
     return ClassModel(
       id: data['id'] as String? ?? '',

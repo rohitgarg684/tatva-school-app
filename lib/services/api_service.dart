@@ -396,6 +396,25 @@ class ApiService {
         'total': total,
       });
 
+  Future<Map<String, dynamic>> deleteGrade(String id) =>
+      _delete('/grade/$id');
+
+  // ─── Test Titles ─────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> addTestTitle({
+    required String title,
+    String subject = '',
+    double total = 100,
+  }) =>
+      _post('/test-title', {
+        'title': title,
+        'subject': subject,
+        'total': total,
+      });
+
+  Future<Map<String, dynamic>> deleteTestTitle(String id) =>
+      _delete('/test-title/$id');
+
   // ─── Messages ─────────────────────────────────────────────────────────
 
   Future<List<Map<String, dynamic>>> getMessages(

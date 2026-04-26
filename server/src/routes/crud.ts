@@ -438,6 +438,76 @@ router.post(
   }
 );
 
+router.delete(
+  "/grade/:id",
+  requireRole("Teacher", "Principal"),
+  async (req, res) => {
+    try {
+      const id = req.params.id as string;
+      const ref = db.collection("grades").doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return res.status(404).json({ error: "Not found" });
+      await ref.delete();
+      cacheDeletePrefix("student_dash_");
+      cacheDeletePrefix("teacher_dash_");
+      res.json({ deleted: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
+// ─── Test Titles (auto-complete master list) ─────────────────────────────────
+
+router.post(
+  "/test-title",
+  requireRole("Teacher", "Principal"),
+  async (req, res) => {
+    try {
+      const { title, subject, total } = req.body;
+      if (!title) return res.status(400).json({ error: "title required" });
+
+      const existing = await db.collection("test_titles")
+        .where("teacherUid", "==", req.uid)
+        .where("title", "==", title)
+        .limit(1).get();
+      if (!existing.empty) {
+        return res.json({ id: existing.docs[0].id, exists: true });
+      }
+
+      const ref = await db.collection("test_titles").add({
+        teacherUid: req.uid,
+        title,
+        subject: subject || "",
+        total: total || 100,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      cacheDeletePrefix("teacher_dash_");
+      res.json({ id: ref.id, created: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
+router.delete(
+  "/test-title/:id",
+  requireRole("Teacher", "Principal"),
+  async (req, res) => {
+    try {
+      const id = req.params.id as string;
+      const ref = db.collection("test_titles").doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return res.status(404).json({ error: "Not found" });
+      await ref.delete();
+      cacheDeletePrefix("teacher_dash_");
+      res.json({ deleted: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
 // ─── Messages (1:1 polling) ──────────────────────────────────────────────────
 
 router.get("/messages/:conversationId", async (req, res) => {

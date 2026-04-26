@@ -52,6 +52,8 @@ class TeacherDashboardData {
   final List<UserModel> studentsInFirstClass;
   final List<UserModel> parentsInFirstClass;
   final List<GradeModel> gradesInFirstClass;
+  final List<GradeModel> allTeacherGrades;
+  final List<Map<String, dynamic>> testTitles;
   final List<AnnouncementModel> announcements;
   final List<HomeworkModel> homework;
   final List<BehaviorPoint> classBehavior;
@@ -66,6 +68,8 @@ class TeacherDashboardData {
     this.studentsInFirstClass = const [],
     this.parentsInFirstClass = const [],
     this.gradesInFirstClass = const [],
+    this.allTeacherGrades = const [],
+    this.testTitles = const [],
     this.announcements = const [],
     this.homework = const [],
     this.classBehavior = const [],
@@ -261,6 +265,10 @@ class DashboardService {
           _parseList(json['parentsInFirstClass'], UserModel.fromJson),
       gradesInFirstClass:
           _parseList(json['gradesInFirstClass'], GradeModel.fromJson),
+      allTeacherGrades:
+          _parseList(json['allTeacherGrades'], GradeModel.fromJson),
+      testTitles: (json['testTitles'] as List?)
+              ?.cast<Map<String, dynamic>>() ?? [],
       announcements:
           _parseList(json['announcements'], AnnouncementModel.fromJson),
       homework: _parseList(json['homework'], HomeworkModel.fromJson),

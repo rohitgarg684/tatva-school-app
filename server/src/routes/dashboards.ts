@@ -236,6 +236,8 @@ router.get("/teacher/:uid", async (req, res) => {
     let todayAttendance: any[] = [];
     let classStory: any[] = [];
     let activityFeed: any[] = [];
+    let allTeacherGrades: any[] = [];
+    let testTitles: any[] = [];
 
     if (classes.length > 0) {
       const first = classes[0] as any;
@@ -278,6 +280,23 @@ router.get("/teacher/:uid", async (req, res) => {
       todayAttendance = att;
       classStory = story;
       activityFeed = activity;
+
+      // Fetch grades for ALL teacher classes
+      const allClassIds = classes.map((c: any) => c.id);
+      const gradePromises = allClassIds.map((cid: string) =>
+        queryDocs("grades", [{ field: "classId", op: "==", value: cid }], { field: "createdAt" })
+      );
+      const gradeArrays = await Promise.all(gradePromises);
+      allTeacherGrades = gradeArrays.flat();
+    }
+
+    // Fetch test titles for this teacher
+    {
+      const ttSnap = await db.collection("test_titles")
+        .where("teacherUid", "==", uid)
+        .orderBy("createdAt", "desc")
+        .get();
+      testTitles = ttSnap.docs.map(d => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate?.()?.toISOString?.() || null }));
     }
 
     const [announcements, homework, allStudents] = await Promise.all([
@@ -300,6 +319,8 @@ router.get("/teacher/:uid", async (req, res) => {
       studentsInFirstClass: serializeDocs(studentsInFirstClass),
       parentsInFirstClass: serializeDocs(parentsInFirstClass),
       gradesInFirstClass: serializeDocs(gradesInFirstClass),
+      allTeacherGrades: serializeDocs(allTeacherGrades),
+      testTitles,
       announcements: serializeDocs(announcements),
       homework: serializeDocs(homework),
       classBehavior: serializeDocs(classBehavior),
