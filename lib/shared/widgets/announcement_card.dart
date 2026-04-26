@@ -314,188 +314,172 @@ class _AttachmentPreviewGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final images = attachments.where((a) => a.isImage).toList();
+    final others = attachments.where((a) => !a.isImage).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: attachments.map((a) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: _buildPreview(a),
-      )).toList(),
+      children: [
+        if (images.isNotEmpty)
+          SizedBox(
+            height: 120,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: images.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) => _ImageThumb(att: images[i]),
+            ),
+          ),
+        if (images.isNotEmpty && others.isNotEmpty) const SizedBox(height: 8),
+        ...others.map((a) => Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: _buildCard(context, a),
+        )),
+      ],
     );
   }
 
-  Widget _buildPreview(Attachment att) {
+  Widget _buildCard(BuildContext context, Attachment att) {
     return switch (att.type) {
-      AttachmentType.image => _ImagePreview(att: att),
-      AttachmentType.youtube => _YouTubeEmbed(att: att),
-      AttachmentType.video => _VideoEmbed(att: att),
-      AttachmentType.audio => _AudioEmbed(att: att),
-      AttachmentType.pdf => _PdfEmbed(att: att),
-      _ => _LinkPreview(att: att),
+      AttachmentType.youtube => _YouTubeThumb(att: att),
+      AttachmentType.video => _MediaCard(att: att, icon: Icons.videocam_outlined, color: TatvaColors.info, label: att.name.isNotEmpty ? att.name : 'Video'),
+      AttachmentType.audio => _MediaCard(att: att, icon: Icons.headphones_outlined, color: TatvaColors.purple, label: att.name.isNotEmpty ? att.name : 'Audio', showPlayer: kIsWeb),
+      AttachmentType.pdf => _PdfCard(att: att),
+      _ => _LinkCard(att: att),
     };
   }
 }
 
-class _ImagePreview extends StatelessWidget {
+class _ImageThumb extends StatelessWidget {
   final Attachment att;
-  const _ImagePreview({required this.att});
+  const _ImageThumb({required this.att});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => _showFullImage(context, att.url),
+      onTap: () => _showImageDialog(context, att.url),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Image.network(
-          att.url,
-          width: double.infinity,
-          fit: BoxFit.cover,
-          loadingBuilder: (_, child, progress) {
-            if (progress == null) return child;
-            return Container(
-              height: 180,
-              color: TatvaColors.bgLight,
-              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-            );
-          },
-          errorBuilder: (_, __, ___) => Container(
-            height: 120,
-            decoration: BoxDecoration(
-              color: TatvaColors.bgLight,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(child: Icon(Icons.broken_image, color: TatvaColors.neutral400)),
-          ),
+        borderRadius: BorderRadius.circular(10),
+        child: SizedBox(
+          width: 120,
+          height: 120,
+          child: kIsWeb
+              ? WebImage(src: att.url, height: 120)
+              : Image.network(att.url, fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: TatvaColors.bgLight,
+                    child: Center(child: Icon(Icons.broken_image, color: TatvaColors.neutral400, size: 24)),
+                  )),
         ),
       ),
     );
   }
+}
 
-  void _showFullImage(BuildContext context, String url) {
-    showDialog(
-      context: context,
-      builder: (_) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(16),
-        child: Stack(children: [
-          Center(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Image.network(url, fit: BoxFit.contain),
+class _YouTubeThumb extends StatelessWidget {
+  final Attachment att;
+  const _YouTubeThumb({required this.att});
+
+  @override
+  Widget build(BuildContext context) {
+    final videoId = Attachment.extractYouTubeId(att.url);
+    final thumb = videoId != null
+        ? 'https://img.youtube.com/vi/$videoId/mqdefault.jpg'
+        : null;
+
+    return GestureDetector(
+      onTap: () {
+        if (videoId != null && kIsWeb) {
+          _showYouTubeDialog(context, videoId);
+        } else {
+          _openUrl(att.url);
+        }
+      },
+      child: Container(
+        height: 72,
+        decoration: BoxDecoration(
+          color: TatvaColors.bgLight,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Row(children: [
+          ClipRRect(
+            borderRadius: const BorderRadius.horizontal(left: Radius.circular(11)),
+            child: SizedBox(
+              width: 112, height: 72,
+              child: Stack(children: [
+                if (thumb != null)
+                  Image.network(thumb, width: 112, height: 72, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(color: Colors.grey.shade800))
+                else
+                  Container(color: Colors.grey.shade800),
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                    child: const Icon(Icons.play_arrow, color: Colors.white, size: 16),
+                  ),
+                ),
+              ]),
             ),
           ),
-          Positioned(
-            top: 8, right: 8,
-            child: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                child: const Icon(Icons.close, color: Colors.white, size: 20),
-              ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              att.name.isNotEmpty ? att.name : 'YouTube Video',
+              maxLines: 2, overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: TatvaColors.neutral900),
             ),
           ),
+          const SizedBox(width: 8),
         ]),
       ),
     );
   }
 }
 
-class _YouTubeEmbed extends StatelessWidget {
+class _MediaCard extends StatelessWidget {
   final Attachment att;
-  const _YouTubeEmbed({required this.att});
+  final IconData icon;
+  final Color color;
+  final String label;
+  final bool showPlayer;
+
+  const _MediaCard({
+    required this.att,
+    required this.icon,
+    required this.color,
+    required this.label,
+    this.showPlayer = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final videoId = Attachment.extractYouTubeId(att.url);
-    if (videoId == null || !kIsWeb) {
-      return _fallbackCard(att, Icons.play_circle_outline, Colors.red, 'YouTube Video');
+    if (showPlayer && att.isAudio) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _cardRow(context),
+          const SizedBox(height: 4),
+          WebAudio(src: att.url),
+        ],
+      );
     }
-    return WebIFrame(
-      src: 'https://www.youtube.com/embed/$videoId',
-      height: 220,
-      allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture',
-      allowFullscreen: true,
-    );
+    return _cardRow(context);
   }
-}
 
-class _VideoEmbed extends StatelessWidget {
-  final Attachment att;
-  const _VideoEmbed({required this.att});
-
-  @override
-  Widget build(BuildContext context) {
-    if (!kIsWeb) {
-      return _fallbackCard(att, Icons.videocam_outlined, TatvaColors.info, att.name.isNotEmpty ? att.name : 'Video');
-    }
-    return WebVideo(src: att.url, height: 220);
-  }
-}
-
-class _AudioEmbed extends StatelessWidget {
-  final Attachment att;
-  const _AudioEmbed({required this.att});
-
-  @override
-  Widget build(BuildContext context) {
-    if (!kIsWeb) {
-      return _fallbackCard(att, Icons.headphones_outlined, TatvaColors.purple, att.name.isNotEmpty ? att.name : 'Audio');
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (att.name.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(children: [
-              Icon(Icons.headphones_outlined, size: 14, color: TatvaColors.purple),
-              const SizedBox(width: 6),
-              Text(att.name, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: TatvaColors.neutral600)),
-            ]),
-          ),
-        WebAudio(src: att.url),
-      ],
-    );
-  }
-}
-
-class _PdfEmbed extends StatelessWidget {
-  final Attachment att;
-  const _PdfEmbed({required this.att});
-
-  @override
-  Widget build(BuildContext context) {
-    if (!kIsWeb) {
-      return _fallbackCard(att, Icons.picture_as_pdf, TatvaColors.error, att.name.isNotEmpty ? att.name : 'PDF Document');
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (att.name.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(children: [
-              Icon(Icons.picture_as_pdf, size: 14, color: TatvaColors.error),
-              const SizedBox(width: 6),
-              Expanded(child: Text(att.name, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: TatvaColors.neutral600), overflow: TextOverflow.ellipsis)),
-            ]),
-          ),
-        WebIFrame(src: att.url, height: 400),
-      ],
-    );
-  }
-}
-
-class _LinkPreview extends StatelessWidget {
-  final Attachment att;
-  const _LinkPreview({required this.att});
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _cardRow(BuildContext context) {
     return GestureDetector(
-      onTap: () => _openUrl(att.url),
+      onTap: () {
+        if (kIsWeb && att.isVideo) {
+          _showVideoDialog(context, att.url);
+        } else {
+          _openUrl(att.url);
+        }
+      },
       child: Container(
-        padding: const EdgeInsets.all(12),
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           color: TatvaColors.bgLight,
           borderRadius: BorderRadius.circular(12),
@@ -503,14 +487,95 @@ class _LinkPreview extends StatelessWidget {
         ),
         child: Row(children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: TatvaColors.neutral900)),
+          ),
+          Icon(Icons.play_circle_outline, size: 20, color: color),
+        ]),
+      ),
+    );
+  }
+}
+
+class _PdfCard extends StatelessWidget {
+  final Attachment att;
+  const _PdfCard({required this.att});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        if (kIsWeb) {
+          _showPdfDialog(context, att.url, att.name);
+        } else {
+          _openUrl(att.url);
+        }
+      },
+      child: Container(
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: TatvaColors.bgLight,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: TatvaColors.error.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(Icons.picture_as_pdf, color: TatvaColors.error, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(att.name.isNotEmpty ? att.name : 'PDF Document',
+                maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: TatvaColors.neutral900)),
+          ),
+          Icon(Icons.visibility_outlined, size: 20, color: TatvaColors.neutral400),
+        ]),
+      ),
+    );
+  }
+}
+
+class _LinkCard extends StatelessWidget {
+  final Attachment att;
+  const _LinkCard({required this.att});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _openUrl(att.url),
+      child: Container(
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: TatvaColors.bgLight,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: TatvaColors.info.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(Icons.link, color: TatvaColors.info, size: 20),
+            child: Icon(Icons.link, color: TatvaColors.info, size: 18),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(att.name.isNotEmpty ? att.name : att.url,
                 maxLines: 1, overflow: TextOverflow.ellipsis,
@@ -523,33 +588,134 @@ class _LinkPreview extends StatelessWidget {
   }
 }
 
-Widget _fallbackCard(Attachment att, IconData icon, Color color, String label) {
-  return GestureDetector(
-    onTap: () => _openUrl(att.url),
-    child: Container(
-      height: 60,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: TatvaColors.bgLight,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(10),
+void _showImageDialog(BuildContext context, String url) {
+  showDialog(
+    context: context,
+    builder: (_) => Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(20),
+      child: Stack(children: [
+        Center(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: kIsWeb
+                ? WebImage(src: url, height: 500, fit: BoxFit.contain)
+                : Image.network(url, fit: BoxFit.contain),
           ),
-          child: Icon(icon, color: color, size: 20),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: TatvaColors.neutral900)),
+        Positioned(
+          top: 0, right: 0,
+          child: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+              child: const Icon(Icons.close, color: Colors.white, size: 20),
+            ),
+          ),
         ),
-        Icon(Icons.open_in_new, size: 18, color: TatvaColors.neutral400),
       ]),
+    ),
+  );
+}
+
+void _showYouTubeDialog(BuildContext context, String videoId) {
+  showDialog(
+    context: context,
+    builder: (_) => Dialog(
+      backgroundColor: Colors.black,
+      insetPadding: const EdgeInsets.all(20),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Align(
+          alignment: Alignment.topRight,
+          child: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Icon(Icons.close, color: Colors.white70, size: 22),
+            ),
+          ),
+        ),
+        ClipRRect(
+          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+          child: WebIFrame(
+            src: 'https://www.youtube.com/embed/$videoId?autoplay=1',
+            height: 320,
+            allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture',
+            allowFullscreen: true,
+          ),
+        ),
+      ]),
+    ),
+  );
+}
+
+void _showVideoDialog(BuildContext context, String url) {
+  showDialog(
+    context: context,
+    builder: (_) => Dialog(
+      backgroundColor: Colors.black,
+      insetPadding: const EdgeInsets.all(20),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Align(
+          alignment: Alignment.topRight,
+          child: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Icon(Icons.close, color: Colors.white70, size: 22),
+            ),
+          ),
+        ),
+        ClipRRect(
+          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+          child: WebVideo(src: url, height: 320),
+        ),
+      ]),
+    ),
+  );
+}
+
+void _showPdfDialog(BuildContext context, String url, String name) {
+  final viewerUrl = 'https://docs.google.com/gview?embedded=true&url=${Uri.encodeComponent(url)}';
+  showDialog(
+    context: context,
+    builder: (_) => Dialog(
+      insetPadding: const EdgeInsets.all(16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: SizedBox(
+        width: double.infinity,
+        height: MediaQuery.of(context).size.height * 0.75,
+        child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
+            child: Row(children: [
+              Icon(Icons.picture_as_pdf, color: TatvaColors.error, size: 20),
+              const SizedBox(width: 8),
+              Expanded(child: Text(name.isNotEmpty ? name : 'PDF', overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+              IconButton(
+                icon: Icon(Icons.open_in_new, size: 18),
+                onPressed: () => _openUrl(url),
+                tooltip: 'Open in new tab',
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, size: 20),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ]),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+              child: WebIFrame(src: viewerUrl, height: double.infinity),
+            ),
+          ),
+        ]),
+      ),
     ),
   );
 }

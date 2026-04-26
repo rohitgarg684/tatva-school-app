@@ -63,10 +63,6 @@ router.post(
     const uid = req.uid!;
     const homeworkId = req.params.homeworkId as string;
 
-    await db.collection(Collections.HOMEWORK).doc(homeworkId).update({
-      submittedBy: FieldValue.arrayUnion(uid),
-    });
-
     const subRef = db
       .collection(Collections.HOMEWORK_SUBMISSIONS)
       .doc(`${homeworkId}_${uid}`);
@@ -80,6 +76,10 @@ router.post(
         submittedAt: FieldValue.serverTimestamp(),
       });
     }
+
+    await db.collection(Collections.HOMEWORK).doc(homeworkId).update({
+      submittedBy: FieldValue.arrayUnion(uid),
+    });
 
     cacheDeletePrefix("student_dash_");
     cacheDeletePrefix("teacher_dash_");

@@ -179,7 +179,8 @@ router.post(
       for (const file of files) {
         const storagePath = `announcements/${generateFileName(file.mimetype)}`;
         const url = await uploadToStorage(file.buffer, storagePath, file.mimetype);
-        uploaded.push({ url, name: file.originalname, type: classifyFileType(file.originalname) });
+        const name = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        uploaded.push({ url, name, type: classifyFileType(name) });
       }
 
       res.json({ attachments: uploaded });
@@ -255,7 +256,7 @@ router.post(
         {
           homeworkId,
           studentUid: uid,
-          files: admin.firestore.FieldValue.arrayUnion(...(fileUrls.length > 0 ? fileUrls : [])),
+          files: fileUrls.length > 0 ? admin.firestore.FieldValue.arrayUnion(...fileUrls) : [],
           note,
           submittedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
@@ -282,29 +283,46 @@ router.get(
   requireRole("Teacher", "Principal"),
   asyncHandler(async (req, res) => {
     const homeworkId = req.params.id as string;
-    const snaps = await db.collection(Collections.HOMEWORK_SUBMISSIONS)
-      .where("homeworkId", "==", homeworkId).get();
 
-    const submissions = snaps.docs.map((d) => {
+    const [subSnaps, hwDoc] = await Promise.all([
+      db.collection(Collections.HOMEWORK_SUBMISSIONS)
+        .where("homeworkId", "==", homeworkId).get(),
+      db.collection(Collections.HOMEWORK).doc(homeworkId).get(),
+    ]);
+
+    const submissionsByUid = new Map<string, any>();
+    for (const d of subSnaps.docs) {
       const data = d.data();
-      return { id: d.id, ...data, submittedAt: data.submittedAt?.toDate?.()?.toISOString?.() || null };
-    });
+      submissionsByUid.set(data.studentUid, {
+        id: d.id, ...data,
+        submittedAt: data.submittedAt?.toDate?.()?.toISOString?.() || null,
+      });
+    }
 
-    const studentUids = submissions.map((s: any) => s.studentUid).filter(Boolean);
-    const userMap: Record<string, string> = {};
-    if (studentUids.length > 0) {
-      const chunks = [];
-      for (let i = 0; i < studentUids.length; i += 10) {
-        chunks.push(studentUids.slice(i, i + 10));
-      }
-      for (const chunk of chunks) {
-        const snap = await db.collection(Collections.USERS)
-          .where(admin.firestore.FieldPath.documentId(), "in", chunk).get();
-        snap.docs.forEach((d) => { userMap[d.id] = d.data().name || d.id; });
+    const submittedBy: string[] = hwDoc.exists ? (hwDoc.data()?.submittedBy || []) : [];
+    for (const uid of submittedBy) {
+      if (!submissionsByUid.has(uid)) {
+        submissionsByUid.set(uid, {
+          id: `${homeworkId}_${uid}`,
+          homeworkId,
+          studentUid: uid,
+          files: [],
+          note: "",
+          submittedAt: null,
+        });
       }
     }
 
-    const enriched = submissions.map((s: any) => ({
+    const allUids = [...submissionsByUid.keys()];
+    const userMap: Record<string, string> = {};
+    for (let i = 0; i < allUids.length; i += 10) {
+      const chunk = allUids.slice(i, i + 10);
+      const snap = await db.collection(Collections.USERS)
+        .where(admin.firestore.FieldPath.documentId(), "in", chunk).get();
+      snap.docs.forEach((d) => { userMap[d.id] = d.data().name || d.id; });
+    }
+
+    const enriched = [...submissionsByUid.values()].map((s: any) => ({
       ...s,
       studentName: userMap[s.studentUid] || s.studentUid,
     }));

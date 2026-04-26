@@ -54,6 +54,48 @@ class _WebIFrameState extends State<WebIFrame> {
   }
 }
 
+class WebImage extends StatefulWidget {
+  final String src;
+  final double? height;
+  final BoxFit fit;
+
+  const WebImage({super.key, required this.src, this.height, this.fit = BoxFit.cover});
+
+  @override
+  State<WebImage> createState() => _WebImageState();
+}
+
+class _WebImageState extends State<WebImage> {
+  late final String _viewType;
+
+  @override
+  void initState() {
+    super.initState();
+    _viewType = 'web-img-${_viewCounter++}';
+    ui_web.platformViewRegistry.registerViewFactory(_viewType, (int viewId) {
+      final img = web.document.createElement('img') as web.HTMLImageElement;
+      img.src = widget.src;
+      img.style.width = '100%';
+      img.style.height = '100%';
+      img.style.objectFit = widget.fit == BoxFit.contain ? 'contain' : 'cover';
+      img.style.borderRadius = '12px';
+      img.style.display = 'block';
+      return img;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: widget.height ?? 200,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: HtmlElementView(viewType: _viewType),
+      ),
+    );
+  }
+}
+
 class WebVideo extends StatefulWidget {
   final String src;
   final double? height;
