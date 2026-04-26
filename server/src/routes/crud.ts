@@ -236,7 +236,7 @@ router.post(
   requireRole("Teacher", "Principal"),
   async (req, res) => {
     try {
-      const { title, description, subject, classId, className, dueDate } = req.body;
+      const { title, description, subject, classId, className, dueDate, attachments } = req.body;
       if (!title || !classId)
         return res.status(400).json({ error: "title, classId required" });
 
@@ -253,12 +253,32 @@ router.post(
         teacherName: userDoc?.name || "",
         dueDate: dueDate || "",
         submittedBy: [],
+        attachments: Array.isArray(attachments) ? attachments : [],
         createdAt: FieldValue.serverTimestamp(),
       });
 
       cacheDeletePrefix("teacher_dash_");
       cacheDeletePrefix("student_dash_");
       res.json({ id: ref.id, created: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
+router.delete(
+  "/homework/:id",
+  requireRole("Teacher", "Principal"),
+  async (req, res) => {
+    try {
+      const docId = req.params.id as string;
+      const ref = db.collection("homework").doc(docId);
+      const snap = await ref.get();
+      if (!snap.exists) return res.status(404).json({ error: "Not found" });
+      await ref.delete();
+      cacheDeletePrefix("teacher_dash_");
+      cacheDeletePrefix("student_dash_");
+      res.json({ deleted: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

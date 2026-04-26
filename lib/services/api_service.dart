@@ -251,6 +251,7 @@ class ApiService {
     String subject = '',
     String className = '',
     String dueDate = '',
+    List<Map<String, dynamic>> attachments = const [],
   }) =>
       _post('/homework', {
         'title': title,
@@ -259,7 +260,11 @@ class ApiService {
         'subject': subject,
         'className': className,
         'dueDate': dueDate,
+        'attachments': attachments,
       });
+
+  Future<Map<String, dynamic>> deleteHomework(String id) =>
+      _delete('/homework/$id');
 
   Future<Map<String, dynamic>> createAnnouncement({
     required String title,

@@ -1,3 +1,25 @@
+class HomeworkAttachment {
+  final String url;
+  final String name;
+  final String type; // 'link', 'pdf', 'image'
+
+  const HomeworkAttachment({
+    required this.url,
+    this.name = '',
+    this.type = 'link',
+  });
+
+  factory HomeworkAttachment.fromJson(Map<String, dynamic> data) {
+    return HomeworkAttachment(
+      url: data['url'] as String? ?? '',
+      name: data['name'] as String? ?? '',
+      type: data['type'] as String? ?? 'link',
+    );
+  }
+
+  Map<String, dynamic> toMap() => {'url': url, 'name': name, 'type': type};
+}
+
 class HomeworkModel {
   final String id;
   final String title;
@@ -9,6 +31,7 @@ class HomeworkModel {
   final String teacherName;
   final String dueDate;
   final List<String> submittedBy;
+  final List<HomeworkAttachment> attachments;
   final DateTime? createdAt;
 
   const HomeworkModel({
@@ -22,6 +45,7 @@ class HomeworkModel {
     this.teacherName = '',
     required this.dueDate,
     this.submittedBy = const [],
+    this.attachments = const [],
     this.createdAt,
   });
 
@@ -41,6 +65,11 @@ class HomeworkModel {
       teacherName: data['teacherName'] as String? ?? '',
       dueDate: data['dueDate'] as String? ?? '',
       submittedBy: List<String>.from(data['submittedBy'] ?? []),
+      attachments: (data['attachments'] as List?)
+              ?.map((a) =>
+                  HomeworkAttachment.fromJson(a as Map<String, dynamic>))
+              .toList() ??
+          [],
       createdAt: data['createdAt'] != null
           ? DateTime.tryParse(data['createdAt'] as String)
           : null,
@@ -58,6 +87,7 @@ class HomeworkModel {
       'teacherName': teacherName,
       'dueDate': dueDate,
       'submittedBy': submittedBy,
+      'attachments': attachments.map((a) => a.toMap()).toList(),
       'createdAt': DateTime.now().toIso8601String(),
     };
   }

@@ -2617,8 +2617,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
     final subs = hw.submissionCount;
     final total = _students.length;
     final pct = total > 0 ? subs / total : 0.0;
-    final isDone = false;
-    final color = isDone ? success : accent;
+    final color = accent;
     return StaggeredItem(
       index: idx,
       child: Container(
@@ -2626,9 +2625,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
         decoration: BoxDecoration(
             color: bgCard,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-                color:
-                    isDone ? success.withOpacity(0.15) : Colors.grey.shade100)),
+            border: Border.all(color: Colors.grey.shade100)),
         child: Column(children: [
           Container(
             padding: const EdgeInsets.all(16),
@@ -2643,12 +2640,8 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                   decoration: BoxDecoration(
                       color: color.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(10)),
-                  child: Icon(
-                      isDone
-                          ? Icons.check_circle_outline_rounded
-                          : Icons.assignment_outlined,
-                      color: color,
-                      size: 18)),
+                  child: Icon(Icons.assignment_outlined,
+                      color: color, size: 18)),
               const SizedBox(width: 12),
               Expanded(
                   child: Column(
@@ -2660,37 +2653,71 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: textDark)),
-                    Text(hw.className,
+                    Text('${hw.className} · ${hw.subject}',
                         style: const TextStyle(
                             fontFamily: 'Raleway',
                             fontSize: 11,
                             color: textLight)),
                   ])),
-              Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              GestureDetector(
+                onTap: () => _deleteHomework(hw),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                      color: color.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: color.withOpacity(0.25))),
-                  child: Text('0 marks',
-                      style: TextStyle(
-                          fontFamily: 'Raleway',
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: color))),
+                      color: danger.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(8)),
+                  child: Icon(Icons.delete_outline_rounded,
+                      color: danger.withOpacity(0.5), size: 16),
+                ),
+              ),
             ]),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(hw.description,
-                  style: const TextStyle(
-                      fontFamily: 'Raleway',
-                      fontSize: 12,
-                      color: textMid,
-                      height: 1.5)),
+              if (hw.description.isNotEmpty)
+                Text(hw.description,
+                    style: const TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 12,
+                        color: textMid,
+                        height: 1.5)),
+              if (hw.attachments.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(spacing: 6, runSpacing: 6, children: hw.attachments.map((a) {
+                  IconData icon;
+                  Color c;
+                  switch (a.type) {
+                    case 'pdf':
+                      icon = Icons.picture_as_pdf_rounded;
+                      c = danger;
+                    case 'image':
+                      icon = Icons.image_rounded;
+                      c = info;
+                    default:
+                      icon = Icons.link_rounded;
+                      c = primary;
+                  }
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                        color: c.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: c.withOpacity(0.15))),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(icon, size: 14, color: c),
+                      const SizedBox(width: 4),
+                      Text(a.name.isNotEmpty ? a.name : 'Attachment',
+                          style: TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: c)),
+                    ]),
+                  );
+                }).toList()),
+              ],
               const SizedBox(height: 12),
               Row(children: [
                 Icon(Icons.calendar_today_outlined, size: 12, color: textLight),
@@ -2728,12 +2755,46 @@ class _TeacherDashboardState extends State<TeacherDashboard>
     );
   }
 
+  void _deleteHomework(HomeworkModel hw) {
+    if (hw.id.isEmpty) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete homework?',
+            style: TextStyle(fontFamily: 'Raleway', fontSize: 16)),
+        content: Text(hw.title,
+            style: const TextStyle(fontFamily: 'Raleway', fontSize: 14)),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await _api.deleteHomework(hw.id);
+                setState(() => _homework.removeWhere((h) => h.id == hw.id));
+                _snack('Homework deleted');
+              } catch (_) {
+                _snack('Failed to delete');
+              }
+            },
+            child: Text('Delete', style: TextStyle(color: danger)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showPostHomeworkSheet() {
     final titleCtrl = TextEditingController();
     final descCtrl = TextEditingController();
-    final marksCtrl = TextEditingController(text: '10');
     String selectedClassId = _classes[0].id;
     String selectedClassName = _classes[0].name;
+    String selectedSubject = _classes[0].subject;
+    DateTime dueDate = DateTime.now().add(const Duration(days: 7));
+    final attachments = <HomeworkAttachment>[];
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -2743,11 +2804,14 @@ class _TeacherDashboardState extends State<TeacherDashboard>
           padding:
               EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
           child: Container(
+            constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.85),
             decoration: const BoxDecoration(
                 color: bgCard,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-            child: Column(
+            child: SingleChildScrollView(
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -2777,6 +2841,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                       child: DropdownButton<String>(
                         value: selectedClassId,
                         isExpanded: true,
+                        dropdownColor: Colors.white,
                         style: const TextStyle(
                             fontFamily: 'Raleway',
                             fontSize: 14,
@@ -2784,7 +2849,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                         items: _classes
                             .map((c) => DropdownMenuItem<String>(
                                   value: c.id,
-                                  child: Text(c.name,
+                                  child: Text('${c.subject} — ${c.name}',
                                       style: const TextStyle(
                                           fontFamily: 'Raleway',
                                           fontSize: 14,
@@ -2793,10 +2858,11 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                             .toList(),
                         onChanged: (v) {
                           if (v == null) return;
+                          final cls = _classes.firstWhere((c) => c.id == v);
                           setModal(() {
                             selectedClassId = v;
-                            selectedClassName = _classes.firstWhere(
-                                (c) => c.id == v).name;
+                            selectedClassName = cls.name;
+                            selectedSubject = cls.subject;
                           });
                         },
                       ),
@@ -2807,27 +2873,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                     controller: titleCtrl,
                     style: const TextStyle(
                         fontFamily: 'Raleway', fontSize: 14, color: textDark),
-                    decoration: InputDecoration(
-                      hintText: 'Assignment title',
-                      hintStyle: TextStyle(
-                          fontFamily: 'Raleway',
-                          fontSize: 13,
-                          color: Colors.grey.shade400),
-                      filled: true,
-                      fillColor: bg,
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 14),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none),
-                      enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey.shade200)),
-                      focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                              color: accent.withOpacity(0.5), width: 1.5)),
-                    ),
+                    decoration: _hwFieldDecor('Assignment title'),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -2835,86 +2881,158 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                     maxLines: 3,
                     style: const TextStyle(
                         fontFamily: 'Raleway', fontSize: 14, color: textDark),
-                    decoration: InputDecoration(
-                      hintText: 'Instructions for students...',
-                      hintStyle: TextStyle(
-                          fontFamily: 'Raleway',
-                          fontSize: 13,
-                          color: Colors.grey.shade400),
-                      filled: true,
-                      fillColor: bg,
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 14),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none),
-                      enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey.shade200)),
-                      focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                              color: accent.withOpacity(0.5), width: 1.5)),
-                    ),
+                    decoration: _hwFieldDecor('Instructions for students...'),
                   ),
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: marksCtrl,
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(
-                        fontFamily: 'Raleway', fontSize: 14, color: textDark),
-                    decoration: InputDecoration(
-                      labelText: 'Total Marks',
-                      labelStyle: const TextStyle(
-                          fontFamily: 'Raleway',
-                          fontSize: 13,
-                          color: textLight),
-                      prefixIcon: const Icon(Icons.star_outline_rounded,
-                          size: 18, color: textLight),
-                      filled: true,
-                      fillColor: bg,
-                      border: OutlineInputBorder(
+                  // Due date picker
+                  GestureDetector(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: dueDate,
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                        builder: (ctx2, child) => Theme(
+                          data: Theme.of(ctx2).copyWith(
+                              colorScheme: ColorScheme.light(primary: accent)),
+                          child: child!,
+                        ),
+                      );
+                      if (picked != null) setModal(() => dueDate = picked);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 14),
+                      decoration: BoxDecoration(
+                          color: bg,
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none),
-                      enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey.shade200)),
-                      focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                              color: accent.withOpacity(0.5), width: 1.5)),
+                          border: Border.all(color: Colors.grey.shade200)),
+                      child: Row(children: [
+                        Icon(Icons.calendar_today_rounded,
+                            size: 16, color: textLight),
+                        const SizedBox(width: 8),
+                        Text(
+                            'Due: ${dueDate.year}-${dueDate.month.toString().padLeft(2, '0')}-${dueDate.day.toString().padLeft(2, '0')}',
+                            style: const TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 14,
+                                color: textDark)),
+                      ]),
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  // Attachments
+                  const Text('Attachments',
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: textLight)),
+                  const SizedBox(height: 8),
+                  ...attachments.asMap().entries.map((e) {
+                    final a = e.value;
+                    final i = e.key;
+                    IconData icon;
+                    Color c;
+                    switch (a.type) {
+                      case 'pdf':
+                        icon = Icons.picture_as_pdf_rounded;
+                        c = danger;
+                      case 'image':
+                        icon = Icons.image_rounded;
+                        c = info;
+                      default:
+                        icon = Icons.link_rounded;
+                        c = primary;
+                    }
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                          color: c.withOpacity(0.04),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: c.withOpacity(0.15))),
+                      child: Row(children: [
+                        Icon(icon, size: 16, color: c),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(a.name.isNotEmpty ? a.name : a.url,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontFamily: 'Raleway',
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: c)),
+                                if (a.name.isNotEmpty)
+                                  Text(a.url,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          fontFamily: 'Raleway',
+                                          fontSize: 10,
+                                          color: textLight)),
+                              ]),
+                        ),
+                        GestureDetector(
+                          onTap: () =>
+                              setModal(() => attachments.removeAt(i)),
+                          child: Icon(Icons.close_rounded,
+                              size: 16, color: textLight),
+                        ),
+                      ]),
+                    );
+                  }),
+                  Row(children: [
+                    _attachBtn('Link', Icons.link_rounded, primary, () =>
+                        _addAttachment(setModal, attachments, 'link')),
+                    const SizedBox(width: 8),
+                    _attachBtn('PDF', Icons.picture_as_pdf_rounded, danger, () =>
+                        _addAttachment(setModal, attachments, 'pdf')),
+                    const SizedBox(width: 8),
+                    _attachBtn('Image', Icons.image_rounded, info, () =>
+                        _addAttachment(setModal, attachments, 'image')),
+                  ]),
                   const SizedBox(height: 20),
                   GestureDetector(
                     onTap: () async {
                       final title = titleCtrl.text.trim();
                       if (title.isEmpty) return;
-                      final hw = HomeworkModel(
-                        id: '',
+                      final dueDateStr =
+                          '${dueDate.year}-${dueDate.month.toString().padLeft(2, '0')}-${dueDate.day.toString().padLeft(2, '0')}';
+                      final resp = await _api.createHomework(
                         title: title,
-                        description: descCtrl.text.trim().isEmpty
-                            ? 'No additional instructions.'
-                            : descCtrl.text.trim(),
-                        subject: 'Mathematics',
                         classId: selectedClassId,
+                        description: descCtrl.text.trim(),
+                        subject: selectedSubject,
                         className: selectedClassName,
-                        teacherUid: _uid,
-                        teacherName: _user?.name ?? '',
-                        dueDate: 'Dec 20, 2024',
+                        dueDate: dueDateStr,
+                        attachments:
+                            attachments.map((a) => a.toMap()).toList(),
                       );
-                      await _api.createHomework(
-                        title: hw.title,
-                        classId: hw.classId,
-                        description: hw.description,
-                        subject: hw.subject,
-                        className: hw.className,
-                        dueDate: hw.dueDate,
-                      );
+                      final newId = resp['id'] as String? ?? '';
                       if (!context.mounted) return;
                       Navigator.pop(context);
-                      setState(() => _homework.insert(0, hw));
-                      _snack('Homework posted to $selectedClassName!');
+                      setState(() => _homework.insert(
+                          0,
+                          HomeworkModel(
+                            id: newId,
+                            title: title,
+                            description: descCtrl.text.trim(),
+                            subject: selectedSubject,
+                            classId: selectedClassId,
+                            className: selectedClassName,
+                            teacherUid: _uid,
+                            teacherName: _user?.name ?? '',
+                            dueDate: dueDateStr,
+                            attachments: attachments,
+                            createdAt: DateTime.now(),
+                          )));
+                      _snack('Homework posted!');
                     },
                     child: Container(
                       width: double.infinity,
@@ -2940,6 +3058,114 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                 ]),
           ),
         ),
+      ),
+    );
+  }
+
+  InputDecoration _hwFieldDecor(String hint) => InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(
+            fontFamily: 'Raleway', fontSize: 13, color: Colors.grey.shade400),
+        filled: true,
+        fillColor: bg,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide:
+                BorderSide(color: accent.withOpacity(0.5), width: 1.5)),
+      );
+
+  Widget _attachBtn(
+          String label, IconData icon, Color c, VoidCallback onTap) =>
+      Expanded(
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+                color: c.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: c.withOpacity(0.2))),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(icon, size: 14, color: c),
+              const SizedBox(width: 4),
+              Text(label,
+                  style: TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: c)),
+            ]),
+          ),
+        ),
+      );
+
+  void _addAttachment(StateSetter setModal,
+      List<HomeworkAttachment> attachments, String type) {
+    final urlCtrl = TextEditingController();
+    final nameCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+            'Add ${type == 'pdf' ? 'PDF' : type == 'image' ? 'Image' : 'Link'}',
+            style:
+                const TextStyle(fontFamily: 'Raleway', fontSize: 16)),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(
+            controller: urlCtrl,
+            autofocus: true,
+            style: const TextStyle(fontFamily: 'Raleway', fontSize: 14),
+            decoration: InputDecoration(
+              hintText: type == 'link'
+                  ? 'https://...'
+                  : type == 'pdf'
+                      ? 'PDF URL'
+                      : 'Image URL',
+              hintStyle: TextStyle(
+                  fontFamily: 'Raleway',
+                  fontSize: 13,
+                  color: Colors.grey.shade400),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: nameCtrl,
+            style: const TextStyle(fontFamily: 'Raleway', fontSize: 14),
+            decoration: InputDecoration(
+              hintText: 'Display name (optional)',
+              hintStyle: TextStyle(
+                  fontFamily: 'Raleway',
+                  fontSize: 13,
+                  color: Colors.grey.shade400),
+            ),
+          ),
+        ]),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              final url = urlCtrl.text.trim();
+              if (url.isEmpty) return;
+              Navigator.pop(ctx);
+              setModal(() => attachments.add(HomeworkAttachment(
+                    url: url,
+                    name: nameCtrl.text.trim(),
+                    type: type,
+                  )));
+            },
+            child: const Text('Add'),
+          ),
+        ],
       ),
     );
   }

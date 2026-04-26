@@ -1581,12 +1581,48 @@ class _StudentDashboardState extends State<StudentDashboard>
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(hw.description,
-                  style: const TextStyle(
-                      fontFamily: 'Raleway',
-                      fontSize: 12,
-                      color: textMid,
-                      height: 1.5)),
+              if (hw.description.isNotEmpty)
+                Text(hw.description,
+                    style: const TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 12,
+                        color: textMid,
+                        height: 1.5)),
+              if (hw.attachments.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(spacing: 6, runSpacing: 6, children: hw.attachments.map((a) {
+                  IconData aIcon;
+                  Color ac;
+                  switch (a.type) {
+                    case 'pdf':
+                      aIcon = Icons.picture_as_pdf_rounded;
+                      ac = danger;
+                    case 'image':
+                      aIcon = Icons.image_rounded;
+                      ac = info;
+                    default:
+                      aIcon = Icons.link_rounded;
+                      ac = primary;
+                  }
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                        color: ac.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: ac.withOpacity(0.15))),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(aIcon, size: 14, color: ac),
+                      const SizedBox(width: 4),
+                      Text(a.name.isNotEmpty ? a.name : 'Attachment',
+                          style: TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: ac)),
+                    ]),
+                  );
+                }).toList()),
+              ],
               const SizedBox(height: 12),
               Row(children: [
                 Icon(Icons.calendar_today_outlined, size: 12, color: textLight),
