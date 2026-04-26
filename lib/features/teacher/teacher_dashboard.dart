@@ -2612,16 +2612,32 @@ class _TeacherDashboardState extends State<TeacherDashboard>
       if (_tSchedLoading && !_tSchedLoaded)
         const Center(child: CircularProgressIndicator())
       else ...[
+        if (periods.isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 32),
+            child: Center(
+              child: Column(children: [
+                Icon(Icons.event_note_rounded, size: 36, color: Colors.grey.shade300),
+                const SizedBox(height: 8),
+                Text('No periods defined yet',
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 13,
+                        color: Colors.grey.shade400)),
+                const SizedBox(height: 4),
+                Text('Tap "Add Period" below to get started',
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 11,
+                        color: Colors.grey.shade300)),
+              ]),
+            ),
+          )
+        else
         ...List.generate(
-          periods.isEmpty ? 6 : periods.length,
+          periods.length,
           (i) {
-            final slot = i < periods.length
-                ? periods[i]
-                : PeriodSlot(
-                    period: i + 1,
-                    startTime: _defaultStartTime(i),
-                    endTime: _defaultEndTime(i),
-                  );
+            final slot = periods[i];
             // Check for conflicts across other grades
             final conflicting = dayCalPeriods.where((p) {
               final pGrade = p['grade'] as String? ?? '';
