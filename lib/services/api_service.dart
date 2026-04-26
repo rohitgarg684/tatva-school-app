@@ -358,6 +358,18 @@ class ApiService {
   Future<Map<String, dynamic>> toggleAnnouncementLike(String id) =>
       _post('/announcement/$id/like', {});
 
+  Future<Map<String, dynamic>> updateAnnouncement(
+    String id, {
+    String? title,
+    String? body,
+    List<String>? grades,
+  }) =>
+      _put('/announcement/$id', {
+        if (title != null) 'title': title,
+        if (body != null) 'body': body,
+        if (grades != null) 'grades': grades,
+      });
+
   Future<Map<String, dynamic>> deleteAnnouncement(String id) =>
       _delete('/announcement/$id');
 

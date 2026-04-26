@@ -104,6 +104,42 @@ router.post(
   })
 );
 
+router.put(
+  "/announcement/:id",
+  requireRole("Teacher", "Principal"),
+  asyncHandler(async (req, res) => {
+    const uid = req.uid!;
+    const id = req.params.id as string;
+    const { title, body: bodyText, grades } = req.body;
+
+    const ref = db.collection(Collections.ANNOUNCEMENTS).doc(id);
+    const snap = await ref.get();
+    if (!snap.exists)
+      return res.status(404).json({ error: "Announcement not found" });
+
+    const data = snap.data()!;
+    if (data.createdBy !== uid && req.role !== "Principal") {
+      return res.status(403).json({ error: "Only author or principal can edit" });
+    }
+
+    const updates: Record<string, any> = {};
+    if (title) updates.title = title;
+    if (bodyText) updates.body = bodyText;
+    if (grades !== undefined) {
+      updates.grades = Array.isArray(grades) ? grades : [];
+      updates.audience = Array.isArray(grades) && grades.length > 0 ? "Grades" : "Everyone";
+    }
+
+    await ref.update(updates);
+    cacheDeletePrefix("announcements_");
+    cacheDeletePrefix("teacher_dash_");
+    cacheDeletePrefix("student_dash_");
+    cacheDeletePrefix("parent_dash_");
+    cacheDeletePrefix("principal_dash_");
+    res.json({ id, updated: true });
+  })
+);
+
 router.delete(
   "/announcement/:id",
   requireRole("Teacher", "Principal"),

@@ -395,6 +395,7 @@ class StudentHomeTab extends StatelessWidget {
           child: AnnouncementCard(
             announcement: announcements[index],
             currentUid: uid,
+            currentRole: 'Student',
             isFirst: index == 0,
             onLike: () => onToggleAnnouncementLike(announcements[index]),
           ),

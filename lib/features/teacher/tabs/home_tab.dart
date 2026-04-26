@@ -26,6 +26,8 @@ class TeacherHomeTab extends StatelessWidget {
   final void Function(ClassModel) onDeleteClass;
   final VoidCallback onNewAnnouncement;
   final void Function(AnnouncementModel) onToggleAnnouncementLike;
+  final void Function(AnnouncementModel) onEditAnnouncement;
+  final void Function(AnnouncementModel) onDeleteAnnouncement;
 
   const TeacherHomeTab({
     super.key,
@@ -44,6 +46,8 @@ class TeacherHomeTab extends StatelessWidget {
     required this.onDeleteClass,
     required this.onNewAnnouncement,
     required this.onToggleAnnouncementLike,
+    required this.onEditAnnouncement,
+    required this.onDeleteAnnouncement,
   });
 
   @override
@@ -145,8 +149,11 @@ class TeacherHomeTab extends StatelessWidget {
                   child: AnnouncementCard(
                     announcement: e.value,
                     currentUid: uid,
+                    currentRole: 'Teacher',
                     isFirst: e.key == 0,
                     onLike: () => onToggleAnnouncementLike(e.value),
+                    onEdit: () => onEditAnnouncement(e.value),
+                    onDelete: () => onDeleteAnnouncement(e.value),
                   ),
                 )),
           if (activityFeed.isNotEmpty) ...[

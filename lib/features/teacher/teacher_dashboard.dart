@@ -13,11 +13,13 @@ import '../../models/user_model.dart';
 import '../../models/class_model.dart';
 import '../../models/grade_model.dart';
 import '../../models/announcement_model.dart';
+import '../../models/audience.dart';
 import '../../models/homework_model.dart';
 import '../../models/behavior_point.dart';
 import '../../models/attendance_record.dart';
 import '../../models/activity_event.dart';
 import '../principal/widgets/new_announcement_sheet.dart';
+import '../../shared/widgets/announcement_card.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/classes_tab.dart';
 import 'tabs/behavior_tab.dart';
@@ -230,6 +232,8 @@ class _TeacherDashboardState extends State<TeacherDashboard>
               onDeleteClass: (cls) => _confirmDeleteClass(cls),
               onNewAnnouncement: _showNewAnnouncement,
               onToggleAnnouncementLike: _toggleAnnouncementLike,
+              onEditAnnouncement: _editAnnouncement,
+              onDeleteAnnouncement: _deleteAnnouncement,
             ),
             TeacherClassesTab(
               classes: _data?.classes ?? [],
@@ -324,6 +328,42 @@ class _TeacherDashboardState extends State<TeacherDashboard>
       _announcements[idx] = current.copyWith(likedBy: newLikedBy);
     });
     _api.toggleAnnouncementLike(ann.id);
+  }
+
+  void _editAnnouncement(AnnouncementModel ann) {
+    final teacherGrades = (_data?.classes ?? [])
+        .map((c) => c.name.split(' ').first)
+        .toSet()
+        .toList()
+      ..sort();
+    final grades = teacherGrades.isEmpty
+        ? List.generate(12, (i) => '${i + 1}')
+        : teacherGrades;
+    EditAnnouncementSheet.show(
+      context,
+      announcement: ann,
+      availableGrades: grades,
+      onSave: (title, body, newGrades) async {
+        await _api.updateAnnouncement(ann.id, title: title, body: body, grades: newGrades);
+        setState(() {
+          final idx = _announcements.indexWhere((a) => a.id == ann.id);
+          if (idx >= 0) {
+            _announcements[idx] = _announcements[idx].copyWith(
+              title: title,
+              body: body,
+              grades: newGrades,
+              audience: newGrades.isEmpty ? Audience.everyone : Audience.grades,
+            );
+          }
+        });
+      },
+    );
+  }
+
+  void _deleteAnnouncement(AnnouncementModel ann) {
+    if (ann.id.isEmpty) return;
+    _api.deleteAnnouncement(ann.id);
+    setState(() => _announcements.removeWhere((a) => a.id == ann.id));
   }
 
   // ─── SHARED SHEETS (used by HomeTab callbacks) ────────────────────────────

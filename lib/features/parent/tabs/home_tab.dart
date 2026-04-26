@@ -300,6 +300,7 @@ class ParentHomeTab extends StatelessWidget {
                   child: AnnouncementCard(
                     announcement: e.value,
                     currentUid: uid,
+                    currentRole: 'Parent',
                     isFirst: e.key == 0,
                     onLike: () => onToggleAnnouncementLike(e.value),
                   ),
