@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { Router, Request, Response } from "express";
 import * as admin from "firebase-admin";
 import multer from "multer";
@@ -7,6 +8,7 @@ import { db, serializeDocs } from "../lib/firestore-helpers";
 import { cacheDeletePrefix } from "../lib/cache";
 import { asyncHandler } from "../lib/async-handler";
 import { Collections } from "../lib/collections";
+import { env } from "../env";
 import { Config } from "../lib/config";
 
 const IMAGE_MIME_TYPES = [
@@ -78,14 +80,17 @@ function generateFileName(mimetype: string): string {
 }
 
 async function uploadToStorage(buffer: Buffer, storagePath: string, contentType: string): Promise<string> {
-  const bucket = admin.storage().bucket("tatva-school-app.firebasestorage.app");
+  const downloadToken = crypto.randomUUID();
+  const bucket = admin.storage().bucket(env.storageBucket);
   const fileRef = bucket.file(storagePath);
-  await fileRef.save(buffer, { metadata: { contentType } });
-  const [signedUrl] = await fileRef.getSignedUrl({
-    action: "read",
-    expires: Date.now() + Config.SIGNED_URL_EXPIRY_MS,
+  await fileRef.save(buffer, {
+    metadata: {
+      contentType,
+      metadata: { firebaseStorageDownloadTokens: downloadToken },
+    },
   });
-  return signedUrl;
+  const encodedPath = encodeURIComponent(storagePath);
+  return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media&token=${downloadToken}`;
 }
 
 function classifyFileType(originalname: string): string {

@@ -5,6 +5,7 @@ import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { uploadLimiter, dashboardLimiter, actionLimiter } from "./middleware/rate-limit";
+import { env } from "./env";
 
 import adminRoutes from "./routes/admin";
 import userRoutes from "./routes/users";
@@ -27,11 +28,7 @@ const app = express();
 app.use(helmet());
 
 app.use(cors({
-  origin: [
-    "https://tatva-school-app.web.app",
-    "https://tatva-school-app.firebaseapp.com",
-    "http://localhost:5000",
-  ],
+  origin: env.corsOrigins,
 }));
 
 app.use(express.json({ limit: "1mb" }));
@@ -63,7 +60,7 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ error: err.message || "Internal server error" });
 });
 
-const port = parseInt(process.env.PORT || "8080", 10);
+const port = env.port;
 app.listen(port, () => {
   console.log(`Server listening on port ${port}`);
 });
