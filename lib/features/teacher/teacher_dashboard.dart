@@ -188,6 +188,138 @@ class _TeacherDashboardState extends State<TeacherDashboard>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ));
 
+  void _showClassStudents(ClassModel cls) {
+    HapticFeedback.lightImpact();
+    final classStudents = _students.where((s) => cls.studentUids.contains(s.uid)).toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.75),
+        decoration: const BoxDecoration(
+          color: TatvaColors.bgCard,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const SizedBox(height: 12),
+          Container(
+              width: 36, height: 3,
+              decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(cls.name,
+                      style: const TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: textDark)),
+                  Text('${cls.subject} · ${classStudents.length} students',
+                      style: const TextStyle(
+                          fontFamily: 'Raleway', fontSize: 12, color: textLight)),
+                ]),
+              ),
+              GestureDetector(
+                onTap: () {
+                  Navigator.pop(context);
+                  _showAddStudentOptions(cls.id, cls.studentUids);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                      color: info.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: info.withOpacity(0.2))),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.person_add_outlined, color: info, size: 16),
+                    const SizedBox(width: 4),
+                    const Text('Add',
+                        style: TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: info)),
+                  ]),
+                ),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 12),
+          if (classStudents.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.people_outline, color: textLight, size: 40),
+                const SizedBox(height: 8),
+                const Text('No students in this class yet',
+                    style: TextStyle(
+                        fontFamily: 'Raleway', fontSize: 14, color: textLight)),
+              ]),
+            )
+          else
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                itemCount: classStudents.length,
+                itemBuilder: (_, i) {
+                  final s = classStudents[i];
+                  final initials = s.name.isNotEmpty
+                      ? s.name.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join()
+                      : '?';
+                  final colors = [primary, info, accent, purple, success];
+                  final c = colors[i % colors.length];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                        color: c.withOpacity(0.04),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: c.withOpacity(0.1))),
+                    child: Row(children: [
+                      CircleAvatar(
+                        radius: 18,
+                        backgroundColor: c.withOpacity(0.12),
+                        child: Text(initials,
+                            style: TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: c)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(s.name,
+                              style: const TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: textDark)),
+                          Text(s.email,
+                              style: const TextStyle(
+                                  fontFamily: 'Raleway', fontSize: 11, color: textLight)),
+                        ]),
+                      ),
+                    ]),
+                  );
+                },
+              ),
+            ),
+          const SizedBox(height: 20),
+        ]),
+      ),
+    );
+  }
+
   void _showAddStudentOptions(String classId, List<String> existingStudentUids) {
     HapticFeedback.lightImpact();
     showModalBottomSheet(
@@ -1096,7 +1228,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
                 child: Row(children: [
                   GestureDetector(
-                      onTap: () => _showAddStudentOptions(c.id, c.studentUids),
+                      onTap: () => _showClassStudents(c),
                       child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 6),
@@ -1106,10 +1238,10 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                               border:
                                   Border.all(color: info.withOpacity(0.2))),
                           child: Row(children: [
-                            Icon(Icons.person_add_outlined, color: info, size: 14),
+                            Icon(Icons.people_outline, color: info, size: 14),
                             const SizedBox(width: 4),
-                            const Text('Add Student',
-                                style: TextStyle(
+                            Text('${c.studentUids.length} Students',
+                                style: const TextStyle(
                                     fontFamily: 'Raleway',
                                     fontSize: 12,
                                     color: info,
