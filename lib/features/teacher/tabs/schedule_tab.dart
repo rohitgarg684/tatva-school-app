@@ -8,6 +8,14 @@ import '../../../models/class_model.dart';
 import '../../../models/schedule_model.dart';
 import '../../../models/schedule_event.dart';
 
+class _DayItem {
+  final int startMin, endMin;
+  final Map<String, dynamic> data;
+  final bool isPeriod;
+  _DayItem.period(this.data, this.startMin, this.endMin) : isPeriod = true;
+  _DayItem.event(this.data, this.startMin, this.endMin) : isPeriod = false;
+}
+
 class TeacherScheduleTab extends StatefulWidget {
   final List<ClassModel> classes;
   final String uid;
@@ -391,172 +399,13 @@ class _TeacherScheduleTabState extends State<TeacherScheduleTab> {
                                     height: 0.5,
                                     color: Colors.grey.shade100),
                               )),
-                      if (dayCancelled)
-                        Positioned.fill(
-                          child: Container(
-                            decoration: BoxDecoration(
-                                color: TatvaColors.error.withOpacity(0.03)),
-                            child: Center(
-                                child: Text('Cancelled',
-                                    style: TextStyle(
-                                        fontSize: 10,
-                                        color: TatvaColors.error.withOpacity(0.3)))),
-                          ),
-                        )
-                      else
-                        ...dayPeriods.map((p) {
-                          final st = p['startTime'] as String? ?? '08:00';
-                          final et = p['endTime'] as String? ?? '08:45';
-                          final subj = p['subject'] as String? ?? '';
-                          final grade = p['grade'] as String? ?? '';
-                          final section = p['section'] as String? ?? '';
-
-                          final stParts = st.split(':');
-                          final etParts = et.split(':');
-                          final stMin = (int.tryParse(stParts[0]) ?? startHour) * 60 +
-                              (stParts.length > 1
-                                  ? int.tryParse(stParts[1]) ?? 0
-                                  : 0);
-                          final etMin = (int.tryParse(etParts[0]) ?? startHour) * 60 +
-                              (etParts.length > 1
-                                  ? int.tryParse(etParts[1]) ?? 0
-                                  : 0);
-                          final top =
-                              (stMin - startHour * 60) * hourHeight / 60;
-                          final height =
-                              (etMin - stMin) * hourHeight / 60;
-
-                          final colors = [
-                            TatvaColors.primary, TatvaColors.info, TatvaColors.accent, TatvaColors.purple, TatvaColors.success
-                          ];
-                          final c =
-                              colors[subj.hashCode.abs() % colors.length];
-
-                          final dateStr = _dateStr(dateOfDay);
-                          final isCancelled = _calCancellations.any((cn) =>
-                              cn['grade'] == grade &&
-                              cn['section'] == section &&
-                              cn['date'] == dateStr &&
-                              cn['startTime'] == st);
-                          final cancelId = isCancelled
-                              ? (_calCancellations.firstWhere((cn) =>
-                                  cn['grade'] == grade &&
-                                  cn['section'] == section &&
-                                  cn['date'] == dateStr &&
-                                  cn['startTime'] == st)['id'] as String? ?? '')
-                              : '';
-
-                          final gsKey = _schedGsMap.keys.cast<String?>().firstWhere(
-                              (k) {
-                                final m = _schedGsMap[k];
-                                return m != null &&
-                                    m['grade'] == grade &&
-                                    m['section'] == section;
-                              },
-                              orElse: () => null);
-                          return Positioned(
-                            top: top.clamp(0, double.infinity),
-                            left: 1,
-                            right: 1,
-                            height: height.clamp(20, double.infinity),
-                            child: GestureDetector(
-                              onTap: () {
-                                if (isCancelled) {
-                                  _showUndoCancelSheet(cancelId, subj, grade, section, dateStr);
-                                } else {
-                                  _showPeriodCancelSheet(p, dateOfDay, gsKey);
-                                }
-                              },
-                              child: Opacity(
-                                opacity: isCancelled ? 0.45 : 1.0,
-                                child: Container(
-                                  margin: const EdgeInsets.symmetric(
-                                      horizontal: 1, vertical: 0.5),
-                                  padding: const EdgeInsets.all(3),
-                                  decoration: BoxDecoration(
-                                      color: isCancelled
-                                          ? Colors.grey.shade200
-                                          : c.withOpacity(0.12),
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(
-                                          color: isCancelled
-                                              ? Colors.grey.shade300
-                                              : c.withOpacity(0.3))),
-                                  child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                            isCancelled ? '$subj ✕' : subj,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.bold,
-                                                color: isCancelled ? Colors.grey : c,
-                                                decoration: isCancelled
-                                                    ? TextDecoration.lineThrough
-                                                    : TextDecoration.none)),
-                                        if (height > 28)
-                                          Text(isCancelled ? 'Cancelled' : '$grade-$section',
-                                              style: TextStyle(
-                                                  fontSize: 8,
-                                                  color: isCancelled
-                                                      ? TatvaColors.error.withOpacity(0.7)
-                                                      : c.withOpacity(0.7))),
-                                      ]),
-                                ),
-                              ),
-                            ),
-                          );
-                        }),
-                      ..._calEvents
-                          .where((ev) =>
-                              ev['date'] == _dateStr(dateOfDay) &&
-                              (ev['startTime'] as String? ?? '').isNotEmpty)
-                          .map((ev) {
-                        final st = ev['startTime'] as String? ?? '09:00';
-                        final et = ev['endTime'] as String? ?? '10:00';
-                        final stParts = st.split(':');
-                        final etParts = et.split(':');
-                        final stMin = (int.tryParse(stParts[0]) ?? 9) * 60 +
-                            (stParts.length > 1
-                                ? int.tryParse(stParts[1]) ?? 0
-                                : 0);
-                        final etMin = (int.tryParse(etParts[0]) ?? 10) * 60 +
-                            (etParts.length > 1
-                                ? int.tryParse(etParts[1]) ?? 0
-                                : 0);
-                        final top =
-                            (stMin - startHour * 60) * hourHeight / 60;
-                        final height = (etMin - stMin) * hourHeight / 60;
-                        return Positioned(
-                          top: top.clamp(0, double.infinity),
-                          left: 1,
-                          right: 1,
-                          height: height.clamp(20, double.infinity),
-                          child: Container(
-                            margin: const EdgeInsets.symmetric(
-                                horizontal: 1, vertical: 0.5),
-                            padding: const EdgeInsets.all(3),
-                            decoration: BoxDecoration(
-                                color: TatvaColors.accent.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(
-                                    color: TatvaColors.accent.withOpacity(0.4),
-                                    width: 1.5)),
-                            child: Text(
-                                ev['title'] as String? ?? '',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                    color: TatvaColors.accent)),
-                          ),
-                        );
-                      }),
+                      ..._buildDayStackItems(
+                        dayPeriods: dayPeriods,
+                        dayCancelled: dayCancelled,
+                        dateOfDay: dateOfDay,
+                        hourHeight: hourHeight,
+                        startHour: startHour,
+                      ),
                     ]),
                   ),
                 ]),
@@ -1956,6 +1805,258 @@ fontSize: 13, color: Colors.grey.shade400),
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
     return months[m];
+  }
+
+  int _toMin(String t) {
+    final p = t.split(':');
+    return (int.tryParse(p[0]) ?? 8) * 60 +
+        (p.length > 1 ? int.tryParse(p[1]) ?? 0 : 0);
+  }
+
+  List<Widget> _buildDayStackItems({
+    required List<Map<String, dynamic>> dayPeriods,
+    required bool dayCancelled,
+    required DateTime dateOfDay,
+    required double hourHeight,
+    required int startHour,
+  }) {
+    if (dayCancelled) {
+      final timedEvts = _calEvents
+          .where((ev) =>
+              ev['date'] == _dateStr(dateOfDay) &&
+              (ev['startTime'] as String? ?? '').isNotEmpty)
+          .toList();
+      return [
+        Positioned.fill(
+          child: Container(
+            decoration:
+                BoxDecoration(color: TatvaColors.error.withOpacity(0.03)),
+            child: Center(
+                child: Text('Cancelled',
+                    style: TextStyle(
+                        fontSize: 10,
+                        color: TatvaColors.error.withOpacity(0.3)))),
+          ),
+        ),
+        ..._positionItems(
+            timedEvts
+                .map((ev) => _DayItem.event(
+                    ev,
+                    _toMin(ev['startTime'] as String),
+                    _toMin(ev['endTime'] as String? ?? '10:00')))
+                .toList(),
+            dateOfDay,
+            hourHeight,
+            startHour),
+      ];
+    }
+
+    final items = <_DayItem>[];
+    for (final p in dayPeriods) {
+      items.add(_DayItem.period(
+          p,
+          _toMin(p['startTime'] as String? ?? '08:00'),
+          _toMin(p['endTime'] as String? ?? '08:45')));
+    }
+    for (final ev in _calEvents) {
+      if (ev['date'] != _dateStr(dateOfDay)) continue;
+      final st = ev['startTime'] as String? ?? '';
+      if (st.isEmpty) continue;
+      items.add(_DayItem.event(
+          ev, _toMin(st), _toMin(ev['endTime'] as String? ?? '10:00')));
+    }
+    return _positionItems(items, dateOfDay, hourHeight, startHour);
+  }
+
+  List<Widget> _positionItems(List<_DayItem> items, DateTime dateOfDay,
+      double hourHeight, int startHour) {
+    if (items.isEmpty) return [];
+    final n = items.length;
+    final starts = items.map((i) => i.startMin).toList();
+    final ends = items.map((i) => i.endMin).toList();
+
+    final cols = List.filled(n, 0);
+    final colEnds = <int>[];
+    final order = List.generate(n, (i) => i)
+      ..sort((a, b) => starts[a].compareTo(starts[b]));
+    for (final i in order) {
+      int c = -1;
+      for (int j = 0; j < colEnds.length; j++) {
+        if (colEnds[j] <= starts[i]) {
+          c = j;
+          break;
+        }
+      }
+      if (c == -1) {
+        c = colEnds.length;
+        colEnds.add(0);
+      }
+      cols[i] = c;
+      colEnds[c] = ends[i];
+    }
+    final totalCols = List.filled(n, 1);
+    for (int i = 0; i < n; i++) {
+      int mx = cols[i];
+      for (int j = 0; j < n; j++) {
+        if (i != j &&
+            starts[i] < ends[j] &&
+            starts[j] < ends[i] &&
+            cols[j] > mx) mx = cols[j];
+      }
+      totalCols[i] = mx + 1;
+    }
+
+    return List.generate(n, (i) {
+      final item = items[i];
+      final top = (item.startMin - startHour * 60) * hourHeight / 60;
+      final height =
+          ((item.endMin - item.startMin) * hourHeight / 60).clamp(20.0, double.infinity);
+      final col = cols[i];
+      final total = totalCols[i];
+
+      Widget content;
+      String tipMsg;
+
+      if (item.isPeriod) {
+        final p = item.data;
+        final subj = p['subject'] as String? ?? '';
+        final grade = p['grade'] as String? ?? '';
+        final section = p['section'] as String? ?? '';
+        final st = p['startTime'] as String? ?? '';
+        final et = p['endTime'] as String? ?? '';
+        final teacher = p['teacherName'] as String? ?? '';
+
+        const palette = [
+          TatvaColors.primary, TatvaColors.info, TatvaColors.accent,
+          TatvaColors.purple, TatvaColors.success
+        ];
+        final c = palette[subj.hashCode.abs() % palette.length];
+        final ds = _dateStr(dateOfDay);
+        final isCancelled = _calCancellations.any((cn) =>
+            cn['grade'] == grade &&
+            cn['section'] == section &&
+            cn['date'] == ds &&
+            cn['startTime'] == st);
+        final cancelId = isCancelled
+            ? (_calCancellations.firstWhere((cn) =>
+                    cn['grade'] == grade &&
+                    cn['section'] == section &&
+                    cn['date'] == ds &&
+                    cn['startTime'] == st)['id']
+                as String? ??
+                '')
+            : '';
+        final gsKey = _schedGsMap.keys.cast<String?>().firstWhere((k) {
+          final m = _schedGsMap[k];
+          return m != null && m['grade'] == grade && m['section'] == section;
+        }, orElse: () => null);
+
+        tipMsg =
+            '$subj\n$st – $et\n$grade-$section${teacher.isNotEmpty ? '\n$teacher' : ''}${isCancelled ? '\n(Cancelled)' : ''}';
+
+        content = GestureDetector(
+          onTap: () {
+            if (isCancelled) {
+              _showUndoCancelSheet(cancelId, subj, grade, section, ds);
+            } else {
+              _showPeriodCancelSheet(p, dateOfDay, gsKey);
+            }
+          },
+          child: Opacity(
+            opacity: isCancelled ? 0.45 : 1.0,
+            child: Container(
+              margin:
+                  const EdgeInsets.symmetric(horizontal: 1, vertical: 0.5),
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                  color: isCancelled
+                      ? Colors.grey.shade200
+                      : c.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                      color: isCancelled
+                          ? Colors.grey.shade300
+                          : c.withOpacity(0.3))),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(isCancelled ? '$subj ✕' : subj,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: isCancelled ? Colors.grey : c,
+                            decoration: isCancelled
+                                ? TextDecoration.lineThrough
+                                : TextDecoration.none)),
+                    if (height > 28)
+                      Text(
+                          isCancelled ? 'Cancelled' : '$grade-$section',
+                          style: TextStyle(
+                              fontSize: 8,
+                              color: isCancelled
+                                  ? TatvaColors.error.withOpacity(0.7)
+                                  : c.withOpacity(0.7))),
+                  ]),
+            ),
+          ),
+        );
+      } else {
+        final ev = item.data;
+        final title = ev['title'] as String? ?? '';
+        final st = ev['startTime'] as String? ?? '';
+        final et = ev['endTime'] as String? ?? '';
+        final evType = ev['type'] as String? ?? 'event';
+        final desc = ev['description'] as String? ?? '';
+
+        tipMsg =
+            '$title\n$st – $et${evType != 'event' ? '\n${evType[0].toUpperCase()}${evType.substring(1)}' : ''}${desc.isNotEmpty ? '\n$desc' : ''}';
+
+        content = Container(
+          margin: const EdgeInsets.symmetric(horizontal: 1, vertical: 0.5),
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+              color: TatvaColors.accent.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                  color: TatvaColors.accent.withOpacity(0.4), width: 1.5)),
+          child: Text(title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                  color: TatvaColors.accent)),
+        );
+      }
+
+      return Positioned(
+        top: top.clamp(0, double.infinity),
+        left: 0,
+        right: 0,
+        height: height,
+        child: Row(children: [
+          if (col > 0) Spacer(flex: col),
+          Expanded(
+            child: Tooltip(
+              message: tipMsg,
+              preferBelow: false,
+              verticalOffset: 12,
+              decoration: BoxDecoration(
+                color: TatvaColors.neutral900.withOpacity(0.92),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              textStyle: const TextStyle(
+                  fontSize: 11, color: Colors.white, height: 1.4),
+              child: content,
+            ),
+          ),
+          if (col + 1 < total) Spacer(flex: total - col - 1),
+        ]),
+      );
+    });
   }
 
   InputDecoration _hwFieldDecor(String hint) => InputDecoration(

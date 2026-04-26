@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../shared/animations/animations.dart';
 import '../../../shared/theme/colors.dart';
+import '../../parent/parent_helpers.dart';
 import '../../../shared/utils/greeting.dart';
 import '../../../models/user_model.dart';
 import '../../../models/class_model.dart';
@@ -110,7 +111,7 @@ class TeacherHomeTab extends StatelessWidget {
                 _ => Icons.circle,
               };
               final ago =
-                  event.createdAt != null ? _timeAgo(event.createdAt!) : '';
+                  event.createdAt != null ? formatTimeAgo(event.createdAt!) : '';
               return Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
@@ -442,12 +443,4 @@ class TeacherHomeTab extends StatelessWidget {
                 ]),
               )));
 
-  static String _timeAgo(DateTime dt) {
-    final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 1) return 'just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
-    return '${dt.month}/${dt.day}';
-  }
 }

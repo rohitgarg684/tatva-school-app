@@ -8,6 +8,7 @@ import '../../../models/user_model.dart';
 import '../../../models/class_model.dart';
 import '../../../models/behavior_point.dart';
 import '../../../models/behavior_category.dart';
+import '../../parent/parent_helpers.dart';
 
 class TeacherBehaviorTab extends StatelessWidget {
   final List<BehaviorPoint> classBehavior;
@@ -141,7 +142,7 @@ class TeacherBehaviorTab extends StatelessWidget {
             final cat = BehaviorCategory.fromId(bp.categoryId);
             final c = bp.isPositive ? TatvaColors.success : TatvaColors.error;
             final timeAgo = bp.createdAt != null
-                ? _behaviorTimeAgo(bp.createdAt!)
+                ? formatTimeAgo(bp.createdAt!)
                 : '';
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
@@ -197,15 +198,15 @@ class TeacherBehaviorTab extends StatelessWidget {
                                     fontStyle: FontStyle.italic,
                                     color: TatvaColors.neutral600)),
                           ),
+                        if (timeAgo.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 3),
+                            child: Text(timeAgo,
+                                style: const TextStyle(
+                                    fontSize: 10, color: TatvaColors.neutral400)),
+                          ),
                       ]),
                 ),
-                if (timeAgo.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: Text(timeAgo,
-                        style: const TextStyle(
-                            fontSize: 10, color: TatvaColors.neutral400)),
-                  ),
                 GestureDetector(
                   onTap: () => _deleteBehaviorPoint(context, bp),
                   child: Container(
@@ -227,14 +228,6 @@ class TeacherBehaviorTab extends StatelessWidget {
     );
   }
 
-  static String _behaviorTimeAgo(DateTime dt) {
-    final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 1) return 'now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
-    if (diff.inHours < 24) return '${diff.inHours}h';
-    if (diff.inDays < 7) return '${diff.inDays}d';
-    return '${(diff.inDays / 7).floor()}w';
-  }
 
   void _deleteBehaviorPoint(BuildContext context, BehaviorPoint bp) {
     if (bp.id.isEmpty) return;

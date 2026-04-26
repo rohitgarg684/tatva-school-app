@@ -142,6 +142,9 @@ class ApiService {
           List<Map<String, dynamic>> records) =>
       _post('/attendance', {'records': records});
 
+  Future<Map<String, dynamic>> getAttendanceByDate(String date) =>
+      _get('/attendance/$date');
+
   Future<Map<String, dynamic>> awardBehaviorPoint({
     required String studentUid,
     required String classId,

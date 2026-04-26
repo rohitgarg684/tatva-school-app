@@ -13,6 +13,7 @@ import '../../../models/behavior_category.dart';
 import '../../../models/attendance_record.dart';
 import '../../../models/attendance_status.dart';
 import '../../../models/activity_event.dart';
+import '../../parent/parent_helpers.dart';
 
 class StudentHomeTab extends StatelessWidget {
   final UserModel? user;
@@ -478,7 +479,7 @@ class StudentHomeTab extends StatelessWidget {
               final event = entry.value;
               final icon = _activityIcon(event.type.name);
               final timeAgo = event.createdAt != null
-                  ? _formatTimeAgo(event.createdAt!)
+                  ? formatTimeAgo(event.createdAt!)
                   : '';
               return Column(children: [
                 if (idx > 0)
@@ -736,12 +737,4 @@ class StudentHomeTab extends StatelessWidget {
     );
   }
 
-  String _formatTimeAgo(DateTime dateTime) {
-    final diff = DateTime.now().difference(dateTime);
-    if (diff.inMinutes < 1) return 'just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
-    return '${(diff.inDays / 7).floor()}w ago';
-  }
 }
