@@ -1214,15 +1214,6 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                           fontFamily: 'Raleway',
                           fontSize: 12,
                           color: textLight)),
-                  const SizedBox(width: 12),
-                  Icon(Icons.family_restroom_outlined,
-                      color: textLight, size: 16),
-                  const SizedBox(width: 4),
-                  Text('$parentCount parents',
-                      style: const TextStyle(
-                          fontFamily: 'Raleway',
-                          fontSize: 12,
-                          color: textLight)),
                 ])),
             Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
