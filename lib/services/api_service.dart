@@ -380,8 +380,9 @@ class ApiService {
         'POST', Uri.parse('$_baseUrl/announcement/upload'));
     request.headers.addAll(headers);
     for (int i = 0; i < files.length; i++) {
+      final safeName = Uri.encodeFull(fileNames[i]);
       request.files.add(http.MultipartFile.fromBytes('files', files[i],
-          filename: fileNames[i]));
+          filename: safeName));
     }
     final response =
         await http.Response.fromStream(await request.send());

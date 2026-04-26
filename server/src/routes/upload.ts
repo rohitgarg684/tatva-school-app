@@ -179,7 +179,12 @@ router.post(
       for (const file of files) {
         const storagePath = `announcements/${generateFileName(file.mimetype)}`;
         const url = await uploadToStorage(file.buffer, storagePath, file.mimetype);
-        const name = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        let name: string;
+        try {
+          name = decodeURIComponent(file.originalname);
+        } catch {
+          name = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        }
         uploaded.push({ url, name, type: classifyFileType(name) });
       }
 
