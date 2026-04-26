@@ -408,6 +408,7 @@ class ApiService {
     String studentName = '',
     double score = 0,
     double total = 100,
+    DateTime? testDate,
   }) =>
       _post('/grade', {
         'studentUid': studentUid,
@@ -417,6 +418,7 @@ class ApiService {
         'studentName': studentName,
         'score': score,
         'total': total,
+        if (testDate != null) 'testDate': testDate.toUtc().toIso8601String(),
       });
 
   Future<Map<String, dynamic>> deleteGrade(String id) =>

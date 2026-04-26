@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../../shared/animations/animations.dart';
 import '../../../shared/theme/colors.dart';
 import '../../../shared/widgets/tatva_snackbar.dart';
@@ -252,77 +253,131 @@ class _TeacherGradesTabState extends State<TeacherGradesTab> {
               ),
             )
           else
-            ...filteredGrades.asMap().entries.map((e) {
-              final g = e.value;
-              final pct = g.total > 0 ? g.score / g.total : 0.0;
-              final c = pct >= 0.9
-                  ? TatvaColors.success
-                  : pct >= 0.7
-                      ? TatvaColors.accent
-                      : TatvaColors.error;
-              return StaggeredItem(
-                  index: e.key,
-                  child: GestureDetector(
-                    onTap: () => _showGradeEntrySheet(
-                      classId: _gradeSelectedClassId,
-                      subject: selClass.subject,
-                      students: classStudents,
-                      existingGrade: g,
-                    ),
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                          color: TatvaColors.bgCard,
-                          borderRadius: BorderRadius.circular(12),
-                          border:
-                              Border.all(color: Colors.grey.shade100)),
-                      child: Row(children: [
-                        CircleAvatar(
-                            radius: 18,
-                            backgroundColor:
-                                TatvaColors.primary.withOpacity(0.1),
-                            child: Text(
-                                g.studentName.isNotEmpty
-                                    ? g.studentName[0]
-                                    : '?',
-                                style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: TatvaColors.primary))),
-                        const SizedBox(width: 12),
-                        Expanded(
-                            child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                children: [
-                              Text(g.studentName,
-                                  style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: TatvaColors.neutral900)),
-                              Text(g.assessmentName,
-                                  style: const TextStyle(
-                                      fontSize: 11,
-                                      color: TatvaColors.neutral400)),
-                            ])),
-                        Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                                color: c.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8)),
-                            child: Text(
-                                '${g.score.toInt()}/${g.total.toInt()}',
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: c))),
-                      ]),
-                    ),
-                  ));
-            }),
+            ..._buildGroupedGrades(filteredGrades, selClass, classStudents),
         ]));
+  }
+
+  List<Widget> _buildGroupedGrades(
+      List<GradeModel> grades, ClassModel selClass, List<UserModel> classStudents) {
+    final grouped = <String, List<GradeModel>>{};
+    for (final g in grades) {
+      grouped.putIfAbsent(g.assessmentName, () => []).add(g);
+    }
+    final sortedKeys = grouped.keys.toList()
+      ..sort((a, b) {
+        final aDate = grouped[a]!.first.testDate ?? grouped[a]!.first.createdAt ?? DateTime(2000);
+        final bDate = grouped[b]!.first.testDate ?? grouped[b]!.first.createdAt ?? DateTime(2000);
+        return bDate.compareTo(aDate);
+      });
+
+    final widgets = <Widget>[];
+    int idx = 0;
+    for (final testName in sortedKeys) {
+      final items = grouped[testName]!;
+      final avg = items.fold<double>(0, (s, g) => s + g.percentage) / items.length;
+      final avgColor = avg >= 90 ? TatvaColors.success : avg >= 70 ? TatvaColors.accent : TatvaColors.error;
+
+      widgets.add(StaggeredItem(
+        index: idx++,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 6, top: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+              color: TatvaColors.primary.withOpacity(0.04),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: TatvaColors.primary.withOpacity(0.1))),
+          child: Row(children: [
+            Icon(Icons.assignment_outlined, size: 16, color: TatvaColors.primary),
+            const SizedBox(width: 8),
+            Expanded(
+                child: Text(testName,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: TatvaColors.neutral900))),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                  color: avgColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6)),
+              child: Text('${avg.round()}% avg',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: avgColor)),
+            ),
+          ]),
+        ),
+      ));
+
+      for (final g in items) {
+        final pct = g.total > 0 ? g.score / g.total : 0.0;
+        final c = pct >= 0.9
+            ? TatvaColors.success
+            : pct >= 0.7
+                ? TatvaColors.accent
+                : TatvaColors.error;
+        final dateStr = g.testDate != null
+            ? DateFormat('MMM d, yyyy').format(g.testDate!.toLocal())
+            : null;
+        widgets.add(StaggeredItem(
+          index: idx++,
+          child: GestureDetector(
+            onTap: () => _showGradeEntrySheet(
+              classId: _gradeSelectedClassId,
+              subject: selClass.subject,
+              students: classStudents,
+              existingGrade: g,
+            ),
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 8, left: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                  color: TatvaColors.bgCard,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade100)),
+              child: Row(children: [
+                CircleAvatar(
+                    radius: 16,
+                    backgroundColor: TatvaColors.primary.withOpacity(0.1),
+                    child: Text(
+                        g.studentName.isNotEmpty ? g.studentName[0] : '?',
+                        style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: TatvaColors.primary))),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(g.studentName,
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: TatvaColors.neutral900)),
+                      if (dateStr != null)
+                        Text(dateStr,
+                            style: const TextStyle(
+                                fontSize: 11,
+                                color: TatvaColors.neutral400)),
+                    ])),
+                Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                        color: c.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8)),
+                    child: Text(
+                        '${g.score.toInt()}/${g.total.toInt()}',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: c))),
+              ]),
+            ),
+          ),
+        ));
+      }
+    }
+    return widgets;
   }
 
   Widget _gradeStatChip(String value, String label, Color c) {
@@ -358,6 +413,7 @@ class _TeacherGradesTabState extends State<TeacherGradesTab> {
     final assessCtrl = TextEditingController(
         text: existingGrade?.assessmentName ?? '');
     String assessQuery = existingGrade?.assessmentName ?? '';
+    DateTime selectedDate = existingGrade?.testDate?.toLocal() ?? DateTime.now();
 
     showModalBottomSheet(
       context: context,
@@ -679,6 +735,45 @@ class _TeacherGradesTabState extends State<TeacherGradesTab> {
                             ]),
                       ),
                     ]),
+                    const SizedBox(height: 16),
+
+                    const Text('Test Date',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: TatvaColors.neutral400)),
+                    const SizedBox(height: 6),
+                    GestureDetector(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: ctx,
+                          initialDate: selectedDate,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now(),
+                        );
+                        if (picked != null) {
+                          setSheet(() => selectedDate = picked);
+                        }
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 12),
+                        decoration: BoxDecoration(
+                            color: TatvaColors.bgLight,
+                            borderRadius: BorderRadius.circular(10)),
+                        child: Row(children: [
+                          Icon(Icons.calendar_today_rounded,
+                              size: 15, color: TatvaColors.neutral400),
+                          const SizedBox(width: 8),
+                          Text(
+                              DateFormat('MMM d, yyyy').format(selectedDate),
+                              style: const TextStyle(
+                                  fontSize: 14,
+                                  color: TatvaColors.neutral900)),
+                        ]),
+                      ),
+                    ),
                     const SizedBox(height: 24),
 
                     Row(children: [
@@ -756,6 +851,7 @@ class _TeacherGradesTabState extends State<TeacherGradesTab> {
                                 studentName: selectedStudentName,
                                 score: score,
                                 total: total,
+                                testDate: selectedDate,
                               );
                               if (!widget.testTitles.any((t) =>
                                   (t['title'] as String? ?? '')

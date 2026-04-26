@@ -17,7 +17,7 @@ router.post(
   "/grade",
   requireRole("Teacher", "Principal"),
   asyncHandler(async (req, res) => {
-    const { studentUid, studentName, classId, subject, assessmentName, score, total } = req.body;
+    const { studentUid, studentName, classId, subject, assessmentName, score, total, testDate } = req.body;
     if (!studentUid || !classId || !subject || !assessmentName)
       return res.status(400).json({ error: "studentUid, classId, subject, assessmentName required" });
 
@@ -27,15 +27,19 @@ router.post(
       .where("assessmentName", "==", assessmentName)
       .limit(1).get();
 
+    const testDateValue = testDate ? new Date(testDate) : null;
+
     if (!existing.empty) {
-      await existing.docs[0].ref.update({
+      const updateData: Record<string, any> = {
         score: score || 0,
         total: total || Config.DEFAULT_SCORE_TOTAL,
         updatedAt: FieldValue.serverTimestamp(),
-      });
+      };
+      if (testDateValue) updateData.testDate = testDateValue;
+      await existing.docs[0].ref.update(updateData);
       res.json({ id: existing.docs[0].id, updated: true });
     } else {
-      const ref = await db.collection(Collections.GRADES).add({
+      const docData: Record<string, any> = {
         studentUid,
         studentName: studentName || "",
         classId,
@@ -46,7 +50,9 @@ router.post(
         teacherUid: req.uid,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
-      });
+      };
+      if (testDateValue) docData.testDate = testDateValue;
+      const ref = await db.collection(Collections.GRADES).add(docData);
       res.json({ id: ref.id, created: true });
     }
 

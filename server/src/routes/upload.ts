@@ -78,7 +78,7 @@ function generateFileName(mimetype: string): string {
 }
 
 async function uploadToStorage(buffer: Buffer, storagePath: string, contentType: string): Promise<string> {
-  const bucket = admin.storage().bucket();
+  const bucket = admin.storage().bucket("tatva-school-app.firebasestorage.app");
   const fileRef = bucket.file(storagePath);
   await fileRef.save(buffer, { metadata: { contentType } });
   const [signedUrl] = await fileRef.getSignedUrl({

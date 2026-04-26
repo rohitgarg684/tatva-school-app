@@ -8,6 +8,7 @@ class GradeModel {
   final double score;
   final double total;
   final String teacherUid;
+  final DateTime? testDate;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -21,6 +22,7 @@ class GradeModel {
     required this.score,
     required this.total,
     required this.teacherUid,
+    this.testDate,
     this.createdAt,
     this.updatedAt,
   });
@@ -38,6 +40,9 @@ class GradeModel {
       score: (data['score'] as num?)?.toDouble() ?? 0,
       total: (data['total'] as num?)?.toDouble() ?? 0,
       teacherUid: data['teacherUid'] as String? ?? '',
+      testDate: data['testDate'] != null
+          ? DateTime.tryParse(data['testDate'] as String)
+          : null,
       createdAt: data['createdAt'] != null
           ? DateTime.tryParse(data['createdAt'] as String)
           : null,
@@ -57,6 +62,7 @@ class GradeModel {
     double? score,
     double? total,
     String? teacherUid,
+    DateTime? testDate,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -70,6 +76,7 @@ class GradeModel {
       score: score ?? this.score,
       total: total ?? this.total,
       teacherUid: teacherUid ?? this.teacherUid,
+      testDate: testDate ?? this.testDate,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -85,6 +92,7 @@ class GradeModel {
       'score': score,
       'total': total,
       'teacherUid': teacherUid,
+      if (testDate != null) 'testDate': testDate!.toUtc().toIso8601String(),
       'createdAt': (createdAt ?? DateTime.now()).toIso8601String(),
       'updatedAt': DateTime.now().toIso8601String(),
     };
