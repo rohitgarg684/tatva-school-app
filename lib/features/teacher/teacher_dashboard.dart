@@ -1285,6 +1285,10 @@ class _TeacherDashboardState extends State<TeacherDashboard>
       studentScores.update(bp.studentUid, (v) => v + bp.points,
           ifAbsent: () => bp.points);
     }
+    final recentPoints = List<BehaviorPoint>.from(_classBehavior)
+      ..sort((a, b) => (b.createdAt ?? DateTime(2000))
+          .compareTo(a.createdAt ?? DateTime(2000)));
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1311,10 +1315,10 @@ class _TeacherDashboardState extends State<TeacherDashboard>
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 1.5),
+              crossAxisCount: 3,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 0.85),
           itemCount: _students.length,
           itemBuilder: (_, i) {
             final s = _students[i];
@@ -1329,34 +1333,37 @@ class _TeacherDashboardState extends State<TeacherDashboard>
               child: Container(
                 decoration: BoxDecoration(
                     color: bgCard,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: Colors.grey.shade100)),
                 child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       CircleAvatar(
-                          radius: 22,
+                          radius: 20,
                           backgroundColor: primary.withOpacity(0.1),
                           child: Text(s.initial,
                               style: const TextStyle(
                                   fontFamily: 'Raleway',
-                                  fontSize: 16,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.bold,
                                   color: primary))),
-                      const SizedBox(height: 8),
-                      Text(s.name,
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontFamily: 'Raleway',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: textDark)),
+                      const SizedBox(height: 6),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(s.name,
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: textDark)),
+                      ),
                       const SizedBox(height: 4),
                       Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 2),
+                              horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                               color: scoreColor.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(10)),
@@ -1364,7 +1371,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                               '${score >= 0 ? '+' : ''}$score pts',
                               style: TextStyle(
                                   fontFamily: 'Raleway',
-                                  fontSize: 12,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                   color: scoreColor))),
                     ]),
@@ -1373,7 +1380,148 @@ class _TeacherDashboardState extends State<TeacherDashboard>
           },
         ),
         const SizedBox(height: 24),
+        if (recentPoints.isNotEmpty) ...[
+          const Text('Recent Activity',
+              style: TextStyle(
+                  fontFamily: 'Raleway',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: textDark)),
+          const SizedBox(height: 12),
+          ...recentPoints.take(20).map((bp) {
+            final cat = BehaviorCategory.fromId(bp.categoryId);
+            final c = bp.isPositive ? success : danger;
+            final timeAgo = bp.createdAt != null
+                ? _behaviorTimeAgo(bp.createdAt!)
+                : '';
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                  color: bgCard,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: c.withOpacity(0.15))),
+              child: Row(children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                      color: c.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10)),
+                  child: Icon(cat.icon, color: c, size: 16),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          Text(bp.studentName,
+                              style: const TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: textDark)),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                                color: c.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8)),
+                            child: Text(
+                                '${bp.isPositive ? '+' : ''}${bp.points}',
+                                style: TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: c)),
+                          ),
+                        ]),
+                        Text(cat.name,
+                            style: const TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 11,
+                                color: textLight)),
+                        if (bp.note.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(bp.note,
+                                style: TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 11,
+                                    fontStyle: FontStyle.italic,
+                                    color: textMid)),
+                          ),
+                      ]),
+                ),
+                if (timeAgo.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Text(timeAgo,
+                        style: const TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 10,
+                            color: textLight)),
+                  ),
+                GestureDetector(
+                  onTap: () => _deleteBehaviorPoint(bp),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                        color: danger.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(6)),
+                    child: Icon(Icons.delete_outline_rounded,
+                        color: danger.withOpacity(0.5), size: 16),
+                  ),
+                ),
+              ]),
+            );
+          }),
+        ],
+        const SizedBox(height: 24),
       ]),
+    );
+  }
+
+  String _behaviorTimeAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
+    if (diff.inHours < 24) return '${diff.inHours}h';
+    if (diff.inDays < 7) return '${diff.inDays}d';
+    return '${(diff.inDays / 7).floor()}w';
+  }
+
+  void _deleteBehaviorPoint(BehaviorPoint bp) {
+    if (bp.id.isEmpty) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete behavior point?',
+            style: TextStyle(fontFamily: 'Raleway', fontSize: 16)),
+        content: Text(
+            '${bp.isPositive ? '+' : ''}${bp.points} ${BehaviorCategory.fromId(bp.categoryId).name} for ${bp.studentName}',
+            style: const TextStyle(fontFamily: 'Raleway', fontSize: 14)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await _api.deleteBehaviorPoint(bp.id);
+                setState(() => _classBehavior.removeWhere((b) => b.id == bp.id));
+                _snack('Behavior point deleted');
+              } catch (e) {
+                _snack('Failed to delete');
+              }
+            },
+            child: Text('Delete', style: TextStyle(color: danger)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1381,93 +1529,132 @@ class _TeacherDashboardState extends State<TeacherDashboard>
     final categories = BehaviorCategory.defaults;
     final positive = categories.where((c) => c.isPositive).toList();
     final negative = categories.where((c) => !c.isPositive).toList();
+    final noteCtrl = TextEditingController();
     HapticFeedback.lightImpact();
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => Container(
-        constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.7),
-        decoration: const BoxDecoration(
-          color: TatvaColors.bgCard,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.75),
+          decoration: const BoxDecoration(
+            color: TatvaColors.bgCard,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+          child: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Center(
+                  child: Container(
+                      width: 36,
+                      height: 3,
+                      decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(2)))),
+              const SizedBox(height: 16),
+              Text(studentName,
+                  style: const TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: textDark)),
+              const SizedBox(height: 4),
+              const Text('Select a behavior category',
+                  style: TextStyle(
+                      fontFamily: 'Raleway', fontSize: 13, color: textLight)),
+              const SizedBox(height: 16),
+              TextField(
+                controller: noteCtrl,
+                style: const TextStyle(
+                    fontFamily: 'Raleway', fontSize: 13, color: textDark),
+                decoration: InputDecoration(
+                  hintText: 'Add a note (optional)',
+                  hintStyle: TextStyle(
+                      fontFamily: 'Raleway',
+                      fontSize: 13,
+                      color: Colors.grey.shade400),
+                  filled: true,
+                  fillColor: bg,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.grey.shade200)),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(
+                          color: primary.withOpacity(0.5), width: 1.5)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Positive',
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: textDark))),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: positive
+                    .map((cat) => _behaviorChip(cat, true, studentUid,
+                        studentName, classId, noteCtrl))
+                    .toList(),
+              ),
+              const SizedBox(height: 16),
+              const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Needs Work',
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: textDark))),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: negative
+                    .map((cat) => _behaviorChip(cat, false, studentUid,
+                        studentName, classId, noteCtrl))
+                    .toList(),
+              ),
+            ]),
+          ),
         ),
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Center(
-              child: Container(
-                  width: 36,
-                  height: 3,
-                  decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(2)))),
-          const SizedBox(height: 16),
-          Text(studentName,
-              style: const TextStyle(
-                  fontFamily: 'Raleway',
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: textDark)),
-          const SizedBox(height: 4),
-          const Text('Select a behavior category',
-              style: TextStyle(
-                  fontFamily: 'Raleway', fontSize: 13, color: textLight)),
-          const SizedBox(height: 16),
-          const Align(
-              alignment: Alignment.centerLeft,
-              child: Text('Positive',
-                  style: TextStyle(
-                      fontFamily: 'Raleway',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: textDark))),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: positive
-                .map((cat) => _behaviorChip(cat, true, studentUid,
-                    studentName, classId))
-                .toList(),
-          ),
-          const SizedBox(height: 16),
-          const Align(
-              alignment: Alignment.centerLeft,
-              child: Text('Needs Work',
-                  style: TextStyle(
-                      fontFamily: 'Raleway',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: textDark))),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: negative
-                .map((cat) => _behaviorChip(cat, false, studentUid,
-                    studentName, classId))
-                .toList(),
-          ),
-        ]),
       ),
     );
   }
 
   Widget _behaviorChip(BehaviorCategory cat, bool isPositive,
-      String studentUid, String studentName, String classId) {
+      String studentUid, String studentName, String classId,
+      TextEditingController noteCtrl) {
     final chipColor = isPositive ? success : danger;
     return GestureDetector(
       onTap: () async {
+        final note = noteCtrl.text.trim();
         Navigator.pop(context);
-        _api.awardBehaviorPoint(
+        final resp = await _api.awardBehaviorPoint(
           studentUid: studentUid,
           classId: classId,
           categoryId: cat.id,
           studentName: studentName,
           points: isPositive ? 1 : -1,
+          note: note,
         );
+        final newId = resp['id'] as String? ?? '';
         setState(() => _classBehavior.add(BehaviorPoint(
+          id: newId,
           studentUid: studentUid,
           studentName: studentName,
           classId: classId,
@@ -1475,6 +1662,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
           points: isPositive ? 1 : -1,
           awardedBy: _uid,
           awardedByName: _user?.name ?? '',
+          note: note,
           createdAt: DateTime.now(),
         )));
         _snack('${isPositive ? '+1' : '-1'} ${cat.name} for $studentName');

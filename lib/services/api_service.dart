@@ -142,6 +142,9 @@ class ApiService {
         'note': note,
       });
 
+  Future<Map<String, dynamic>> deleteBehaviorPoint(String id) =>
+      _delete('/behavior-point/$id');
+
   // ─── File Upload ──────────────────────────────────────────────────────
 
   Future<String?> _uploadMultipart(

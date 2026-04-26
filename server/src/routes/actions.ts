@@ -214,4 +214,27 @@ router.post(
   }
 );
 
+// DELETE /api/behavior-point/:id  — Teacher, Principal
+router.delete(
+  "/behavior-point/:id",
+  requireRole("Teacher", "Principal"),
+  async (req, res) => {
+    try {
+      const docId = req.params.id as string;
+      const ref = db.collection("behavior_points").doc(docId);
+      const snap = await ref.get();
+      if (!snap.exists) {
+        return res.status(404).json({ error: "Not found" });
+      }
+      await ref.delete();
+      cacheDeletePrefix("student_dash_");
+      cacheDeletePrefix("teacher_dash_");
+      res.json({ deleted: true });
+    } catch (err: any) {
+      console.error("deleteBehaviorPoint error:", err);
+      res.status(500).json({ error: err.message || "Internal server error" });
+    }
+  }
+);
+
 export default router;
