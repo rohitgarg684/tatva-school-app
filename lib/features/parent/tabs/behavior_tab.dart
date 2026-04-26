@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../services/dashboard_service.dart';
 import '../../../shared/theme/colors.dart';
 import '../../../shared/animations/animations.dart';
 import '../../../models/child_info.dart';
@@ -18,7 +19,7 @@ class ParentBehaviorTab extends StatelessWidget {
 
     final catSummary = <String, int>{};
     for (final p in points) {
-      catSummary[p.categoryId] = (catSummary[p.categoryId] ?? 0) + p.points;
+      catSummary[p.categoryId] = ((catSummary[p.categoryId] ?? 0) + p.points).toInt();
     }
     final sortedCats = catSummary.entries.toList()
       ..sort((a, b) => b.value.abs().compareTo(a.value.abs()));
