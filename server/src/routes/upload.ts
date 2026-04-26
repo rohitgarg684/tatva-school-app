@@ -45,7 +45,10 @@ const docUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_DOC_SIZE },
   fileFilter: (_req, file, cb) => {
-    if (DOC_MIME_TYPES.includes(file.mimetype)) {
+    if (
+      DOC_MIME_TYPES.includes(file.mimetype) ||
+      file.mimetype === "application/octet-stream"
+    ) {
       cb(null, true);
     } else {
       cb(

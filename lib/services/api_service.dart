@@ -3,6 +3,23 @@ import 'dart:typed_data';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+
+String _mimeFromFilename(String filename) {
+  final ext = filename.split('.').last.toLowerCase();
+  const map = {
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'gif': 'image/gif',
+    'webp': 'image/webp',
+    'pdf': 'application/pdf',
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  };
+  return map[ext] ?? 'application/octet-stream';
+}
 
 class ApiService {
   static final ApiService _instance = ApiService._();
@@ -186,9 +203,11 @@ class ApiService {
       final request = http.MultipartRequest('POST', uri)
         ..headers['Authorization'] = 'Bearer $token';
       for (final entry in files) {
+        final mime = _mimeFromFilename(entry.key);
         request.files.add(
             http.MultipartFile.fromBytes('files', entry.value,
-                filename: entry.key));
+                filename: entry.key,
+                contentType: MediaType.parse(mime)));
       }
       final response =
           await request.send().timeout(const Duration(seconds: 120));
@@ -212,9 +231,11 @@ class ApiService {
         ..headers['Authorization'] = 'Bearer $token'
         ..fields['note'] = note;
       for (final entry in files) {
+        final mime = _mimeFromFilename(entry.key);
         request.files.add(
             http.MultipartFile.fromBytes('files', entry.value,
-                filename: entry.key));
+                filename: entry.key,
+                contentType: MediaType.parse(mime)));
       }
       final response =
           await request.send().timeout(const Duration(seconds: 120));
