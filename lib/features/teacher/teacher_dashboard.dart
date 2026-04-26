@@ -71,6 +71,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
   List<StoryPost> _classStory = [];
   List<ActivityEvent> _activityFeed = [];
   List<UserModel> _allSchoolStudents = [];
+  String _attSearchQuery = '';
 
   // ── SCHEDULE STATE
   List<ScheduleModel> _tSchedData = [];
@@ -145,7 +146,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
   Future<void> _loadUser() async {
     setState(() => isLoading = true);
     try {
-      _uid = AuthRepository().currentUid ?? 'teacher_priya';
+      _uid = AuthRepository().currentUid ?? '';
       final data = await _dashSvc.loadTeacherDashboard(overrideUid: _uid, forceRefresh: true);
       _user = data.user;
       _classes = data.classes;
@@ -1739,16 +1740,14 @@ class _TeacherDashboardState extends State<TeacherDashboard>
     }
 
     return StatefulBuilder(builder: (ctx, setLocal) {
-      String searchQuery = '';
-
       return SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: StatefulBuilder(builder: (ctx2, setInner) {
-          final filtered = searchQuery.isEmpty
+          final filtered = _attSearchQuery.isEmpty
               ? allStudents
               : allStudents
                   .where((s) =>
-                      s.name.toLowerCase().contains(searchQuery.toLowerCase()))
+                      s.name.toLowerCase().contains(_attSearchQuery.toLowerCase()))
                   .toList();
 
           final presentCount =
@@ -1824,7 +1823,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
             const SizedBox(height: 12),
             // Search
             TextField(
-              onChanged: (v) => setInner(() => searchQuery = v),
+              onChanged: (v) => setInner(() => _attSearchQuery = v),
               style: const TextStyle(
                   fontFamily: 'Raleway', fontSize: 13, color: textDark),
               decoration: InputDecoration(

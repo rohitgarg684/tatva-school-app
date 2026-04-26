@@ -118,7 +118,7 @@ class _ParentDashboardState extends State<ParentDashboard>
   Future<void> _loadData() async {
     setState(() => isLoading = true);
     try {
-      _uid = AuthRepository().currentUid ?? 'parent_suresh';
+      _uid = AuthRepository().currentUid ?? '';
       final data = await _dashSvc.loadParentDashboard(overrideUid: _uid, forceRefresh: true);
       _user = data.user;
       _childrenData = data.childrenData;

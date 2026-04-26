@@ -130,7 +130,7 @@ class _StudentDashboardState extends State<StudentDashboard>
   Future<void> _loadUser() async {
     setState(() => isLoading = true);
     try {
-      _uid = AuthRepository().currentUid ?? 'student_arjun';
+      _uid = AuthRepository().currentUid ?? '';
       final data = await _dashSvc.loadStudentDashboard(overrideUid: _uid, forceRefresh: true);
       _user = data.user;
       _primaryClass = data.primaryClass;
