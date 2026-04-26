@@ -4744,7 +4744,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                                     subject: subject,
                                     total: total);
                               }
-                              await _loadData();
+                              await _loadUser();
                               _snack(isEdit
                                   ? 'Grade updated'
                                   : 'Grade saved');
