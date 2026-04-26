@@ -454,6 +454,11 @@ class ApiService {
         [];
   }
 
+  Future<Map<String, dynamic>> getScheduleWithCancellations(
+      String grade, String section) async {
+    return await _get('/schedule/$grade/$section');
+  }
+
   Future<Map<String, dynamic>> upsertSchedule({
     required String grade,
     required String section,
@@ -504,4 +509,26 @@ class ApiService {
     final data = await _get('/schedule-events?start=$start&end=$end');
     return (data['events'] as List?)?.cast<Map<String, dynamic>>() ?? [];
   }
+
+  // ─── Period Cancellations ──────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> cancelPeriod({
+    required String grade,
+    required String section,
+    required String date,
+    required String startTime,
+    String classId = '',
+    String reason = '',
+  }) =>
+      _post('/period-cancellation', {
+        'grade': grade,
+        'section': section,
+        'date': date,
+        'startTime': startTime,
+        'classId': classId,
+        'reason': reason,
+      });
+
+  Future<Map<String, dynamic>> undoCancelPeriod(String id) =>
+      _delete('/period-cancellation/$id');
 }

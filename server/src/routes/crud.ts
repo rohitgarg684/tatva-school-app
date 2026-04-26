@@ -611,15 +611,37 @@ router.get("/schedule/:grade/:section", requireAuth, async (req, res) => {
     const grade = req.params.grade as string;
     const section = req.params.section as string;
 
-    const snap = await db
-      .collection("schedules")
-      .where("grade", "==", grade)
-      .where("section", "==", section)
-      .orderBy("dayOfWeek", "asc")
-      .get();
+    const now = new Date();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const wsStr = monday.toISOString().substring(0, 10);
+    const weStr = sunday.toISOString().substring(0, 10);
 
-    const schedules = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    res.json({ schedules: serializeDocs(schedules) });
+    const [schedSnap, cancelSnap] = await Promise.all([
+      db
+        .collection("schedules")
+        .where("grade", "==", grade)
+        .where("section", "==", section)
+        .orderBy("dayOfWeek", "asc")
+        .get(),
+      db
+        .collection("period_cancellations")
+        .where("grade", "==", grade)
+        .where("section", "==", section)
+        .where("date", ">=", wsStr)
+        .where("date", "<=", weStr)
+        .get(),
+    ]);
+
+    const schedules = schedSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const cancellations = cancelSnap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+      createdAt: d.data().createdAt?.toDate?.()?.toISOString?.() || null,
+    }));
+    res.json({ schedules: serializeDocs(schedules), cancellations });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -701,7 +723,21 @@ router.get(
         });
       }
 
-      res.json({ periods: myPeriods, events });
+      let cancellations: any[] = [];
+      if (weekStart && weekEnd) {
+        const cancelSnap = await db
+          .collection("period_cancellations")
+          .where("date", ">=", weekStart)
+          .where("date", "<=", weekEnd)
+          .get();
+        cancellations = cancelSnap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+          createdAt: d.data().createdAt?.toDate?.()?.toISOString?.() || null,
+        }));
+      }
+
+      res.json({ periods: myPeriods, events, cancellations });
     } catch (err: any) {
       console.error("teacher-calendar error:", err);
       res.status(500).json({ error: err.message });
@@ -786,5 +822,61 @@ router.get("/schedule-events", requireAuth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ─── Period Cancellations ────────────────────────────────────────────────────
+
+router.post(
+  "/period-cancellation",
+  requireRole("Teacher", "Principal"),
+  async (req, res) => {
+    try {
+      const { grade, section, date, startTime, classId, reason } = req.body;
+      if (!grade || !section || !date || !startTime)
+        return res
+          .status(400)
+          .json({ error: "grade, section, date, startTime required" });
+
+      const docId = `${grade}_${section}_${date}_${startTime.replace(":", "")}`;
+      await db
+        .collection("period_cancellations")
+        .doc(docId)
+        .set({
+          grade,
+          section,
+          date,
+          startTime,
+          classId: classId || "",
+          reason: reason || "",
+          cancelledBy: req.uid,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+
+      cacheDeletePrefix("teacher_dash_");
+      cacheDeletePrefix("student_dash_");
+      res.json({ id: docId, cancelled: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
+router.delete(
+  "/period-cancellation/:id",
+  requireRole("Teacher", "Principal"),
+  async (req, res) => {
+    try {
+      const docId = req.params.id as string;
+      const ref = db.collection("period_cancellations").doc(docId);
+      const snap = await ref.get();
+      if (!snap.exists) return res.status(404).json({ error: "Not found" });
+      await ref.delete();
+      cacheDeletePrefix("teacher_dash_");
+      cacheDeletePrefix("student_dash_");
+      res.json({ deleted: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
 
 export default router;

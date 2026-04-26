@@ -71,6 +71,7 @@ class _StudentDashboardState extends State<StudentDashboard>
 
   // ── SCHEDULE STATE ────────────────────────────────────────────────────────
   List<ScheduleModel> _schedWeekData = [];
+  List<Map<String, dynamic>> _schedCancellations = [];
   bool _schedLoading = false;
   bool _schedLoaded = false;
   int _schedSelectedDay = 0;
@@ -1018,11 +1019,17 @@ class _StudentDashboardState extends State<StudentDashboard>
     if (_schedLoading) return;
     setState(() => _schedLoading = true);
     try {
-      final raw = await _api.getSchedule(_parseGrade(), _parseSection());
+      final data = await _api.getScheduleWithCancellations(
+          _parseGrade(), _parseSection());
+      final raw = (data['schedules'] as List?)
+              ?.cast<Map<String, dynamic>>() ?? [];
       _schedWeekData = raw.map((m) => ScheduleModel.fromJson(m)).toList();
+      _schedCancellations = (data['cancellations'] as List?)
+              ?.cast<Map<String, dynamic>>() ?? [];
     } catch (e) {
       debugPrint('Schedule load error: $e');
       _schedWeekData = [];
+      _schedCancellations = [];
     }
     if (mounted) setState(() { _schedLoading = false; _schedLoaded = true; });
   }
@@ -1157,6 +1164,18 @@ class _StudentDashboardState extends State<StudentDashboard>
     );
   }
 
+  String _schedDateStr(int dayOfWeek) {
+    final ws = _weekStart(_schedWeekStart);
+    final d = ws.add(Duration(days: dayOfWeek - 1));
+    return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  }
+
+  bool _isPeriodCancelled(int dayOfWeek, String startTime) {
+    final dateStr = _schedDateStr(dayOfWeek);
+    return _schedCancellations.any((cn) =>
+        cn['date'] == dateStr && cn['startTime'] == startTime);
+  }
+
   Widget _buildWeekGrid(List<ScheduleModel> schedules) {
     final allPeriodTimes = <String>{};
     for (final s in schedules) {
@@ -1247,48 +1266,59 @@ class _StudentDashboardState extends State<StudentDashboard>
                   if (matching.isNotEmpty) slot = matching.first;
                 }
                 final isToday = DateTime.now().weekday == day;
+                final cancelled = slot != null && _isPeriodCancelled(day, time);
                 final c = slot != null
                     ? (subjectColorMap[slot.subject] ?? primary)
                     : Colors.grey.shade200;
                 return Expanded(
-                  child: Container(
-                    height: 52,
-                    margin: const EdgeInsets.symmetric(horizontal: 1),
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                        color: slot != null
-                            ? c.withOpacity(isToday ? 0.18 : 0.1)
-                            : Colors.grey.shade50,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                            color: slot != null
-                                ? c.withOpacity(0.3)
-                                : Colors.grey.shade100)),
-                    child: slot != null
-                        ? Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(slot.subject,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                      fontFamily: 'Raleway',
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w700,
-                                      color: c)),
-                              if (slot.teacherName.isNotEmpty)
-                                Text(slot.teacherName.split(' ').last,
+                  child: Opacity(
+                    opacity: cancelled ? 0.4 : 1.0,
+                    child: Container(
+                      height: 52,
+                      margin: const EdgeInsets.symmetric(horizontal: 1),
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                          color: cancelled
+                              ? Colors.grey.shade100
+                              : slot != null
+                                  ? c.withOpacity(isToday ? 0.18 : 0.1)
+                                  : Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                              color: cancelled
+                                  ? Colors.grey.shade200
+                                  : slot != null
+                                      ? c.withOpacity(0.3)
+                                      : Colors.grey.shade100)),
+                      child: slot != null
+                          ? Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(cancelled ? '✕' : slot.subject,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                         fontFamily: 'Raleway',
-                                        fontSize: 8,
-                                        color: c.withOpacity(0.7))),
-                            ],
-                          )
-                        : const SizedBox.shrink(),
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                        color: cancelled ? Colors.grey : c,
+                                        decoration: cancelled
+                                            ? TextDecoration.lineThrough
+                                            : TextDecoration.none)),
+                                if (!cancelled && slot.teacherName.isNotEmpty)
+                                  Text(slot.teacherName.split(' ').last,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                          fontFamily: 'Raleway',
+                                          fontSize: 8,
+                                          color: c.withOpacity(0.7))),
+                              ],
+                            )
+                          : const SizedBox.shrink(),
+                    ),
                   ),
                 );
               }),
@@ -1346,50 +1376,76 @@ class _StudentDashboardState extends State<StudentDashboard>
         final i = e.key;
         final p = e.value;
         final c = colors[i % colors.length];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-              color: bgCard,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: c.withOpacity(0.2))),
-          child: Row(children: [
-            Container(
-              width: 4,
-              height: 48,
-              decoration: BoxDecoration(
-                  color: c, borderRadius: BorderRadius.circular(2)),
-            ),
-            const SizedBox(width: 14),
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('${p.startTime} - ${p.endTime}',
-                  style: TextStyle(
-                      fontFamily: 'Raleway',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: c)),
-              Text('Period ${p.period}',
-                  style: const TextStyle(
-                      fontFamily: 'Raleway', fontSize: 10, color: textLight)),
-            ]),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(p.subject.isNotEmpty ? p.subject : 'Free Period',
+        final cancelled = _isPeriodCancelled(day, p.startTime);
+        return Opacity(
+          opacity: cancelled ? 0.5 : 1.0,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+                color: cancelled ? Colors.grey.shade50 : bgCard,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: cancelled ? Colors.grey.shade200 : c.withOpacity(0.2))),
+            child: Row(children: [
+              Container(
+                width: 4,
+                height: 48,
+                decoration: BoxDecoration(
+                    color: cancelled ? Colors.grey.shade300 : c,
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+              const SizedBox(width: 14),
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('${p.startTime} - ${p.endTime}',
                     style: TextStyle(
                         fontFamily: 'Raleway',
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: p.subject.isNotEmpty ? textDark : textLight)),
-                if (p.teacherName.isNotEmpty)
-                  Text(p.teacherName,
-                      style: const TextStyle(
-                          fontFamily: 'Raleway',
-                          fontSize: 12,
-                          color: textLight)),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: cancelled ? Colors.grey : c,
+                        decoration: cancelled ? TextDecoration.lineThrough : TextDecoration.none)),
+                Text('Period ${p.period}',
+                    style: const TextStyle(
+                        fontFamily: 'Raleway', fontSize: 10, color: textLight)),
               ]),
-            ),
-          ]),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Flexible(
+                      child: Text(p.subject.isNotEmpty ? p.subject : 'Free Period',
+                          style: TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: cancelled ? Colors.grey : (p.subject.isNotEmpty ? textDark : textLight),
+                              decoration: cancelled ? TextDecoration.lineThrough : TextDecoration.none)),
+                    ),
+                    if (cancelled) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                            color: danger.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4)),
+                        child: Text('Cancelled',
+                            style: TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: danger)),
+                      ),
+                    ],
+                  ]),
+                  if (!cancelled && p.teacherName.isNotEmpty)
+                    Text(p.teacherName,
+                        style: const TextStyle(
+                            fontFamily: 'Raleway',
+                            fontSize: 12,
+                            color: textLight)),
+                ]),
+              ),
+            ]),
+          ),
         );
       }).toList(),
     );

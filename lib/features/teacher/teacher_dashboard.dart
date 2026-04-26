@@ -82,6 +82,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
   int _schedViewMode = 0; // 0=My Week, 1=Edit Timetable
   List<Map<String, dynamic>> _calPeriods = [];
   List<Map<String, dynamic>> _calEvents = [];
+  List<Map<String, dynamic>> _calCancellations = [];
   bool _calLoading = false;
   bool _calLoaded = false;
   DateTime _calWeekStart = DateTime.now();
@@ -2076,7 +2077,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
     if (_calLoading) return;
     setState(() => _calLoading = true);
     final ws = _mondayOf(_calWeekStart);
-    final we = ws.add(const Duration(days: 4));
+    final we = ws.add(const Duration(days: 6));
     try {
       final data = await _api.getTeacherCalendar(
           _uid, _dateStr(ws), _dateStr(we));
@@ -2084,10 +2085,13 @@ class _TeacherDashboardState extends State<TeacherDashboard>
           (data['periods'] as List?)?.cast<Map<String, dynamic>>() ?? [];
       _calEvents =
           (data['events'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      _calCancellations =
+          (data['cancellations'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     } catch (e) {
       debugPrint('Calendar load error: $e');
       _calPeriods = [];
       _calEvents = [];
+      _calCancellations = [];
     }
     if (mounted) setState(() { _calLoading = false; _calLoaded = true; });
   }
@@ -2442,6 +2446,20 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                           final c =
                               colors[subj.hashCode.abs() % colors.length];
 
+                          final dateStr = _dateStr(dateOfDay);
+                          final isCancelled = _calCancellations.any((cn) =>
+                              cn['grade'] == grade &&
+                              cn['section'] == section &&
+                              cn['date'] == dateStr &&
+                              cn['startTime'] == st);
+                          final cancelId = isCancelled
+                              ? (_calCancellations.firstWhere((cn) =>
+                                  cn['grade'] == grade &&
+                                  cn['section'] == section &&
+                                  cn['date'] == dateStr &&
+                                  cn['startTime'] == st)['id'] as String? ?? '')
+                              : '';
+
                           final gsKey = _schedGsMap.keys.cast<String?>().firstWhere(
                               (k) {
                                 final m = _schedGsMap[k];
@@ -2456,44 +2474,55 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                             right: 1,
                             height: height.clamp(20, double.infinity),
                             child: GestureDetector(
-                              onTap: gsKey != null
-                                  ? () => setState(() {
-                                        _schedViewMode = 1;
-                                        _tSchedSelectedGS = gsKey;
-                                        _tSchedDay = day;
-                                        _tSchedLoaded = false;
-                                        _loadTeacherSchedule();
-                                      })
-                                  : null,
-                              child: Container(
-                                margin: const EdgeInsets.symmetric(
-                                    horizontal: 1, vertical: 0.5),
-                                padding: const EdgeInsets.all(3),
-                                decoration: BoxDecoration(
-                                    color: c.withOpacity(0.12),
-                                    borderRadius: BorderRadius.circular(4),
-                                    border:
-                                        Border.all(color: c.withOpacity(0.3))),
-                                child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(subj,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                              fontFamily: 'Raleway',
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.bold,
-                                              color: c)),
-                                      if (height > 28)
-                                        Text('$grade-$section',
+                              onTap: () {
+                                if (isCancelled) {
+                                  _showUndoCancelSheet(cancelId, subj, grade, section, dateStr);
+                                } else {
+                                  _showPeriodCancelSheet(p, dateOfDay, gsKey);
+                                }
+                              },
+                              child: Opacity(
+                                opacity: isCancelled ? 0.45 : 1.0,
+                                child: Container(
+                                  margin: const EdgeInsets.symmetric(
+                                      horizontal: 1, vertical: 0.5),
+                                  padding: const EdgeInsets.all(3),
+                                  decoration: BoxDecoration(
+                                      color: isCancelled
+                                          ? Colors.grey.shade200
+                                          : c.withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                          color: isCancelled
+                                              ? Colors.grey.shade300
+                                              : c.withOpacity(0.3))),
+                                  child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                            isCancelled ? '$subj ✕' : subj,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
                                                 fontFamily: 'Raleway',
-                                                fontSize: 8,
-                                                color: c.withOpacity(0.7))),
-                                    ]),
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.bold,
+                                                color: isCancelled ? Colors.grey : c,
+                                                decoration: isCancelled
+                                                    ? TextDecoration.lineThrough
+                                                    : TextDecoration.none)),
+                                        if (height > 28)
+                                          Text(isCancelled ? 'Cancelled' : '$grade-$section',
+                                              style: TextStyle(
+                                                  fontFamily: 'Raleway',
+                                                  fontSize: 8,
+                                                  color: isCancelled
+                                                      ? danger.withOpacity(0.7)
+                                                      : c.withOpacity(0.7))),
+                                      ]),
+                                ),
                               ),
                             ),
                           );
@@ -2555,6 +2584,210 @@ class _TeacherDashboardState extends State<TeacherDashboard>
         ),
       const SizedBox(height: 24),
     ]);
+  }
+
+  // ─── PERIOD CANCEL / UNDO SHEETS ────────────────────────────────────────────
+
+  void _showPeriodCancelSheet(Map<String, dynamic> period, DateTime dateOfDay, String? gsKey) {
+    final subj = period['subject'] as String? ?? '';
+    final grade = period['grade'] as String? ?? '';
+    final section = period['section'] as String? ?? '';
+    final st = period['startTime'] as String? ?? '';
+    final classId = period['classId'] as String? ?? '';
+    final dateStr = _dateStr(dateOfDay);
+    final dayName = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][dateOfDay.weekday];
+    final reasonCtrl = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+            color: bgCard,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 16,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2))),
+          Text('$subj · $grade-$section',
+              style: const TextStyle(
+                  fontFamily: 'Raleway',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: textDark)),
+          const SizedBox(height: 4),
+          Text('$st · $dayName, ${_monthName(dateOfDay.month)} ${dateOfDay.day}',
+              style: const TextStyle(
+                  fontFamily: 'Raleway', fontSize: 13, color: textLight)),
+          const SizedBox(height: 16),
+          TextField(
+            controller: reasonCtrl,
+            decoration: InputDecoration(
+              hintText: 'Reason (optional)',
+              hintStyle: TextStyle(
+                  fontFamily: 'Raleway',
+                  fontSize: 13,
+                  color: textLight.withOpacity(0.5)),
+              filled: true,
+              fillColor: bg,
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none),
+            ),
+            style: const TextStyle(
+                fontFamily: 'Raleway', fontSize: 13, color: textDark),
+          ),
+          const SizedBox(height: 16),
+          Row(children: [
+            if (gsKey != null)
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    setState(() {
+                      _schedViewMode = 1;
+                      _tSchedSelectedGS = gsKey;
+                      _tSchedDay = dateOfDay.weekday;
+                      _tSchedLoaded = false;
+                      _loadTeacherSchedule();
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                        color: bg,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.grey.shade200)),
+                    child: const Center(
+                        child: Text('Edit Timetable',
+                            style: TextStyle(
+                                fontFamily: 'Raleway',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: textDark))),
+                  ),
+                ),
+              ),
+            if (gsKey != null) const SizedBox(width: 10),
+            Expanded(
+              child: GestureDetector(
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    await _api.cancelPeriod(
+                      grade: grade,
+                      section: section,
+                      date: dateStr,
+                      startTime: st,
+                      classId: classId,
+                      reason: reasonCtrl.text.trim(),
+                    );
+                    _calLoaded = false;
+                    _loadCalendar();
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed: $e')));
+                    }
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                      color: danger.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: danger.withOpacity(0.3))),
+                  child: Center(
+                      child: Text(
+                          'Cancel for $dayName, ${_monthName(dateOfDay.month)} ${dateOfDay.day}',
+                          style: TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: danger))),
+                ),
+              ),
+            ),
+          ]),
+        ]),
+      ),
+    );
+  }
+
+  void _showUndoCancelSheet(String cancelId, String subj, String grade, String section, String dateStr) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+            color: bgCard,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        padding: const EdgeInsets.all(20),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2))),
+          Icon(Icons.cancel_outlined, size: 36, color: danger),
+          const SizedBox(height: 10),
+          Text('$subj · $grade-$section',
+              style: const TextStyle(
+                  fontFamily: 'Raleway',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: textDark)),
+          const SizedBox(height: 4),
+          Text('This period is cancelled for $dateStr',
+              style: const TextStyle(
+                  fontFamily: 'Raleway', fontSize: 13, color: textLight)),
+          const SizedBox(height: 20),
+          GestureDetector(
+            onTap: () async {
+              Navigator.pop(ctx);
+              if (cancelId.isEmpty) return;
+              try {
+                await _api.undoCancelPeriod(cancelId);
+                _calLoaded = false;
+                _loadCalendar();
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed: $e')));
+                }
+              }
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                  color: success.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: success.withOpacity(0.3))),
+              child: Center(
+                  child: Text('Restore This Period',
+                      style: TextStyle(
+                          fontFamily: 'Raleway',
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: success))),
+            ),
+          ),
+        ]),
+      ),
+    );
   }
 
   // ─── TIMETABLE EDITOR (existing) ──────────────────────────────────────────
@@ -2715,6 +2948,15 @@ class _TeacherDashboardState extends State<TeacherDashboard>
           final colors = [primary, info, accent, purple, success];
           final c = colors[subj.hashCode.abs() % colors.length];
 
+          final edWs = _mondayOf(_calWeekStart);
+          final edDayDate = edWs.add(Duration(days: _tSchedDay - 1));
+          final edDateStr = _dateStr(edDayDate);
+          final edCancelled = _calCancellations.any((cn) =>
+              cn['grade'] == grade &&
+              cn['section'] == section &&
+              cn['date'] == edDateStr &&
+              cn['startTime'] == st);
+
           // Find which gsKey and period index this maps to for editing
           final gsKey = gsMap.keys.cast<String?>().firstWhere((k) {
             final m = gsMap[k];
@@ -2742,71 +2984,96 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                 }
               });
             } : null,
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                  color: bgCard,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: c.withOpacity(0.15))),
-              child: Row(children: [
-                Container(
-                  width: 4, height: 42,
-                  decoration: BoxDecoration(
-                      color: c, borderRadius: BorderRadius.circular(2)),
-                ),
-                const SizedBox(width: 10),
-                Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('$st - $et',
-                          style: const TextStyle(
-                              fontFamily: 'Raleway',
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: textLight)),
-                    ]),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
+            child: Opacity(
+              opacity: edCancelled ? 0.5 : 1.0,
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                    color: edCancelled ? Colors.grey.shade50 : bgCard,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: edCancelled ? Colors.grey.shade200 : c.withOpacity(0.15))),
+                child: Row(children: [
+                  Container(
+                    width: 4, height: 42,
+                    decoration: BoxDecoration(
+                        color: edCancelled ? Colors.grey.shade300 : c,
+                        borderRadius: BorderRadius.circular(2)),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(subj,
+                        Text('$st - $et',
                             style: TextStyle(
                                 fontFamily: 'Raleway',
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: c)),
-                        Row(children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 5, vertical: 1),
-                            decoration: BoxDecoration(
-                                color: c.withOpacity(0.06),
-                                borderRadius: BorderRadius.circular(4)),
-                            child: Text('$grade-$section',
-                                style: TextStyle(
-                                    fontFamily: 'Raleway',
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: c.withOpacity(0.7))),
-                          ),
-                          if (teacherName.isNotEmpty) ...[
-                            const SizedBox(width: 6),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: textLight,
+                                decoration: edCancelled ? TextDecoration.lineThrough : TextDecoration.none)),
+                      ]),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(children: [
                             Flexible(
-                              child: Text(teacherName,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
+                              child: Text(subj,
+                                  style: TextStyle(
+                                      fontFamily: 'Raleway',
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: edCancelled ? Colors.grey : c,
+                                      decoration: edCancelled ? TextDecoration.lineThrough : TextDecoration.none)),
+                            ),
+                            if (edCancelled) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                    color: danger.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(4)),
+                                child: Text('Cancelled',
+                                    style: TextStyle(
+                                        fontFamily: 'Raleway',
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                        color: danger)),
+                              ),
+                            ],
+                          ]),
+                          Row(children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                  color: c.withOpacity(0.06),
+                                  borderRadius: BorderRadius.circular(4)),
+                              child: Text('$grade-$section',
+                                  style: TextStyle(
                                       fontFamily: 'Raleway',
                                       fontSize: 10,
-                                      color: textLight)),
+                                      fontWeight: FontWeight.w600,
+                                      color: c.withOpacity(0.7))),
                             ),
-                          ],
+                            if (teacherName.isNotEmpty) ...[
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(teacherName,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        fontFamily: 'Raleway',
+                                        fontSize: 10,
+                                        color: textLight)),
+                              ),
+                            ],
+                          ]),
                         ]),
-                      ]),
-                ),
-                Icon(Icons.edit_rounded, size: 16, color: Colors.grey.shade300),
-              ]),
+                  ),
+                  Icon(Icons.edit_rounded, size: 16, color: Colors.grey.shade300),
+                ]),
+              ),
             ),
           );
         }),
@@ -3523,7 +3790,97 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                     decoration: _scheduleFieldDecor('End', '08:45'),
                   )),
                 ]),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
+                // Cancel for specific date
+                Builder(builder: (_) {
+                  final gsData = gsMap[selectedGS];
+                  final pGrade = gsData?['grade'] ?? '';
+                  final pSection = gsData?['section'] ?? '';
+                  final ws = _mondayOf(_calWeekStart);
+                  final dayDate = ws.add(Duration(days: dayOfWeek - 1));
+                  final dayName = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][dayDate.weekday];
+                  final dateStr = _dateStr(dayDate);
+                  final alreadyCancelled = _calCancellations.any((cn) =>
+                      cn['grade'] == pGrade &&
+                      cn['section'] == pSection &&
+                      cn['date'] == dateStr &&
+                      cn['startTime'] == slot.startTime);
+                  if (alreadyCancelled) {
+                    final cId = _calCancellations.firstWhere((cn) =>
+                        cn['grade'] == pGrade &&
+                        cn['section'] == pSection &&
+                        cn['date'] == dateStr &&
+                        cn['startTime'] == slot.startTime)['id'] as String? ?? '';
+                    return GestureDetector(
+                      onTap: () async {
+                        Navigator.pop(context);
+                        if (cId.isEmpty) return;
+                        try {
+                          await _api.undoCancelPeriod(cId);
+                          _calLoaded = false;
+                          _loadCalendar();
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Failed: $e')));
+                          }
+                        }
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                            color: success.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: success.withOpacity(0.25))),
+                        child: Center(
+                            child: Text('Restore — Cancelled for $dayName, ${_monthName(dayDate.month)} ${dayDate.day}',
+                                style: TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: success))),
+                      ),
+                    );
+                  }
+                  return GestureDetector(
+                    onTap: () async {
+                      Navigator.pop(context);
+                      try {
+                        await _api.cancelPeriod(
+                          grade: pGrade,
+                          section: pSection,
+                          date: dateStr,
+                          startTime: slot.startTime,
+                          classId: slot.classId,
+                        );
+                        _calLoaded = false;
+                        _loadCalendar();
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Failed: $e')));
+                        }
+                      }
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                          color: danger.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: danger.withOpacity(0.2))),
+                      child: Center(
+                          child: Text('Cancel for $dayName, ${_monthName(dayDate.month)} ${dayDate.day}',
+                              style: TextStyle(
+                                  fontFamily: 'Raleway',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: danger))),
+                    ),
+                  );
+                }),
+                const SizedBox(height: 16),
                 Row(children: [
                   // Remove button
                   Expanded(
