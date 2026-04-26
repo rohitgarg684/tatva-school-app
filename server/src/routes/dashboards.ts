@@ -280,7 +280,7 @@ router.get("/teacher/:uid", async (req, res) => {
       activityFeed = activity;
     }
 
-    const [announcements, homework] = await Promise.all([
+    const [announcements, homework, allStudents] = await Promise.all([
       fetchShared("announcements_all", () =>
         queryDocs("announcements", [], { field: "createdAt", direction: "desc" }, 25)
       ),
@@ -288,6 +288,9 @@ router.get("/teacher/:uid", async (req, res) => {
         "homework",
         [{ field: "teacherUid", op: "==", value: uid }],
         { field: "createdAt", direction: "desc" }
+      ),
+      fetchShared("all_students", () =>
+        queryDocs("users", [{ field: "role", op: "==", value: "Student" }], { field: "name" })
       ),
     ]);
 
@@ -303,6 +306,7 @@ router.get("/teacher/:uid", async (req, res) => {
       todayAttendance: serializeDocs(todayAttendance),
       classStory: serializeDocs(classStory),
       activityFeed: serializeDocs(activityFeed),
+      allStudents: serializeDocs(allStudents),
     };
 
     cacheSet(cacheKey, result, USER_TTL);

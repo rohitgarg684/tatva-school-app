@@ -68,6 +68,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
   List<AttendanceRecord> _todayAttendance = [];
   List<StoryPost> _classStory = [];
   List<ActivityEvent> _activityFeed = [];
+  List<UserModel> _allSchoolStudents = [];
 
   // ── SCHEDULE STATE
   List<ScheduleModel> _tSchedData = [];
@@ -154,6 +155,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
       _todayAttendance = data.todayAttendance;
       _classStory = data.classStory;
       _activityFeed = data.activityFeed;
+      _allSchoolStudents = data.allStudents;
     } catch (e) {
       debugPrint('TeacherDashboard._loadData error: $e');
     }
@@ -1706,20 +1708,22 @@ class _TeacherDashboardState extends State<TeacherDashboard>
     final displayDate =
         '${_monthName(now.month)} ${now.day}, ${now.year}';
 
-    // Deduplicate students across all classes
-    final seenUids = <String>{};
-    final allStudents = <UserModel>[];
-    for (final cls in _classes) {
-      for (final uid in cls.studentUids) {
-        if (seenUids.add(uid)) {
-          final match = _students.where((s) => s.uid == uid);
-          if (match.isNotEmpty) allStudents.add(match.first);
+    final allStudents = List<UserModel>.from(_allSchoolStudents);
+    if (allStudents.isEmpty) {
+      final seenUids = <String>{};
+      for (final cls in _classes) {
+        for (final uid in cls.studentUids) {
+          if (seenUids.add(uid)) {
+            final match = _students.where((s) => s.uid == uid);
+            if (match.isNotEmpty) allStudents.add(match.first);
+          }
         }
       }
-    }
-    if (allStudents.isEmpty) {
       for (final s in _students) {
-        if (seenUids.add(s.uid)) allStudents.add(s);
+        if (!seenUids.contains(s.uid)) {
+          seenUids.add(s.uid);
+          allStudents.add(s);
+        }
       }
     }
     allStudents.sort((a, b) => a.name.compareTo(b.name));
@@ -1730,169 +1734,279 @@ class _TeacherDashboardState extends State<TeacherDashboard>
     }
 
     return StatefulBuilder(builder: (ctx, setLocal) {
-      final statuses = <String, AttendanceStatus>{};
-      for (final s in allStudents) {
-        statuses[s.uid] = preMarked[s.uid] ?? AttendanceStatus.present;
-      }
+      String searchQuery = '';
 
       return SingleChildScrollView(
         padding: const EdgeInsets.all(20),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const SizedBox(height: 8),
-          FadeSlideIn(
-              child: const Text('Attendance',
-                  style: TextStyle(
-                      fontFamily: 'Raleway',
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: textDark,
-                      letterSpacing: -0.8))),
-          const SizedBox(height: 4),
-          FadeSlideIn(
-              delayMs: 60,
-              child: Text('$displayDate • ${allStudents.length} students',
-                  style: const TextStyle(
-                      fontFamily: 'Raleway', fontSize: 13, color: textLight))),
-          const SizedBox(height: 20),
-          if (_todayAttendance.isNotEmpty)
-            Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                  color: success.withOpacity(0.06),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: success.withOpacity(0.2))),
-              child: Row(children: [
-                Icon(Icons.check_circle_outline, color: success, size: 16),
-                const SizedBox(width: 8),
-                const Expanded(
-                    child: Text('Attendance already marked today. You can update it.',
+        child: StatefulBuilder(builder: (ctx2, setInner) {
+          final filtered = searchQuery.isEmpty
+              ? allStudents
+              : allStudents
+                  .where((s) =>
+                      s.name.toLowerCase().contains(searchQuery.toLowerCase()))
+                  .toList();
+
+          final presentCount =
+              allStudents.where((s) => (preMarked[s.uid] ?? AttendanceStatus.present) == AttendanceStatus.present).length;
+          final absentCount =
+              allStudents.where((s) => preMarked[s.uid] == AttendanceStatus.absent).length;
+          final tardyCount =
+              allStudents.where((s) => preMarked[s.uid] == AttendanceStatus.tardy).length;
+
+          return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const SizedBox(height: 8),
+            FadeSlideIn(
+                child: const Text('Attendance',
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: textDark,
+                        letterSpacing: -0.8))),
+            const SizedBox(height: 4),
+            FadeSlideIn(
+                delayMs: 60,
+                child: Text('$displayDate • ${allStudents.length} students in school',
+                    style: const TextStyle(
+                        fontFamily: 'Raleway', fontSize: 13, color: textLight))),
+            const SizedBox(height: 16),
+            // Summary chips
+            Row(children: [
+              _attSummaryChip('Present', presentCount, success),
+              const SizedBox(width: 8),
+              _attSummaryChip('Absent', absentCount, danger),
+              const SizedBox(width: 8),
+              _attSummaryChip('Tardy', tardyCount, accent),
+            ]),
+            const SizedBox(height: 16),
+            if (_todayAttendance.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                    color: success.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: success.withOpacity(0.2))),
+                child: Row(children: [
+                  Icon(Icons.check_circle_outline, color: success, size: 14),
+                  const SizedBox(width: 6),
+                  const Expanded(
+                      child: Text('Attendance already marked today. You can update it.',
+                          style: TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 11,
+                              color: textMid))),
+                ]),
+              ),
+            // Bulk actions
+            Row(children: [
+              _attBulkBtn('All Present', success, () {
+                setInner(() {
+                  for (final s in allStudents) {
+                    preMarked[s.uid] = AttendanceStatus.present;
+                  }
+                });
+              }),
+              const SizedBox(width: 8),
+              _attBulkBtn('All Absent', danger, () {
+                setInner(() {
+                  for (final s in allStudents) {
+                    preMarked[s.uid] = AttendanceStatus.absent;
+                  }
+                });
+              }),
+            ]),
+            const SizedBox(height: 12),
+            // Search
+            TextField(
+              onChanged: (v) => setInner(() => searchQuery = v),
+              style: const TextStyle(
+                  fontFamily: 'Raleway', fontSize: 13, color: textDark),
+              decoration: InputDecoration(
+                hintText: 'Search students...',
+                hintStyle: TextStyle(
+                    fontFamily: 'Raleway',
+                    fontSize: 13,
+                    color: Colors.grey.shade400),
+                prefixIcon: Icon(Icons.search_rounded,
+                    size: 18, color: Colors.grey.shade400),
+                filled: true,
+                fillColor: bgCard,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none),
+                enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade200)),
+                focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: primary.withOpacity(0.4))),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...filtered.map((s) {
+              final current = preMarked[s.uid] ?? AttendanceStatus.present;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                    color: bgCard,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade100)),
+                child: Row(children: [
+                  CircleAvatar(
+                      radius: 16,
+                      backgroundColor: primary.withOpacity(0.1),
+                      child: Text(s.initial,
+                          style: const TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: primary))),
+                  const SizedBox(width: 10),
+                  Expanded(
+                      child: Text(s.name,
+                          style: const TextStyle(
+                              fontFamily: 'Raleway',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: textDark))),
+                  ...AttendanceStatus.values.map((st) => Padding(
+                        padding: const EdgeInsets.only(left: 4),
+                        child: GestureDetector(
+                          onTap: () {
+                            setInner(() {
+                              preMarked[s.uid] = st;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                                color: current == st
+                                    ? _attendanceColor(st).withOpacity(0.15)
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                    color: current == st
+                                        ? _attendanceColor(st)
+                                        : Colors.grey.shade200)),
+                            child: Text(st.label,
+                                style: TextStyle(
+                                    fontFamily: 'Raleway',
+                                    fontSize: 10,
+                                    fontWeight: current == st
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    color: current == st
+                                        ? _attendanceColor(st)
+                                        : textLight)),
+                          ),
+                        ),
+                      )),
+                ]),
+              );
+            }),
+            const SizedBox(height: 16),
+            GestureDetector(
+              onTap: () async {
+                final finalStatuses = <String, AttendanceStatus>{};
+                final names = <String, String>{};
+                for (final s in allStudents) {
+                  finalStatuses[s.uid] =
+                      preMarked[s.uid] ?? AttendanceStatus.present;
+                  names[s.uid] = s.name;
+                }
+                final records = finalStatuses.entries.map((e) => {
+                  'studentUid': e.key,
+                  'studentName': names[e.key] ?? '',
+                  'date': dateStr,
+                  'status': e.value.label,
+                }).toList();
+                _api.markAttendanceBatch(records);
+                setState(() {
+                  _todayAttendance = finalStatuses.entries.map((e) =>
+                    AttendanceRecord(
+                      studentUid: e.key,
+                      studentName: names[e.key] ?? '',
+                      date: dateStr,
+                      status: e.value,
+                      markedBy: _uid,
+                      createdAt: DateTime.now(),
+                    )).toList();
+                });
+                _snack('Attendance saved for ${allStudents.length} students');
+              },
+              child: Container(
+                width: double.infinity,
+                height: 50,
+                decoration: BoxDecoration(
+                    color: primary,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                          color: primary.withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4))
+                    ]),
+                child: const Center(
+                    child: Text('Save Attendance',
                         style: TextStyle(
                             fontFamily: 'Raleway',
-                            fontSize: 12,
-                            color: textMid))),
-              ]),
-            ),
-          ...allStudents.asMap().entries.map((e) {
-            final s = e.value;
-            final current = statuses[s.uid] ?? AttendanceStatus.present;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                  color: bgCard,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.grey.shade100)),
-              child: Row(children: [
-                CircleAvatar(
-                    radius: 18,
-                    backgroundColor: primary.withOpacity(0.1),
-                    child: Text(s.initial,
-                        style: const TextStyle(
-                            fontFamily: 'Raleway',
-                            fontSize: 13,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            color: primary))),
-                const SizedBox(width: 12),
-                Expanded(
-                    child: Text(s.name,
-                        style: const TextStyle(
-                            fontFamily: 'Raleway',
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: textDark))),
-                ...AttendanceStatus.values.map((st) => Padding(
-                      padding: const EdgeInsets.only(left: 4),
-                      child: GestureDetector(
-                        onTap: () {
-                          setLocal(() {
-                            preMarked[s.uid] = st;
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                              color: current == st
-                                  ? _attendanceColor(st).withOpacity(0.15)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                  color: current == st
-                                      ? _attendanceColor(st)
-                                      : Colors.grey.shade200)),
-                          child: Text(st.label,
-                              style: TextStyle(
-                                  fontFamily: 'Raleway',
-                                  fontSize: 10,
-                                  fontWeight: current == st
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                  color: current == st
-                                      ? _attendanceColor(st)
-                                      : textLight)),
-                        ),
-                      ),
-                    )),
-              ]),
-            );
-          }),
-          const SizedBox(height: 16),
-          GestureDetector(
-            onTap: () async {
-              final finalStatuses = <String, AttendanceStatus>{};
-              final names = <String, String>{};
-              for (final s in allStudents) {
-                finalStatuses[s.uid] =
-                    preMarked[s.uid] ?? AttendanceStatus.present;
-                names[s.uid] = s.name;
-              }
-              final records = finalStatuses.entries.map((e) => {
-                'studentUid': e.key,
-                'studentName': names[e.key] ?? '',
-                'date': dateStr,
-                'status': e.value.label,
-              }).toList();
-              _api.markAttendanceBatch(records);
-              setState(() {
-                _todayAttendance = finalStatuses.entries.map((e) =>
-                  AttendanceRecord(
-                    studentUid: e.key,
-                    studentName: names[e.key] ?? '',
-                    date: dateStr,
-                    status: e.value,
-                    markedBy: _uid,
-                    createdAt: DateTime.now(),
-                  )).toList();
-              });
-              _snack('Attendance saved for $displayDate');
-            },
-            child: Container(
-              width: double.infinity,
-              height: 50,
-              decoration: BoxDecoration(
-                  color: primary,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                        color: primary.withOpacity(0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4))
-                  ]),
-              child: const Center(
-                  child: Text('Save Attendance',
-                      style: TextStyle(
-                          fontFamily: 'Raleway',
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white))),
+                            color: Colors.white))),
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
-        ]),
+            const SizedBox(height: 24),
+          ]);
+        }),
       );
     });
   }
+
+  Widget _attSummaryChip(String label, int count, Color c) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+            color: c.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: c.withOpacity(0.2))),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
+          const SizedBox(width: 6),
+          Text('$count $label',
+              style: TextStyle(
+                  fontFamily: 'Raleway',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: c)),
+        ]),
+      );
+
+  Widget _attBulkBtn(String label, Color c, VoidCallback onTap) => Expanded(
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+                color: c.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: c.withOpacity(0.2))),
+            child: Center(
+                child: Text(label,
+                    style: TextStyle(
+                        fontFamily: 'Raleway',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: c))),
+          ),
+        ),
+      );
 
   Color _attendanceColor(AttendanceStatus st) {
     switch (st) {
