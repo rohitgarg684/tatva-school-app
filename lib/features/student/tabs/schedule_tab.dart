@@ -36,6 +36,9 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
   bool _holidaysLoaded = false;
   int _viewMode = 0; // 0 = weekly schedule, 1 = year calendar
   String _selectedCalDate = '';
+  String _firstDay = '';
+  String _lastDay = '';
+  bool _schoolDatesLoaded = false;
 
   String _parseGrade() {
     final name = widget.primaryClass?.name ?? '';
@@ -88,6 +91,9 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
     }
     if (!_holidaysLoaded) {
       Future.microtask(_loadHolidays);
+    }
+    if (!_schoolDatesLoaded) {
+      Future.microtask(_loadSchoolDates);
     }
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -258,6 +264,11 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
         cn['date'] == dateStr && cn['startTime'] == startTime);
   }
 
+  bool _isDayHoliday(int dayOfWeek) {
+    final dateStr = _schedDateStr(dayOfWeek);
+    return _holidays.any((h) => h.coversDate(dateStr));
+  }
+
   Widget _buildWeekGrid(List<ScheduleModel> schedules) {
     final allPeriodTimes = <String>{};
     for (final s in schedules) {
@@ -297,19 +308,29 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
         ...List.generate(5, (i) {
           final day = i + 1;
           final isToday = DateTime.now().weekday == day;
+          final isHoliday = _isDayHoliday(day);
+          final headerColor = isHoliday
+              ? TatvaColors.error
+              : isToday
+                  ? TatvaColors.primary
+                  : TatvaColors.neutral900;
           return Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 6),
               margin: const EdgeInsets.symmetric(horizontal: 1),
               decoration: BoxDecoration(
-                  color: isToday ? TatvaColors.primary.withOpacity(0.1) : Colors.transparent,
+                  color: isHoliday
+                      ? TatvaColors.error.withOpacity(0.1)
+                      : isToday
+                          ? TatvaColors.primary.withOpacity(0.1)
+                          : Colors.transparent,
                   borderRadius: BorderRadius.circular(6)),
               child: Center(
                   child: Text(ScheduleModel.dayNames[day],
                       style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: isToday ? TatvaColors.primary : TatvaColors.neutral900))),
+                          color: headerColor))),
             ),
           );
         }),
@@ -343,7 +364,7 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                   if (matching.isNotEmpty) slot = matching.first;
                 }
                 final isToday = DateTime.now().weekday == day;
-                final cancelled = slot != null && _isPeriodCancelled(day, time);
+                final cancelled = slot != null && (_isPeriodCancelled(day, time) || _isDayHoliday(day));
                 final c = slot != null
                     ? (subjectColorMap[slot.subject] ?? TatvaColors.primary)
                     : Colors.grey.shade200;
@@ -617,6 +638,27 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
     }
   }
 
+  void _loadSchoolDates() async {
+    try {
+      final data = await widget.api.getSchoolYearDates(_schoolYear);
+      if (mounted) setState(() {
+        _firstDay = data['firstDay'] as String? ?? '';
+        _lastDay = data['lastDay'] as String? ?? '';
+        _schoolDatesLoaded = true;
+      });
+    } catch (e) {
+      debugPrint('School dates load error: $e');
+      if (mounted) setState(() => _schoolDatesLoaded = true);
+    }
+  }
+
+  bool _isSchoolDay(String dateStr) {
+    if (_firstDay.isEmpty && _lastDay.isEmpty) return true;
+    if (_firstDay.isNotEmpty && dateStr.compareTo(_firstDay) < 0) return false;
+    if (_lastDay.isNotEmpty && dateStr.compareTo(_lastDay) > 0) return false;
+    return true;
+  }
+
   String _fmtDate(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
@@ -792,6 +834,7 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
               final holiday = holidayDates[dateStr];
               final isToday = dateStr == todayStr;
               final isSelected = dateStr == _selectedCalDate;
+              final inSchool = _isSchoolDay(dateStr);
               final c = holiday?.typeColor;
               cells.add(Expanded(
                 child: GestureDetector(
@@ -804,7 +847,9 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                             ? TatvaColors.primary.withOpacity(0.15)
                             : holiday != null
                                 ? c!.withOpacity(0.15)
-                                : Colors.transparent,
+                                : !inSchool
+                                    ? Colors.grey.shade100
+                                    : Colors.transparent,
                         borderRadius: BorderRadius.circular(4),
                         border: isToday ? Border.all(color: TatvaColors.primary, width: 1.2) : null),
                     child: Center(
@@ -812,7 +857,9 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                           style: TextStyle(
                               fontSize: 9,
                               fontWeight: (isToday || holiday != null) ? FontWeight.w700 : FontWeight.w400,
-                              color: holiday != null ? c : TatvaColors.neutral900)),
+                              color: !inSchool
+                                  ? Colors.grey.shade400
+                                  : holiday != null ? c : TatvaColors.neutral900)),
                     ),
                   ),
                 ),
@@ -844,7 +891,7 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
 
   Future<void> _downloadPdf() async {
     try {
-      final bytes = await generateSchoolYearPdf(_holidays, _schoolYear);
+      final bytes = await generateSchoolYearPdf(_holidays, _schoolYear, firstDay: _firstDay, lastDay: _lastDay);
       await Printing.sharePdf(bytes: bytes, filename: 'school_year_${_schoolYear - 1}_${_schoolYear}_holidays.pdf');
     } catch (e) {
       debugPrint('PDF error: $e');

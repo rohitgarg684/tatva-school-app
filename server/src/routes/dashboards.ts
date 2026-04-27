@@ -237,7 +237,7 @@ router.get(
       safe(fetchShared("all_students", () =>
         queryDocs(Collections.USERS, [{ field: "role", op: "==", value: "Student" }], { field: "name" })
       ), []),
-      safe(queryDocs(Collections.CONTENT, [{ field: "createdBy", op: "==", value: uid }], { field: "createdAt", direction: "desc" }), []),
+      safe(queryDocs(Collections.CONTENT, [], { field: "createdAt", direction: "desc" }), []),
       safe(fetchShared("votes_visible", () =>
         queryDocs(Collections.VOTES, [{ field: "resultsVisibleUntil", op: ">=", value: new Date().toISOString() }], { field: "resultsVisibleUntil" })
       ), []),

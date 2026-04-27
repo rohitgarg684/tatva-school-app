@@ -671,6 +671,20 @@ class ApiService {
   Future<Map<String, dynamic>> deleteHoliday(String id) =>
       _delete('/holiday/$id');
 
+  Future<Map<String, dynamic>> getSchoolYearDates(int year) =>
+      _get('/school-year-dates?year=$year');
+
+  Future<Map<String, dynamic>> setSchoolYearDates({
+    required int year,
+    required String firstDay,
+    required String lastDay,
+  }) =>
+      _put('/school-year-dates', {
+        'year': year,
+        'firstDay': firstDay,
+        'lastDay': lastDay,
+      });
+
   // ─── Schedule ───────────────────────────────────────────────────────
 
   Future<List<Map<String, dynamic>>> getSchedule(

@@ -54,7 +54,7 @@ class TeacherLearnTab extends StatelessWidget {
         const SizedBox(height: 4),
         FadeSlideIn(
             delayMs: 60,
-            child: Text('${contentItems.length} learning items created by you',
+            child: Text('${contentItems.length} learning items',
                 style: const TextStyle(
                     fontSize: 13, color: TatvaColors.neutral400))),
         const SizedBox(height: 16),
@@ -565,7 +565,7 @@ class _ContentFormSheetState extends State<_ContentFormSheet> {
       TextField(
         controller: ctrl,
         maxLines: maxLines,
-        style: const TextStyle(fontSize: 14),
+        style: const TextStyle(fontSize: 14, color: TatvaColors.neutral900),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle:
@@ -607,6 +607,7 @@ class _ContentFormSheetState extends State<_ContentFormSheet> {
           child: DropdownButton<ContentCategory>(
             value: _category,
             isExpanded: true,
+            dropdownColor: TatvaColors.bgCard,
             style: const TextStyle(fontSize: 13, color: TatvaColors.neutral900),
             items: ContentCategory.values
                 .map((c) => DropdownMenuItem(

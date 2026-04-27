@@ -21,7 +21,8 @@ PdfColor _holidayPdfColor(String type) {
 }
 
 Future<Uint8List> generateSchoolYearPdf(
-    List<Holiday> holidays, int schoolYear) async {
+    List<Holiday> holidays, int schoolYear,
+    {String firstDay = '', String lastDay = ''}) async {
   final pdf = pw.Document();
 
   final schoolYearMonths = <DateTime>[];
@@ -90,11 +91,19 @@ Future<Uint8List> generateSchoolYearPdf(
           final dateStr =
               '$year-${month.toString().padLeft(2, '0')}-${dayCounter.toString().padLeft(2, '0')}';
           final holiday = holidayDates[dateStr];
+          final inSchool = (firstDay.isEmpty && lastDay.isEmpty) ||
+              (firstDay.isEmpty || dateStr.compareTo(firstDay) >= 0) &&
+              (lastDay.isEmpty || dateStr.compareTo(lastDay) <= 0);
           final bg = holiday != null
               ? _holidayPdfColor(holiday.type).shade(0.85)
-              : PdfColors.white;
-          final textColor =
-              holiday != null ? _holidayPdfColor(holiday.type) : PdfColors.grey800;
+              : !inSchool
+                  ? const PdfColor.fromInt(0xFFE8E8E8)
+                  : PdfColors.white;
+          final textColor = holiday != null
+              ? _holidayPdfColor(holiday.type)
+              : !inSchool
+                  ? PdfColors.grey400
+                  : PdfColors.grey800;
           cells.add(pw.Container(
             height: 11,
             alignment: pw.Alignment.center,

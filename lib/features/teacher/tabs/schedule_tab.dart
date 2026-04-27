@@ -48,6 +48,9 @@ class _TeacherScheduleTabState extends State<TeacherScheduleTab> {
   List<Holiday> _holidays = [];
   bool _holidaysLoading = false;
   bool _holidaysLoaded = false;
+  String _firstDay = '';
+  String _lastDay = '';
+  bool _schoolDatesLoaded = false;
 
   Map<String, Map<String, String>> get _schedGsMap {
     final gsMap = <String, Map<String, String>>{};
@@ -174,10 +177,64 @@ class _TeacherScheduleTabState extends State<TeacherScheduleTab> {
 
   // ─── MY WEEK CALENDAR (Outlook-style) ─────────────────────────────────────
 
+  Holiday? _holidayForDate(DateTime d) {
+    final ds = _dateStr(d);
+    for (final h in _holidays) {
+      if (h.coversDate(ds)) return h;
+    }
+    return null;
+  }
+
+  List<Widget> _weekHolidayCards(DateTime ws) {
+    final eventDates = _calEvents
+        .where((ev) => ev['type'] == 'holiday')
+        .map((ev) => ev['date'] as String? ?? '')
+        .toSet();
+    final shown = <String>{};
+    final cards = <Widget>[];
+    for (int i = 0; i < 5; i++) {
+      final d = ws.add(Duration(days: i));
+      final ds = _dateStr(d);
+      final h = _holidayForDate(d);
+      if (h != null && !eventDates.contains(ds) && shown.add(h.id.isEmpty ? h.name : h.id)) {
+        cards.add(Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+              color: TatvaColors.error.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: TatvaColors.error.withOpacity(0.2))),
+          child: Row(children: [
+            Icon(h.typeIcon, size: 16, color: TatvaColors.error),
+            const SizedBox(width: 8),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(h.name,
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: TatvaColors.error)),
+                  Text('${h.startDate} · Holiday',
+                      style: const TextStyle(
+                          fontSize: 10,
+                          color: TatvaColors.neutral400)),
+                ])),
+          ]),
+        ));
+      }
+    }
+    return cards;
+  }
+
   Widget _buildMyWeekCalendar() {
     if (!_calLoaded && !_calLoading) {
       _calWeekStart = _mondayOf(DateTime.now());
       Future.microtask(_loadCalendar);
+    }
+    if (!_holidaysLoaded && !_holidaysLoading) {
+      Future.microtask(_loadHolidays);
     }
 
     final ws = _mondayOf(_calWeekStart);
@@ -303,6 +360,7 @@ class _TeacherScheduleTabState extends State<TeacherScheduleTab> {
             ]),
           );
         }),
+      ..._weekHolidayCards(ws),
       GestureDetector(
         onTap: () => _showAddEventSheet(ws),
         child: Container(
@@ -360,18 +418,28 @@ class _TeacherScheduleTabState extends State<TeacherScheduleTab> {
                   .where((p) => (p['dayOfWeek'] as num?)?.toInt() == day)
                   .toList();
 
-              final dayCancelled = _calEvents.any((ev) =>
-                  ev['date'] == _dateStr(dateOfDay) &&
-                  ev['cancelsRegularSchedule'] == true);
+              final holiday = _holidayForDate(dateOfDay);
+              final dayCancelled = holiday != null ||
+                  _calEvents.any((ev) =>
+                      ev['date'] == _dateStr(dateOfDay) &&
+                      ev['cancelsRegularSchedule'] == true);
+
+              final headerColor = holiday != null
+                  ? TatvaColors.error
+                  : isToday
+                      ? TatvaColors.primary
+                      : null;
 
               return Expanded(
                 child: Column(children: [
                   Container(
                     height: 36,
                     decoration: BoxDecoration(
-                        color: isToday
-                            ? TatvaColors.primary.withOpacity(0.08)
-                            : Colors.transparent,
+                        color: holiday != null
+                            ? TatvaColors.error.withOpacity(0.08)
+                            : isToday
+                                ? TatvaColors.primary.withOpacity(0.08)
+                                : Colors.transparent,
                         borderRadius: BorderRadius.circular(6)),
                     child: Center(
                         child: Column(
@@ -381,12 +449,12 @@ class _TeacherScheduleTabState extends State<TeacherScheduleTab> {
                               style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w600,
-                                  color: isToday ? TatvaColors.primary : TatvaColors.neutral400)),
+                                  color: headerColor ?? TatvaColors.neutral400)),
                           Text('${dateOfDay.day}',
                               style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
-                                  color: isToday ? TatvaColors.primary : TatvaColors.neutral900)),
+                                  color: headerColor ?? TatvaColors.neutral900)),
                         ])),
                   ),
                   Container(
@@ -2104,9 +2172,46 @@ fontSize: 13, color: Colors.grey.shade400),
     if (mounted) setState(() { _holidaysLoading = false; _holidaysLoaded = true; });
   }
 
+  Future<void> _loadSchoolDates() async {
+    try {
+      final data = await _api.getSchoolYearDates(_schoolYear);
+      if (mounted) setState(() {
+        _firstDay = data['firstDay'] as String? ?? '';
+        _lastDay = data['lastDay'] as String? ?? '';
+        _schoolDatesLoaded = true;
+      });
+    } catch (e) {
+      debugPrint('School dates load error: $e');
+      if (mounted) setState(() => _schoolDatesLoaded = true);
+    }
+  }
+
+  Future<void> _pickSchoolDate(bool isFirst) async {
+    final initial = DateTime.tryParse(isFirst ? _firstDay : _lastDay) ?? DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(DateTime.now().year - 1, 7),
+      lastDate: DateTime(DateTime.now().year + 2, 8),
+    );
+    if (picked == null) return;
+    final dateStr = _dateStr(picked);
+    setState(() {
+      if (isFirst) _firstDay = dateStr; else _lastDay = dateStr;
+    });
+    try {
+      await _api.setSchoolYearDates(year: _schoolYear, firstDay: _firstDay, lastDay: _lastDay);
+    } catch (e) {
+      debugPrint('Save school dates error: $e');
+    }
+  }
+
   Widget _buildHolidaysManager() {
     if (!_holidaysLoaded && !_holidaysLoading) {
       Future.microtask(_loadHolidays);
+    }
+    if (!_schoolDatesLoaded) {
+      Future.microtask(_loadSchoolDates);
     }
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
@@ -2117,6 +2222,8 @@ fontSize: 13, color: Colors.grey.shade400),
         ),
         _addHolidayButton(),
       ]),
+      const SizedBox(height: 16),
+      _schoolDatesRow(),
       const SizedBox(height: 16),
       if (_holidaysLoading && !_holidaysLoaded)
         const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
@@ -2145,6 +2252,49 @@ fontSize: 13, color: Colors.grey.shade400),
         }),
       const SizedBox(height: 24),
     ]);
+  }
+
+  Widget _schoolDatesRow() {
+    String fmtDisplay(String dateStr) {
+      final d = DateTime.tryParse(dateStr);
+      if (d == null) return 'Not set';
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${months[d.month - 1]} ${d.day}, ${d.year}';
+    }
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+          color: TatvaColors.bgCard,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: TatvaColors.primary.withOpacity(0.2))),
+      child: Row(children: [
+        Expanded(child: _schoolDateTile('First Day of School', _firstDay, fmtDisplay(_firstDay), () => _pickSchoolDate(true))),
+        Container(width: 1, height: 40, color: Colors.grey.shade200),
+        Expanded(child: _schoolDateTile('Last Day of School', _lastDay, fmtDisplay(_lastDay), () => _pickSchoolDate(false))),
+      ]),
+    );
+  }
+
+  Widget _schoolDateTile(String label, String value, String display, VoidCallback onTap) {
+    final isSet = value.isNotEmpty;
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: TatvaColors.neutral400)),
+          const SizedBox(height: 4),
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.calendar_today_outlined, size: 13,
+                color: isSet ? TatvaColors.primary : TatvaColors.neutral400),
+            const SizedBox(width: 6),
+            Text(display, style: TextStyle(
+                fontSize: 13, fontWeight: FontWeight.w600,
+                color: isSet ? TatvaColors.neutral900 : TatvaColors.neutral400)),
+          ]),
+        ]),
+      ),
+    );
   }
 
   Widget _addHolidayButton() {

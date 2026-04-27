@@ -38,6 +38,9 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
   bool _holidaysLoaded = false;
   DateTime _calMonth = DateTime(DateTime.now().year, DateTime.now().month);
   String _selectedCalDate = '';
+  String _firstDay = '';
+  String _lastDay = '';
+  bool _schoolDatesLoaded = false;
 
   @override
   void didUpdateWidget(ParentScheduleTab old) {
@@ -131,6 +134,27 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
     }
   }
 
+  void _loadSchoolDates() async {
+    try {
+      final data = await widget.api.getSchoolYearDates(_schoolYear);
+      if (mounted) setState(() {
+        _firstDay = data['firstDay'] as String? ?? '';
+        _lastDay = data['lastDay'] as String? ?? '';
+        _schoolDatesLoaded = true;
+      });
+    } catch (e) {
+      debugPrint('School dates load error: $e');
+      if (mounted) setState(() => _schoolDatesLoaded = true);
+    }
+  }
+
+  bool _isSchoolDay(String dateStr) {
+    if (_firstDay.isEmpty && _lastDay.isEmpty) return true;
+    if (_firstDay.isNotEmpty && dateStr.compareTo(_firstDay) < 0) return false;
+    if (_lastDay.isNotEmpty && dateStr.compareTo(_lastDay) > 0) return false;
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_loaded && !_loading) {
@@ -138,6 +162,9 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
     }
     if (!_holidaysLoaded) {
       Future.microtask(_loadHolidays);
+    }
+    if (!_schoolDatesLoaded) {
+      Future.microtask(_loadSchoolDates);
     }
     final childName = widget.childrenData.isNotEmpty
         ? widget.childrenData[widget.selectedChildIndex].info.childName
@@ -624,7 +651,7 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
 
   Future<void> _downloadPdf() async {
     try {
-      final bytes = await generateSchoolYearPdf(_holidays, _schoolYear);
+      final bytes = await generateSchoolYearPdf(_holidays, _schoolYear, firstDay: _firstDay, lastDay: _lastDay);
       await Printing.sharePdf(bytes: bytes, filename: 'school_year_${_schoolYear - 1}_${_schoolYear}_holidays.pdf');
     } catch (e) {
       debugPrint('PDF error: $e');
@@ -720,6 +747,7 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
           final isHoliday = holidayDates.contains(dateStr);
           final isToday = dateStr == todayStr;
           final isSelected = dateStr == _selectedCalDate;
+          final inSchool = _isSchoolDay(dateStr);
           return Expanded(
             child: GestureDetector(
               onTap: () => setState(() => _selectedCalDate = isSelected ? '' : dateStr),
@@ -731,7 +759,9 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
                         ? TatvaColors.primary.withOpacity(0.15)
                         : isHoliday
                             ? Colors.red.withOpacity(0.06)
-                            : Colors.transparent,
+                            : !inSchool
+                                ? Colors.grey.shade100
+                                : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
                     border: isToday ? Border.all(color: TatvaColors.primary, width: 1.5) : null),
                 child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -743,7 +773,9 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
                               ? TatvaColors.primary
                               : isHoliday
                                   ? Colors.red
-                                  : TatvaColors.neutral900)),
+                                  : !inSchool
+                                      ? Colors.grey.shade400
+                                      : TatvaColors.neutral900)),
                   if (isHoliday)
                     Container(
                       margin: const EdgeInsets.only(top: 2),

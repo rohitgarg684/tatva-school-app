@@ -20,6 +20,7 @@ export const Collections = {
   PERIOD_CANCELLATIONS: "period_cancellations",
   HOLIDAYS: "holidays",
   HOMEWORK_COMMENTS: "homework_comments",
+  SCHOOL_SETTINGS: "school_settings",
 } as const;
 
 export type CollectionName = (typeof Collections)[keyof typeof Collections];

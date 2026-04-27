@@ -91,4 +91,35 @@ router.get(
   })
 );
 
+// ─── School Year Dates ──────────────────────────────────────────────
+
+router.get(
+  "/school-year-dates",
+  asyncHandler(async (req, res) => {
+    const year = parseInt(req.query.year as string, 10);
+    if (!year) return res.status(400).json({ error: "year query param required" });
+
+    const doc = await db.collection(Collections.SCHOOL_SETTINGS).doc(`${year}`).get();
+    if (!doc.exists) return res.json({ firstDay: "", lastDay: "" });
+    const data = doc.data()!;
+    res.json({ firstDay: data.firstDay || "", lastDay: data.lastDay || "" });
+  })
+);
+
+router.put(
+  "/school-year-dates",
+  requireRole("Teacher", "Principal"),
+  asyncHandler(async (req, res) => {
+    const { year, firstDay, lastDay } = req.body;
+    if (!year) return res.status(400).json({ error: "year required" });
+
+    const updates: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() };
+    if (firstDay !== undefined) updates.firstDay = firstDay;
+    if (lastDay !== undefined) updates.lastDay = lastDay;
+
+    await db.collection(Collections.SCHOOL_SETTINGS).doc(`${year}`).set(updates, { merge: true });
+    res.json({ year, updated: true });
+  })
+);
+
 export default router;
