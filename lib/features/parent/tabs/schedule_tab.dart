@@ -5,6 +5,7 @@ import '../../../shared/animations/animations.dart';
 import '../../../models/child_info.dart';
 import '../../../models/schedule_model.dart';
 import '../../../models/schedule_event.dart';
+import '../../../models/holiday.dart';
 import '../../../services/api_service.dart';
 
 class ParentScheduleTab extends StatefulWidget {
@@ -30,6 +31,11 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
   bool _loading = false;
   bool _loaded = false;
   int _selectedDay = 0;
+  int _viewMode = 0; // 0 = schedule, 1 = calendar
+  List<Holiday> _holidays = [];
+  bool _holidaysLoaded = false;
+  DateTime _calMonth = DateTime(DateTime.now().year, DateTime.now().month);
+  String _selectedCalDate = '';
 
   @override
   void didUpdateWidget(ParentScheduleTab old) {
@@ -105,10 +111,31 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
         .any((cn) => cn['date'] == dateStr && cn['startTime'] == startTime);
   }
 
+  int get _schoolYear {
+    final now = DateTime.now();
+    return now.month >= 8 ? now.year + 1 : now.year;
+  }
+
+  void _loadHolidays() async {
+    try {
+      final raw = await widget.api.getHolidays(_schoolYear);
+      if (mounted) setState(() {
+        _holidays = raw.map((m) => Holiday.fromJson(m)).toList();
+        _holidaysLoaded = true;
+      });
+    } catch (e) {
+      debugPrint('Holidays load error: $e');
+      if (mounted) setState(() => _holidaysLoaded = true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_loaded && !_loading) {
       Future.microtask(_loadData);
+    }
+    if (!_holidaysLoaded) {
+      Future.microtask(_loadHolidays);
     }
     final childName = widget.childrenData.isNotEmpty
         ? widget.childrenData[widget.selectedChildIndex].info.childName
@@ -132,53 +159,84 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
         const SizedBox(height: 4),
         FadeSlideIn(
             delayMs: 60,
-            child: Text('$className • Weekly Timetable',
+            child: Text('$className • Schedule & Holidays',
                 style: const TextStyle(
                     fontSize: 13, color: TatvaColors.neutral400))),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            _dayChip('All', _selectedDay == 0,
-                () => setState(() => _selectedDay = 0)),
-            ...List.generate(5, (i) {
-              final day = i + 1;
-              return _dayChip(ScheduleModel.dayNames[day], _selectedDay == day,
-                  () => setState(() => _selectedDay = day));
-            }),
-          ],
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+              color: TatvaColors.bgLight, borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.all(3),
+          child: Row(children: [
+            _modeBtn('Weekly Schedule', 0),
+            _modeBtn('Holiday Calendar', 1),
+          ]),
         ),
         const SizedBox(height: 16),
-        if (_loading && !_loaded)
-          const Center(
-              child: Padding(
-                  padding: EdgeInsets.all(40),
-                  child: CircularProgressIndicator()))
-        else if (_weekData.isEmpty)
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.all(40),
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.calendar_today_outlined,
-                    color: TatvaColors.neutral400, size: 48),
-                const SizedBox(height: 12),
-                const Text('No schedule set yet',
-                    style: TextStyle(
-                        fontSize: 15, color: TatvaColors.neutral400)),
-              ]),
-            ),
-          )
-        else if (_selectedDay == 0)
-          _weekGrid(_weekData)
-        else
-          _dayDetail(_weekData, _selectedDay),
-        if (_visibleEvents.isNotEmpty) ...[
+        if (_viewMode == 0) ...[
+          Row(
+            children: [
+              _dayChip('All', _selectedDay == 0,
+                  () => setState(() => _selectedDay = 0)),
+              ...List.generate(5, (i) {
+                final day = i + 1;
+                return _dayChip(ScheduleModel.dayNames[day], _selectedDay == day,
+                    () => setState(() => _selectedDay = day));
+              }),
+            ],
+          ),
           const SizedBox(height: 16),
-          ..._visibleEvents.map(_buildEventCard),
-        ],
+          if (_loading && !_loaded)
+            const Center(
+                child: Padding(
+                    padding: EdgeInsets.all(40),
+                    child: CircularProgressIndicator()))
+          else if (_weekData.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(40),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.calendar_today_outlined,
+                      color: TatvaColors.neutral400, size: 48),
+                  const SizedBox(height: 12),
+                  const Text('No schedule set yet',
+                      style: TextStyle(
+                          fontSize: 15, color: TatvaColors.neutral400)),
+                ]),
+              ),
+            )
+          else if (_selectedDay == 0)
+            _weekGrid(_weekData)
+          else
+            _dayDetail(_weekData, _selectedDay),
+          if (_visibleEvents.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            ..._visibleEvents.map(_buildEventCard),
+          ],
+        ] else
+          _buildHolidayCalendar(),
         const SizedBox(height: 24),
       ]),
     );
   }
+
+  Widget _modeBtn(String label, int mode) => Expanded(
+    child: GestureDetector(
+      onTap: () => setState(() => _viewMode = mode),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+            color: _viewMode == mode ? TatvaColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(10)),
+        child: Center(
+            child: Text(label,
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _viewMode == mode ? Colors.white : TatvaColors.neutral400))),
+      ),
+    ),
+  );
 
   Widget _dayChip(String label, bool isActive, VoidCallback onTap) {
     return Expanded(
@@ -558,5 +616,195 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
         );
       }).toList(),
     );
+  }
+
+  // ─── Holiday Calendar ──────────────────────────────────────────────
+
+  Widget _buildHolidayCalendar() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _monthCalendarWidget(),
+      if (_selectedCalDate.isNotEmpty) ...[
+        const SizedBox(height: 16),
+        ..._holidaysForDate(_selectedCalDate).map(_buildHolidayCard),
+      ],
+      const SizedBox(height: 20),
+      _buildUpcomingHolidays(),
+    ]);
+  }
+
+  List<Holiday> _holidaysForDate(String dateStr) =>
+      _holidays.where((h) => h.coversDate(dateStr)).toList();
+
+  Widget _monthCalendarWidget() {
+    final year = _calMonth.year;
+    final month = _calMonth.month;
+    final firstDay = DateTime(year, month, 1);
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    final startWeekday = firstDay.weekday % 7; // 0=Sun
+    const months = ['January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'];
+    final todayStr = _fmtDate(DateTime.now());
+
+    final holidayDates = <String>{};
+    for (final h in _holidays) {
+      final s = DateTime.tryParse(h.startDate);
+      final e = DateTime.tryParse(h.endDate);
+      if (s == null || e == null) continue;
+      for (var d = s; !d.isAfter(e); d = d.add(const Duration(days: 1))) {
+        if (d.month == month && d.year == year) holidayDates.add(_fmtDate(d));
+      }
+    }
+
+    return Column(children: [
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        IconButton(
+          icon: const Icon(Icons.chevron_left, color: TatvaColors.neutral900),
+          onPressed: () => setState(() {
+            _calMonth = DateTime(year, month - 1);
+            _selectedCalDate = '';
+          }),
+        ),
+        Text('${months[month - 1]} $year',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: TatvaColors.neutral900)),
+        IconButton(
+          icon: const Icon(Icons.chevron_right, color: TatvaColors.neutral900),
+          onPressed: () => setState(() {
+            _calMonth = DateTime(year, month + 1);
+            _selectedCalDate = '';
+          }),
+        ),
+      ]),
+      const SizedBox(height: 8),
+      Row(children: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+          .map((d) => Expanded(
+              child: Center(
+                  child: Text(d,
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: TatvaColors.neutral400)))))
+          .toList()),
+      const SizedBox(height: 6),
+      ...List.generate(6, (week) {
+        return Row(children: List.generate(7, (col) {
+          final idx = week * 7 + col - startWeekday + 1;
+          if (idx < 1 || idx > daysInMonth) {
+            return const Expanded(child: SizedBox(height: 42));
+          }
+          final dateStr = _fmtDate(DateTime(year, month, idx));
+          final isHoliday = holidayDates.contains(dateStr);
+          final isToday = dateStr == todayStr;
+          final isSelected = dateStr == _selectedCalDate;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedCalDate = isSelected ? '' : dateStr),
+              child: Container(
+                height: 42,
+                margin: const EdgeInsets.all(1),
+                decoration: BoxDecoration(
+                    color: isSelected
+                        ? TatvaColors.primary.withOpacity(0.15)
+                        : isHoliday
+                            ? Colors.red.withOpacity(0.06)
+                            : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                    border: isToday ? Border.all(color: TatvaColors.primary, width: 1.5) : null),
+                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Text('$idx',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: isToday || isSelected ? FontWeight.w700 : FontWeight.w500,
+                          color: isSelected
+                              ? TatvaColors.primary
+                              : isHoliday
+                                  ? Colors.red
+                                  : TatvaColors.neutral900)),
+                  if (isHoliday)
+                    Container(
+                      margin: const EdgeInsets.only(top: 2),
+                      width: 5, height: 5,
+                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                    ),
+                ]),
+              ),
+            ),
+          );
+        }));
+      }),
+    ]);
+  }
+
+  String _fmtDate(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  Widget _buildHolidayCard(Holiday h) {
+    final c = h.typeColor;
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final s = DateTime.tryParse(h.startDate);
+    final e = DateTime.tryParse(h.endDate);
+    String dateLabel = '';
+    if (s != null) {
+      dateLabel = '${months[s.month - 1]} ${s.day}';
+      if (e != null && h.isMultiDay) {
+        dateLabel += ' – ${months[e.month - 1]} ${e.day}  (${h.durationDays} days)';
+      }
+    }
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+          color: c.withOpacity(0.07),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: c.withOpacity(0.2))),
+      child: Row(children: [
+        Icon(h.typeIcon, size: 18, color: c),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(h.name, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c)),
+            Text(dateLabel, style: const TextStyle(fontSize: 11, color: TatvaColors.neutral400)),
+            if (h.description.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(h.description, maxLines: 2, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11, color: TatvaColors.neutral400)),
+              ),
+          ]),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(color: c.withOpacity(0.12), borderRadius: BorderRadius.circular(4)),
+          child: Text(h.typeLabel, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: c)),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildUpcomingHolidays() {
+    final todayStr = _fmtDate(DateTime.now());
+    final upcoming = _holidays
+        .where((h) => h.endDate.compareTo(todayStr) >= 0)
+        .toList()
+      ..sort((a, b) => a.startDate.compareTo(b.startDate));
+
+    if (upcoming.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.beach_access_outlined, color: TatvaColors.neutral400, size: 36),
+            const SizedBox(height: 8),
+            const Text('No upcoming holidays', style: TextStyle(fontSize: 13, color: TatvaColors.neutral400)),
+          ]),
+        ),
+      );
+    }
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('Upcoming Holidays',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: TatvaColors.neutral900)),
+      const SizedBox(height: 10),
+      ...upcoming.asMap().entries.map((entry) {
+        final i = entry.key;
+        return FadeSlideIn(delayMs: i * 40, child: _buildHolidayCard(entry.value));
+      }),
+    ]);
   }
 }

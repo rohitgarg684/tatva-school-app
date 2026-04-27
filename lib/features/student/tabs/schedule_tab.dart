@@ -4,6 +4,7 @@ import '../../../shared/theme/colors.dart';
 import '../../../models/class_model.dart';
 import '../../../models/schedule_model.dart';
 import '../../../models/schedule_event.dart';
+import '../../../models/holiday.dart';
 import '../../../services/api_service.dart';
 
 class StudentScheduleTab extends StatefulWidget {
@@ -29,6 +30,8 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
   DateTime? _lastLoadedWeek;
   int _selectedDay = 0;
   DateTime _weekStart = DateTime.now();
+  List<Holiday> _holidays = [];
+  bool _holidaysLoaded = false;
 
   String _parseGrade() {
     final name = widget.primaryClass?.name ?? '';
@@ -78,6 +81,9 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
         _getWeekStart(_weekStart) != _getWeekStart(_lastLoadedWeek!);
     if (needsLoad || (weekChanged && !_loading)) {
       Future.microtask(_loadData);
+    }
+    if (!_holidaysLoaded) {
+      Future.microtask(_loadHolidays);
     }
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -176,6 +182,14 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
         if (_weekEvents.isNotEmpty) ...[
           const SizedBox(height: 16),
           ..._weekEvents.map(_buildEventCard),
+        ],
+        if (_upcomingHolidays.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          const Text('Upcoming Holidays',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: TatvaColors.neutral900)),
+          const SizedBox(height: 10),
+          ..._upcomingHolidays.asMap().entries.map((e) =>
+              FadeSlideIn(delayMs: e.key * 40, child: _buildHolidayCard(e.value))),
         ],
         const SizedBox(height: 24),
       ]),
@@ -554,5 +568,79 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
       return '${months[weekStart.month]} ${weekStart.day} - ${weekEnd.day}, ${weekStart.year}';
     }
     return '${months[weekStart.month]} ${weekStart.day} - ${months[weekEnd.month]} ${weekEnd.day}';
+  }
+
+  // ─── Holidays ──────────────────────────────────────────────────────
+
+  int get _schoolYear {
+    final now = DateTime.now();
+    return now.month >= 8 ? now.year + 1 : now.year;
+  }
+
+  void _loadHolidays() async {
+    try {
+      final raw = await widget.api.getHolidays(_schoolYear);
+      if (mounted) setState(() {
+        _holidays = raw.map((m) => Holiday.fromJson(m)).toList();
+        _holidaysLoaded = true;
+      });
+    } catch (e) {
+      debugPrint('Holidays load error: $e');
+      if (mounted) setState(() => _holidaysLoaded = true);
+    }
+  }
+
+  String _fmtDate(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  List<Holiday> get _upcomingHolidays {
+    final todayStr = _fmtDate(DateTime.now());
+    return _holidays
+        .where((h) => h.endDate.compareTo(todayStr) >= 0)
+        .toList()
+      ..sort((a, b) => a.startDate.compareTo(b.startDate));
+  }
+
+  Widget _buildHolidayCard(Holiday h) {
+    final c = h.typeColor;
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final s = DateTime.tryParse(h.startDate);
+    final e = DateTime.tryParse(h.endDate);
+    String dateLabel = '';
+    if (s != null) {
+      dateLabel = '${months[s.month - 1]} ${s.day}';
+      if (e != null && h.isMultiDay) {
+        dateLabel += ' – ${months[e.month - 1]} ${e.day}  (${h.durationDays} days)';
+      }
+    }
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+          color: c.withOpacity(0.07),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: c.withOpacity(0.2))),
+      child: Row(children: [
+        Icon(h.typeIcon, size: 18, color: c),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(h.name, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c)),
+            Text(dateLabel, style: const TextStyle(fontSize: 11, color: TatvaColors.neutral400)),
+            if (h.description.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(h.description, maxLines: 2, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11, color: TatvaColors.neutral400)),
+              ),
+          ]),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(color: c.withOpacity(0.12), borderRadius: BorderRadius.circular(4)),
+          child: Text(h.typeLabel, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: c)),
+        ),
+      ]),
+    );
   }
 }

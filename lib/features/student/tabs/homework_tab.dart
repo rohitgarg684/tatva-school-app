@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../shared/animations/animations.dart';
 import '../../../shared/theme/colors.dart';
 import '../../../shared/widgets/tatva_snackbar.dart';
 import '../../../models/homework_model.dart';
 import '../../../services/api_service.dart';
 import '../widgets/submit_work_sheet.dart';
+import '../../shared/homework_comments_sheet.dart';
 
 class StudentHomeworkTab extends StatelessWidget {
   final List<HomeworkModel> homework;
@@ -15,6 +17,7 @@ class StudentHomeworkTab extends StatelessWidget {
   final ApiService api;
   final void Function(String hwId, [Map<String, dynamic>? submission]) onMarkDone;
   final void Function(String hwId) onMarkIncomplete;
+  final VoidCallback? onRefresh;
 
   const StudentHomeworkTab({
     super.key,
@@ -25,6 +28,7 @@ class StudentHomeworkTab extends StatelessWidget {
     required this.api,
     required this.onMarkDone,
     required this.onMarkIncomplete,
+    this.onRefresh,
   });
 
   @override
@@ -220,59 +224,155 @@ class StudentHomeworkTab extends StatelessWidget {
                 color: c)),
       );
 
-  Widget _mySubmissionSection(Map<String, dynamic> sub) {
+  Widget _mySubmissionSection(BuildContext context, HomeworkModel hw, Map<String, dynamic> sub) {
     final files = (sub['files'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final note = sub['note'] as String? ?? '';
+    final status = sub['status'] as String? ?? 'pending';
+    final commentCount = sub['commentCount'] as int? ?? 0;
     if (files.isEmpty && note.isEmpty) return const SizedBox.shrink();
+
+    final Color statusColor;
+    final String statusLabel;
+    switch (status) {
+      case 'accepted':
+        statusColor = TatvaColors.success;
+        statusLabel = 'Accepted';
+      case 'returned':
+        statusColor = TatvaColors.accent;
+        statusLabel = 'Returned';
+      default:
+        statusColor = TatvaColors.info;
+        statusLabel = 'Pending';
+    }
+
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: TatvaColors.success.withOpacity(0.04),
+        color: statusColor.withOpacity(0.04),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: TatvaColors.success.withOpacity(0.15)),
+        border: Border.all(color: statusColor.withOpacity(0.15)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Icon(Icons.upload_file_rounded, size: 13, color: TatvaColors.success),
+          Icon(Icons.upload_file_rounded, size: 13, color: statusColor),
           const SizedBox(width: 4),
           const Text('Your Submission',
-              style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: TatvaColors.success)),
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: TatvaColors.neutral900)),
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+                color: statusColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(5),
+                border: Border.all(color: statusColor.withOpacity(0.25))),
+            child: Text(statusLabel,
+                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: statusColor)),
+          ),
         ]),
         if (note.isNotEmpty) ...[
           const SizedBox(height: 6),
-          Text(note,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontSize: 11, color: TatvaColors.neutral600, height: 1.4)),
+          Text(note, maxLines: 2, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 11, color: TatvaColors.neutral600, height: 1.4)),
         ],
         if (files.isNotEmpty) ...[
           const SizedBox(height: 6),
           Wrap(spacing: 6, runSpacing: 4, children: files.map((f) {
             final type = f['type'] as String? ?? 'link';
-            final name = f['name'] as String? ?? 'File';
+            final fName = f['name'] as String? ?? 'File';
+            final fUrl = f['url'] as String? ?? '';
             final isImg = type == 'image';
             final ac = isImg ? TatvaColors.info : TatvaColors.error;
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                  color: ac.withOpacity(0.06),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: ac.withOpacity(0.15))),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(isImg ? Icons.image_rounded : Icons.picture_as_pdf_rounded,
-                    size: 12, color: ac),
-                const SizedBox(width: 4),
-                Text(name,
-                    style: TextStyle(
-                        fontSize: 10, fontWeight: FontWeight.w600, color: ac)),
-              ]),
-            );
+            return Row(mainAxisSize: MainAxisSize.min, children: [
+              GestureDetector(
+                onTap: () {
+                  if (fUrl.isNotEmpty) launchUrl(Uri.parse(fUrl), mode: LaunchMode.externalApplication);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                      color: ac.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: ac.withOpacity(0.15))),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(isImg ? Icons.image_rounded : Icons.picture_as_pdf_rounded, size: 12, color: ac),
+                    const SizedBox(width: 4),
+                    Text(fName, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: ac)),
+                    const SizedBox(width: 2),
+                    Icon(Icons.open_in_new_rounded, size: 9, color: ac.withOpacity(0.6)),
+                  ]),
+                ),
+              ),
+              if (status != 'accepted')
+                GestureDetector(
+                  onTap: () async {
+                    HapticFeedback.lightImpact();
+                    try {
+                      await api.deleteSubmissionFile(hw.id, fUrl);
+                      if (context.mounted) {
+                        TatvaSnackbar.show(context, 'File removed');
+                        onRefresh?.call();
+                      }
+                    } catch (_) {
+                      if (context.mounted) TatvaSnackbar.show(context, 'Failed to delete');
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 2),
+                    child: Icon(Icons.close_rounded, size: 14, color: TatvaColors.neutral400),
+                  ),
+                ),
+            ]);
           }).toList()),
         ],
+        const SizedBox(height: 8),
+        Row(children: [
+          if (status == 'returned')
+            GestureDetector(
+              onTap: () => SubmitWorkSheet.show(
+                context,
+                hw: hw,
+                color: TatvaColors.accent,
+                api: api,
+                onSubmitted: (submission) {
+                  onMarkDone(hw.id, submission);
+                  onRefresh?.call();
+                },
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                    color: TatvaColors.accent.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: TatvaColors.accent.withOpacity(0.2))),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.refresh_rounded, size: 13, color: TatvaColors.accent),
+                  const SizedBox(width: 4),
+                  Text('Re-submit', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: TatvaColors.accent)),
+                ]),
+              ),
+            ),
+          if (status == 'returned') const SizedBox(width: 6),
+          GestureDetector(
+            onTap: () => HomeworkCommentsSheet.show(
+              context,
+              homeworkId: hw.id,
+              studentUid: uid,
+              studentName: 'My Submission',
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              decoration: BoxDecoration(
+                  color: TatvaColors.neutral400.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.chat_bubble_outline_rounded, size: 12, color: TatvaColors.neutral600),
+                const SizedBox(width: 4),
+                Text(commentCount > 0 ? '$commentCount' : 'Comment',
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: TatvaColors.neutral600)),
+              ]),
+            ),
+          ),
+        ]),
       ]),
     );
   }
@@ -434,9 +534,9 @@ class StudentHomeworkTab extends StatelessWidget {
                     style: const TextStyle(
                         fontSize: 11, color: TatvaColors.neutral400)),
               ]),
-              if (isDone && mySubmissions.containsKey(hw.id)) ...[
+              if (mySubmissions.containsKey(hw.id)) ...[
                 const SizedBox(height: 8),
-                _mySubmissionSection(mySubmissions[hw.id]!),
+                _mySubmissionSection(context, hw, mySubmissions[hw.id]!),
               ],
               const SizedBox(height: 12),
               if (!isDone)

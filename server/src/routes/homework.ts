@@ -84,6 +84,8 @@ router.post(
         studentUid: uid,
         files: [],
         note: "",
+        status: "pending",
+        commentCount: 0,
         submittedAt: FieldValue.serverTimestamp(),
       });
     }
@@ -106,6 +108,91 @@ router.post(
 
     invalidateDashboards("homework_");
     res.json({ homeworkId, submitted: true });
+  })
+);
+
+router.post(
+  "/homework/:homeworkId/submissions/:studentUid/comments",
+  asyncHandler(async (req, res) => {
+    const { homeworkId, studentUid } = req.params;
+    const uid = req.uid!;
+    const role = req.role!;
+    const { text } = req.body;
+    if (!text || typeof text !== "string")
+      return res.status(400).json({ error: "text required" });
+
+    const isTeacher = role === "Teacher" || role === "Principal";
+    if (!isTeacher && uid !== studentUid)
+      return res.status(403).json({ error: "Forbidden" });
+
+    const subId = `${homeworkId}_${studentUid}`;
+    const subRef = db.collection(Collections.HOMEWORK_SUBMISSIONS).doc(subId);
+    const subSnap = await subRef.get();
+    if (!subSnap.exists) return res.status(404).json({ error: "Submission not found" });
+
+    const userDoc = await getDoc(Collections.USERS, uid);
+    const ref = await db.collection(Collections.HOMEWORK_COMMENTS).add({
+      submissionId: subId,
+      authorUid: uid,
+      authorName: userDoc?.name || "",
+      authorRole: role,
+      text,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    await subRef.update({ commentCount: FieldValue.increment(1) });
+    res.json({ id: ref.id, created: true });
+  })
+);
+
+router.get(
+  "/homework/:homeworkId/submissions/:studentUid/comments",
+  asyncHandler(async (req, res) => {
+    const { homeworkId, studentUid } = req.params;
+    const uid = req.uid!;
+    const role = req.role!;
+
+    const isTeacher = role === "Teacher" || role === "Principal";
+    if (!isTeacher && uid !== studentUid)
+      return res.status(403).json({ error: "Forbidden" });
+
+    const subId = `${homeworkId}_${studentUid}`;
+    const snap = await db.collection(Collections.HOMEWORK_COMMENTS)
+      .where("submissionId", "==", subId)
+      .orderBy("createdAt", "asc")
+      .get();
+
+    const comments = snap.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        createdAt: data.createdAt?.toDate?.()?.toISOString?.() || null,
+      };
+    });
+
+    res.json({ comments });
+  })
+);
+
+router.patch(
+  "/homework/:homeworkId/submissions/:studentUid/status",
+  requireRole("Teacher", "Principal"),
+  asyncHandler(async (req, res) => {
+    const { homeworkId, studentUid } = req.params;
+    const { status } = req.body;
+    if (!["accepted", "returned"].includes(status))
+      return res.status(400).json({ error: "status must be 'accepted' or 'returned'" });
+
+    const subRef = db
+      .collection(Collections.HOMEWORK_SUBMISSIONS)
+      .doc(`${homeworkId}_${studentUid}`);
+    const snap = await subRef.get();
+    if (!snap.exists) return res.status(404).json({ error: "Submission not found" });
+
+    await subRef.update({ status });
+    invalidateDashboards("homework_");
+    res.json({ updated: true, status });
   })
 );
 

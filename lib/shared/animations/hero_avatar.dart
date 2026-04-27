@@ -8,6 +8,7 @@ class HeroAvatar extends StatelessWidget {
   final Color textColor;
   final Color? borderColor;
   final String heroTag;
+  final String photoUrl;
 
   const HeroAvatar({
     super.key,
@@ -17,6 +18,7 @@ class HeroAvatar extends StatelessWidget {
     required this.textColor,
     this.borderColor,
     required this.heroTag,
+    this.photoUrl = '',
   });
 
   @override
@@ -30,11 +32,12 @@ class HeroAvatar extends StatelessWidget {
               opaque: false,
               barrierColor: Colors.black54,
               barrierDismissible: true,
-              pageBuilder: (_, __, ___) => _AvatarZoomScreen(
+              pageBuilder: (_, __, ___) =>               _AvatarZoomScreen(
                 heroTag: heroTag,
                 initial: initial,
                 bgColor: bgColor,
                 textColor: textColor,
+                photoUrl: photoUrl,
               ),
               transitionDuration: Duration(milliseconds: 350),
               transitionsBuilder: (_, animation, __, child) {
@@ -54,13 +57,17 @@ class HeroAvatar extends StatelessWidget {
           child: CircleAvatar(
             radius: radius,
             backgroundColor: bgColor,
-            child: Text(
-              initial.toUpperCase(),
-              style: TextStyle(
-                  fontSize: radius * 0.75,
-                  fontWeight: FontWeight.bold,
-                  color: textColor),
-            ),
+            backgroundImage:
+                photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+            child: photoUrl.isNotEmpty
+                ? null
+                : Text(
+                    initial.toUpperCase(),
+                    style: TextStyle(
+                        fontSize: radius * 0.75,
+                        fontWeight: FontWeight.bold,
+                        color: textColor),
+                  ),
           ),
         ),
       ),
@@ -73,12 +80,14 @@ class _AvatarZoomScreen extends StatelessWidget {
   final String initial;
   final Color bgColor;
   final Color textColor;
+  final String photoUrl;
 
   const _AvatarZoomScreen(
       {required this.heroTag,
       required this.initial,
       required this.bgColor,
-      required this.textColor});
+      required this.textColor,
+      this.photoUrl = ''});
 
   @override
   Widget build(BuildContext context) {
@@ -92,13 +101,17 @@ class _AvatarZoomScreen extends StatelessWidget {
             child: CircleAvatar(
               radius: 100,
               backgroundColor: bgColor,
-              child: Text(
-                initial.toUpperCase(),
-                style: TextStyle(
-                    fontSize: 72,
-                    fontWeight: FontWeight.bold,
-                    color: textColor),
-              ),
+              backgroundImage:
+                  photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+              child: photoUrl.isNotEmpty
+                  ? null
+                  : Text(
+                      initial.toUpperCase(),
+                      style: TextStyle(
+                          fontSize: 72,
+                          fontWeight: FontWeight.bold,
+                          color: textColor),
+                    ),
             ),
           ),
         ),

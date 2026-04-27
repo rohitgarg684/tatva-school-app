@@ -184,6 +184,9 @@ class _TeacherDashboardState extends State<TeacherDashboard>
               user: _data?.user,
               classCount: _data?.classes.length ?? 0,
               onLogout: logout,
+              onPhotoUpdated: (url) => setState(() {
+                _data = _data?.copyWithPhotoUrl(url);
+              }),
             ),
           ]),
     );

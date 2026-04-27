@@ -18,6 +18,8 @@ export const Collections = {
   SCHEDULES: "schedules",
   SCHEDULE_EVENTS: "schedule_events",
   PERIOD_CANCELLATIONS: "period_cancellations",
+  HOLIDAYS: "holidays",
+  HOMEWORK_COMMENTS: "homework_comments",
 } as const;
 
 export type CollectionName = (typeof Collections)[keyof typeof Collections];

@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../shared/animations/animations.dart';
 import '../../../shared/theme/colors.dart';
 import '../../../shared/widgets/tatva_snackbar.dart';
@@ -9,6 +10,7 @@ import '../../../services/api_service.dart';
 import '../../../models/user_model.dart';
 import '../../../models/class_model.dart';
 import '../../../models/homework_model.dart';
+import '../../shared/homework_comments_sheet.dart';
 
 class TeacherHomeworkTab extends StatelessWidget {
   final List<HomeworkModel> homework;
@@ -293,203 +295,8 @@ class TeacherHomeworkTab extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.7),
-        decoration: const BoxDecoration(
-            color: TatvaColors.bgCard,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-        child: FutureBuilder<List<Map<String, dynamic>>>(
-          future: ApiService().getHomeworkSubmissions(hw.id),
-          builder: (ctx, snap) {
-            final subs = snap.data ?? [];
-            return Column(
-                mainAxisSize: subs.isEmpty && !snap.hasError
-                    ? MainAxisSize.min
-                    : MainAxisSize.max,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                      child: Container(
-                          width: 36,
-                          height: 3,
-                          decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(2)))),
-                  const SizedBox(height: 16),
-                  Text('Submissions — ${hw.title}',
-                      style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: TatvaColors.neutral900)),
-                  const SizedBox(height: 4),
-                  Text(
-                      '${subs.length} student${subs.length != 1 ? 's' : ''} submitted',
-                      style: const TextStyle(
-                          fontSize: 12, color: TatvaColors.neutral400)),
-                  const SizedBox(height: 16),
-                  if (snap.connectionState == ConnectionState.waiting)
-                    const Center(
-                        child: Padding(
-                            padding: EdgeInsets.all(24),
-                            child: CircularProgressIndicator(strokeWidth: 2)))
-                  else if (snap.hasError)
-                    Center(
-                        child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Text('Failed to load submissions',
-                                style: TextStyle(
-                                    fontSize: 14,
-                                    color: TatvaColors.error))))
-                  else if (subs.isEmpty)
-                    const Center(
-                        child: Padding(
-                            padding: EdgeInsets.all(24),
-                            child: Text('No submissions yet',
-                                style: TextStyle(
-                                    fontSize: 14,
-                                    color: TatvaColors.neutral400))))
-                  else
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: subs.length,
-                        itemBuilder: (_, i) {
-                          final s = subs[i];
-                          final files = (s['files'] as List?)
-                                  ?.cast<Map<String, dynamic>>() ??
-                              [];
-                          final name =
-                              s['studentName'] as String? ?? 'Student';
-                          final note = s['note'] as String? ?? '';
-                          final at = s['submittedAt'] as String?;
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                                color: TatvaColors.bgLight,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                    color: Colors.grey.shade100)),
-                            child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                children: [
-                                  Row(children: [
-                                    CircleAvatar(
-                                        radius: 14,
-                                        backgroundColor: TatvaColors.info
-                                            .withOpacity(0.1),
-                                        child: Text(
-                                            name.isNotEmpty
-                                                ? name[0].toUpperCase()
-                                                : '?',
-                                            style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.bold,
-                                                color: TatvaColors.info))),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                        child: Text(name,
-                                            style: const TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w600,
-                                                color: TatvaColors
-                                                    .neutral900))),
-                                    if (at != null)
-                                      Text(_submissionTimeLabel(at),
-                                          style: const TextStyle(
-                                              fontSize: 10,
-                                              color: TatvaColors
-                                                  .neutral400)),
-                                  ]),
-                                  if (note.isNotEmpty) ...[
-                                    const SizedBox(height: 6),
-                                    Text(note,
-                                        style: const TextStyle(
-                                            fontSize: 12,
-                                            color:
-                                                TatvaColors.neutral600)),
-                                  ],
-                                  if (files.isNotEmpty) ...[
-                                    const SizedBox(height: 8),
-                                    Wrap(
-                                        spacing: 6,
-                                        runSpacing: 4,
-                                        children: files.map((f) {
-                                          final fType = f['type']
-                                                  as String? ??
-                                              'document';
-                                          final fName = f['name']
-                                                  as String? ??
-                                              'File';
-                                          final ic = fType == 'pdf'
-                                              ? Icons
-                                                  .picture_as_pdf_rounded
-                                              : fType == 'image'
-                                                  ? Icons.image_rounded
-                                                  : Icons
-                                                      .insert_drive_file_rounded;
-                                          final fc = fType == 'pdf'
-                                              ? TatvaColors.error
-                                              : fType == 'image'
-                                                  ? TatvaColors.info
-                                                  : TatvaColors.accent;
-                                          return Container(
-                                            padding:
-                                                const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 4),
-                                            decoration: BoxDecoration(
-                                                color:
-                                                    fc.withOpacity(0.06),
-                                                borderRadius:
-                                                    BorderRadius.circular(
-                                                        8),
-                                                border: Border.all(
-                                                    color: fc.withOpacity(
-                                                        0.15))),
-                                            child: Row(
-                                                mainAxisSize:
-                                                    MainAxisSize.min,
-                                                children: [
-                                                  Icon(ic,
-                                                      size: 13,
-                                                      color: fc),
-                                                  const SizedBox(width: 4),
-                                                  Text(fName,
-                                                      style: TextStyle(
-                                                          fontFamily:
-                                                              'Raleway',
-                                                          fontSize: 11,
-                                                          fontWeight:
-                                                              FontWeight
-                                                                  .w600,
-                                                          color: fc)),
-                                                ]),
-                                          );
-                                        }).toList()),
-                                  ],
-                                ]),
-                          );
-                        },
-                      ),
-                    ),
-                ]);
-          },
-        ),
-      ),
+      builder: (_) => _SubmissionsSheet(hw: hw),
     );
-  }
-
-  String _submissionTimeLabel(String iso) {
-    final dt = DateTime.tryParse(iso);
-    if (dt == null) return '';
-    final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
-    return '${dt.month}/${dt.day}';
   }
 
   void _deleteHomework(BuildContext context, HomeworkModel hw) {
@@ -962,6 +769,31 @@ class TeacherHomeworkTab extends StatelessWidget {
         ),
       );
 
+  static Widget _statusBadge(String status) {
+    final Color c;
+    final String label;
+    switch (status) {
+      case 'accepted':
+        c = TatvaColors.success;
+        label = 'Accepted';
+      case 'returned':
+        c = TatvaColors.accent;
+        label = 'Returned';
+      default:
+        c = TatvaColors.info;
+        label = 'Pending';
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+          color: c.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: c.withOpacity(0.25))),
+      child: Text(label,
+          style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: c)),
+    );
+  }
+
   void _addAttachment(BuildContext context, StateSetter setModal,
       List<HomeworkAttachment> attachments, String type) {
     final urlCtrl = TextEditingController();
@@ -1018,5 +850,222 @@ class TeacherHomeworkTab extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _SubmissionsSheet extends StatefulWidget {
+  final HomeworkModel hw;
+  const _SubmissionsSheet({required this.hw});
+
+  @override
+  State<_SubmissionsSheet> createState() => _SubmissionsSheetState();
+}
+
+class _SubmissionsSheetState extends State<_SubmissionsSheet> {
+  List<Map<String, dynamic>>? _subs;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final subs = await ApiService().getHomeworkSubmissions(widget.hw.id);
+      if (!mounted) return;
+      setState(() { _subs = subs; _loading = false; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  Future<void> _setStatus(int index, String studentUid, String status) async {
+    try {
+      await ApiService().updateSubmissionStatus(widget.hw.id, studentUid, status);
+      if (!mounted) return;
+      setState(() { _subs![index]['status'] = status; });
+      TatvaSnackbar.show(context, status == 'accepted' ? 'Accepted' : 'Returned');
+    } catch (_) {
+      if (mounted) TatvaSnackbar.show(context, 'Failed to update');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final subs = _subs ?? [];
+    return Container(
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
+      decoration: const BoxDecoration(
+          color: TatvaColors.bgCard,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      child: Column(
+        mainAxisSize: subs.isEmpty && _error == null ? MainAxisSize.min : MainAxisSize.max,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(child: Container(
+              width: 36, height: 3,
+              decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(2)))),
+          const SizedBox(height: 16),
+          Text('Submissions — ${widget.hw.title}',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: TatvaColors.neutral900)),
+          const SizedBox(height: 4),
+          Text('${subs.length} student${subs.length != 1 ? 's' : ''} submitted',
+              style: const TextStyle(fontSize: 12, color: TatvaColors.neutral400)),
+          const SizedBox(height: 16),
+          if (_loading)
+            const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator(strokeWidth: 2)))
+          else if (_error != null)
+            Center(child: Padding(padding: const EdgeInsets.all(24),
+                child: Text('Failed to load submissions', style: TextStyle(fontSize: 14, color: TatvaColors.error))))
+          else if (subs.isEmpty)
+            const Center(child: Padding(padding: EdgeInsets.all(24),
+                child: Text('No submissions yet', style: TextStyle(fontSize: 14, color: TatvaColors.neutral400))))
+          else
+            Expanded(
+              child: ListView.builder(
+                itemCount: subs.length,
+                itemBuilder: (_, i) => _submissionCard(i, subs[i]),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _submissionCard(int index, Map<String, dynamic> s) {
+    final files = (s['files'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final name = s['studentName'] as String? ?? 'Student';
+    final note = s['note'] as String? ?? '';
+    final at = s['submittedAt'] as String?;
+    final status = s['status'] as String? ?? 'pending';
+    final studentUid = s['studentUid'] as String? ?? '';
+    final commentCount = s['commentCount'] as int? ?? 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+          color: TatvaColors.bgLight,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade100)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          CircleAvatar(
+              radius: 14,
+              backgroundColor: TatvaColors.info.withOpacity(0.1),
+              child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: TatvaColors.info))),
+          const SizedBox(width: 8),
+          Expanded(child: Text(name,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: TatvaColors.neutral900))),
+          TeacherHomeworkTab._statusBadge(status),
+          if (at != null) ...[
+            const SizedBox(width: 6),
+            Text(_timeLabel(at), style: const TextStyle(fontSize: 10, color: TatvaColors.neutral400)),
+          ],
+        ]),
+        if (note.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(note, style: const TextStyle(fontSize: 12, color: TatvaColors.neutral600)),
+        ],
+        if (files.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(spacing: 6, runSpacing: 4, children: files.map((f) {
+            final fType = f['type'] as String? ?? 'document';
+            final fName = f['name'] as String? ?? 'File';
+            final fUrl = f['url'] as String? ?? '';
+            final ic = fType == 'pdf' ? Icons.picture_as_pdf_rounded
+                : fType == 'image' ? Icons.image_rounded : Icons.insert_drive_file_rounded;
+            final fc = fType == 'pdf' ? TatvaColors.error
+                : fType == 'image' ? TatvaColors.info : TatvaColors.accent;
+            return GestureDetector(
+              onTap: () {
+                if (fUrl.isNotEmpty) launchUrl(Uri.parse(fUrl), mode: LaunchMode.externalApplication);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                    color: fc.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: fc.withOpacity(0.15))),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(ic, size: 13, color: fc),
+                  const SizedBox(width: 4),
+                  Text(fName, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fc)),
+                  const SizedBox(width: 2),
+                  Icon(Icons.open_in_new_rounded, size: 10, color: fc.withOpacity(0.6)),
+                ]),
+              ),
+            );
+          }).toList()),
+        ],
+        const SizedBox(height: 10),
+        Row(children: [
+          if (status != 'accepted')
+            _actionChip('Accept', Icons.check_rounded, TatvaColors.success,
+                () => _setStatus(index, studentUid, 'accepted')),
+          if (status != 'accepted') const SizedBox(width: 6),
+          if (status != 'returned')
+            _actionChip('Return', Icons.reply_rounded, TatvaColors.accent,
+                () => _setStatus(index, studentUid, 'returned')),
+          const Spacer(),
+          GestureDetector(
+            onTap: () => HomeworkCommentsSheet.show(
+              context,
+              homeworkId: widget.hw.id,
+              studentUid: studentUid,
+              studentName: name,
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                  color: TatvaColors.neutral400.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.chat_bubble_outline_rounded, size: 12, color: TatvaColors.neutral600),
+                const SizedBox(width: 4),
+                Text(commentCount > 0 ? '$commentCount' : 'Comment',
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: TatvaColors.neutral600)),
+              ]),
+            ),
+          ),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _actionChip(String label, IconData icon, Color c, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: () { HapticFeedback.lightImpact(); onTap(); },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+            color: c.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: c.withOpacity(0.2))),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 12, color: c),
+          const SizedBox(width: 4),
+          Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: c)),
+        ]),
+      ),
+    );
+  }
+
+  String _timeLabel(String iso) {
+    final dt = DateTime.tryParse(iso);
+    if (dt == null) return '';
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${dt.month}/${dt.day}';
   }
 }

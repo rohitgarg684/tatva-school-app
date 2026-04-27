@@ -60,7 +60,19 @@ export interface HomeworkSubmissionDoc {
   studentUid: string;
   files: HomeworkAttachment[];
   note: string;
+  status: "pending" | "accepted" | "returned";
+  commentCount: number;
   submittedAt?: FirebaseFirestore.Timestamp | string;
+}
+
+export interface HomeworkCommentDoc {
+  id: string;
+  submissionId: string;
+  authorUid: string;
+  authorName: string;
+  authorRole: string;
+  text: string;
+  createdAt?: FirebaseFirestore.Timestamp | string;
 }
 
 export interface AnnouncementDoc {
@@ -218,6 +230,18 @@ export interface ActivityDoc {
   body: string;
   metadata: Record<string, unknown>;
   createdAt?: FirebaseFirestore.Timestamp | string;
+}
+
+export interface HolidayDoc {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  type: "federal" | "summer_break" | "spring_break" | "winter_break" | "teacher_workday" | "custom";
+  description: string;
+  createdBy: string;
+  createdAt: FirebaseFirestore.Timestamp | string;
+  updatedAt: FirebaseFirestore.Timestamp | string;
 }
 
 export interface ContentDoc {

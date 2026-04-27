@@ -1,19 +1,58 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../shared/animations/animations.dart';
 import '../../../shared/theme/colors.dart';
+import '../../../shared/widgets/tatva_snackbar.dart';
 import '../../../models/user_model.dart';
+import '../../../services/api_service.dart';
 
-class TeacherProfileTab extends StatelessWidget {
+class TeacherProfileTab extends StatefulWidget {
   final UserModel? user;
   final int classCount;
   final VoidCallback onLogout;
+  final ValueChanged<String> onPhotoUpdated;
 
   const TeacherProfileTab({
     super.key,
     required this.user,
     required this.classCount,
     required this.onLogout,
+    required this.onPhotoUpdated,
   });
+
+  @override
+  State<TeacherProfileTab> createState() => _TeacherProfileTabState();
+}
+
+class _TeacherProfileTabState extends State<TeacherProfileTab> {
+  bool _uploading = false;
+
+  Future<void> _pickAndUploadPhoto() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    if (file.bytes == null || file.name.isEmpty) return;
+
+    setState(() => _uploading = true);
+    try {
+      final url = await ApiService().uploadProfilePhoto(file.bytes!, file.name);
+      if (url != null && mounted) {
+        widget.onPhotoUpdated(url);
+        TatvaSnackbar.show(context, 'Profile photo updated');
+      } else if (mounted) {
+        TatvaSnackbar.show(context, 'Upload failed', color: TatvaColors.error);
+      }
+    } catch (_) {
+      if (mounted) {
+        TatvaSnackbar.show(context, 'Upload failed', color: TatvaColors.error);
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,17 +61,47 @@ class TeacherProfileTab extends StatelessWidget {
         child: Column(children: [
           const SizedBox(height: 16),
           FadeSlideIn(
-              child: HeroAvatar(
-                  heroTag: 'teacher_avatar',
-                  initial: user?.initial ?? '?',
-                  radius: 46,
-                  bgColor: TatvaColors.primary.withOpacity(0.1),
-                  textColor: TatvaColors.primary,
-                  borderColor: TatvaColors.accent)),
+              child: GestureDetector(
+                  onLongPress: _uploading ? null : _pickAndUploadPhoto,
+                  child: Stack(
+                    children: [
+                      HeroAvatar(
+                          heroTag: 'teacher_avatar',
+                          initial: widget.user?.initial ?? '?',
+                          radius: 46,
+                          bgColor: TatvaColors.primary.withOpacity(0.1),
+                          textColor: TatvaColors.primary,
+                          borderColor: TatvaColors.accent,
+                          photoUrl: widget.user?.photoUrl ?? ''),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: GestureDetector(
+                          onTap: _uploading ? null : _pickAndUploadPhoto,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: TatvaColors.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            child: _uploading
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white))
+                                : const Icon(Icons.camera_alt,
+                                    size: 14, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ))),
           const SizedBox(height: 16),
           FadeSlideIn(
               delayMs: 80,
-              child: Text(user?.name ?? '',
+              child: Text(widget.user?.name ?? '',
                   style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -41,7 +110,7 @@ class TeacherProfileTab extends StatelessWidget {
           const SizedBox(height: 4),
           FadeSlideIn(
               delayMs: 100,
-              child: Text(user?.email ?? '',
+              child: Text(widget.user?.email ?? '',
                   style: const TextStyle(
                       fontSize: 13, color: TatvaColors.neutral400))),
           const SizedBox(height: 10),
@@ -63,7 +132,7 @@ class TeacherProfileTab extends StatelessWidget {
             final items = [
               [Icons.school_outlined, 'School', 'Tatva Academy'],
               [Icons.book_outlined, 'Subject', 'Mathematics'],
-              [Icons.class_outlined, 'Classes', '$classCount Active'],
+              [Icons.class_outlined, 'Classes', '${widget.classCount} Active'],
               [Icons.verified_outlined, 'Status', 'Verified'],
             ];
             return StaggeredItem(
@@ -101,7 +170,7 @@ class TeacherProfileTab extends StatelessWidget {
           FadeSlideIn(
               delayMs: 200,
               child: BouncyTap(
-                  onTap: onLogout,
+                  onTap: widget.onLogout,
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),

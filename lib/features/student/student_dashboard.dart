@@ -169,6 +169,7 @@ class _StudentDashboardState extends State<StudentDashboard>
           api: _api,
           onMarkDone: _handleMarkDone,
           onMarkIncomplete: _handleMarkIncomplete,
+          onRefresh: _loadUser,
         ),
         StudentGradesTab(grades: _data?.grades ?? []),
         StudentLearnTab(
@@ -180,6 +181,9 @@ class _StudentDashboardState extends State<StudentDashboard>
           user: _data?.user,
           primaryClass: _data?.primaryClass,
           onLogout: logout,
+          onPhotoUpdated: (url) => setState(() {
+            _data = _data?.copyWithPhotoUrl(url);
+          }),
         ),
       ]),
     );

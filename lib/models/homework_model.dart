@@ -32,6 +32,83 @@ class HomeworkAttachment {
   Map<String, dynamic> toJson() => {'url': url, 'name': name, 'type': type};
 }
 
+class HomeworkSubmission {
+  final String id;
+  final String homeworkId;
+  final String studentUid;
+  final String studentName;
+  final List<HomeworkAttachment> files;
+  final String note;
+  final String status;
+  final int commentCount;
+  final DateTime? submittedAt;
+
+  const HomeworkSubmission({
+    required this.id,
+    required this.homeworkId,
+    required this.studentUid,
+    this.studentName = '',
+    this.files = const [],
+    this.note = '',
+    this.status = 'pending',
+    this.commentCount = 0,
+    this.submittedAt,
+  });
+
+  factory HomeworkSubmission.fromJson(Map<String, dynamic> data) {
+    return HomeworkSubmission(
+      id: data['id'] as String? ?? '',
+      homeworkId: data['homeworkId'] as String? ?? '',
+      studentUid: data['studentUid'] as String? ?? '',
+      studentName: data['studentName'] as String? ?? '',
+      files: (data['files'] as List?)
+              ?.map((a) => HomeworkAttachment.fromJson(a as Map<String, dynamic>))
+              .toList() ??
+          [],
+      note: data['note'] as String? ?? '',
+      status: data['status'] as String? ?? 'pending',
+      commentCount: data['commentCount'] as int? ?? 0,
+      submittedAt: data['submittedAt'] != null
+          ? DateTime.tryParse(data['submittedAt'] as String)
+          : null,
+    );
+  }
+}
+
+class HomeworkComment {
+  final String id;
+  final String submissionId;
+  final String authorUid;
+  final String authorName;
+  final String authorRole;
+  final String text;
+  final DateTime? createdAt;
+
+  const HomeworkComment({
+    required this.id,
+    required this.submissionId,
+    required this.authorUid,
+    this.authorName = '',
+    this.authorRole = '',
+    required this.text,
+    this.createdAt,
+  });
+
+  factory HomeworkComment.fromJson(Map<String, dynamic> data) {
+    return HomeworkComment(
+      id: data['id'] as String? ?? '',
+      submissionId: data['submissionId'] as String? ?? '',
+      authorUid: data['authorUid'] as String? ?? '',
+      authorName: data['authorName'] as String? ?? '',
+      authorRole: data['authorRole'] as String? ?? '',
+      text: data['text'] as String? ?? '',
+      createdAt: data['createdAt'] != null
+          ? DateTime.tryParse(data['createdAt'] as String)
+          : null,
+    );
+  }
+}
+
 class HomeworkModel {
   final String id;
   final String title;

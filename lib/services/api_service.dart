@@ -85,10 +85,25 @@ class ApiService {
     return json.decode(response.body) as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> _delete(String path) async {
+  Future<Map<String, dynamic>> _patch(
+      String path, Map<String, dynamic> body) async {
     final headers = await _authHeaders();
     final response = await http
-        .delete(Uri.parse('$_baseUrl$path'), headers: headers)
+        .patch(Uri.parse('$_baseUrl$path'),
+            headers: headers, body: json.encode(body))
+        .timeout(const Duration(seconds: 30));
+    if (response.statusCode != 200) {
+      throw Exception('API error ${response.statusCode}: ${response.body}');
+    }
+    return json.decode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> _delete(String path,
+      {Map<String, dynamic>? body}) async {
+    final headers = await _authHeaders();
+    final response = await http
+        .delete(Uri.parse('$_baseUrl$path'),
+            headers: headers, body: body != null ? json.encode(body) : null)
         .timeout(const Duration(seconds: 30));
     if (response.statusCode != 200) {
       throw Exception('API error ${response.statusCode}: ${response.body}');
@@ -223,6 +238,26 @@ class ApiService {
     }
   }
 
+  Future<String?> uploadProfilePhoto(Uint8List bytes, String fileName) async {
+    try {
+      final token = await _getToken();
+      final uri = Uri.parse('$_baseUrl/profile-photo');
+      final mime = _mimeFromFilename(fileName);
+      final request = http.MultipartRequest('POST', uri)
+        ..headers['Authorization'] = 'Bearer $token'
+        ..files.add(http.MultipartFile.fromBytes('file', bytes,
+            filename: fileName, contentType: MediaType.parse(mime)));
+      final response =
+          await request.send().timeout(const Duration(seconds: 60));
+      if (response.statusCode != 200) return null;
+      final body = await response.stream.bytesToString();
+      final data = json.decode(body) as Map<String, dynamic>;
+      return data['url'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<String?> uploadDocument(
           Uint8List bytes, String classId, String fileName) =>
       _uploadMultipart('/document/upload', bytes, classId, fileName);
@@ -291,6 +326,24 @@ class ApiService {
     final data = await _get('/homework/$homeworkId/my-submission');
     return data['submission'] as Map<String, dynamic>?;
   }
+
+  Future<Map<String, dynamic>> updateSubmissionStatus(
+      String homeworkId, String studentUid, String status) =>
+      _patch('/homework/$homeworkId/submissions/$studentUid/status', {'status': status});
+
+  Future<Map<String, dynamic>> addSubmissionComment(
+      String homeworkId, String studentUid, String text) =>
+      _post('/homework/$homeworkId/submissions/$studentUid/comments', {'text': text});
+
+  Future<List<Map<String, dynamic>>> getSubmissionComments(
+      String homeworkId, String studentUid) async {
+    final data = await _get('/homework/$homeworkId/submissions/$studentUid/comments');
+    return (data['comments'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+  }
+
+  Future<Map<String, dynamic>> deleteSubmissionFile(
+      String homeworkId, String url) =>
+      _delete('/homework/$homeworkId/submissions/files', body: {'url': url});
 
   // ─── CRUD ─────────────────────────────────────────────────────────────
 
@@ -542,6 +595,47 @@ class ApiService {
       _get('/report/weekly?studentUid=$studentUid'
           '${startDate != null ? '&startDate=$startDate' : ''}'
           '${endDate != null ? '&endDate=$endDate' : ''}');
+
+  // ─── Holidays ──────────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getHolidays(int year) async {
+    final data = await _get('/holidays?year=$year');
+    return (data['holidays'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+  }
+
+  Future<Map<String, dynamic>> createHoliday({
+    required String name,
+    required String startDate,
+    required String endDate,
+    String type = 'custom',
+    String description = '',
+  }) =>
+      _post('/holiday', {
+        'name': name,
+        'startDate': startDate,
+        'endDate': endDate,
+        'type': type,
+        'description': description,
+      });
+
+  Future<Map<String, dynamic>> updateHoliday(
+    String id, {
+    String? name,
+    String? startDate,
+    String? endDate,
+    String? type,
+    String? description,
+  }) =>
+      _put('/holiday/$id', {
+        if (name != null) 'name': name,
+        if (startDate != null) 'startDate': startDate,
+        if (endDate != null) 'endDate': endDate,
+        if (type != null) 'type': type,
+        if (description != null) 'description': description,
+      });
+
+  Future<Map<String, dynamic>> deleteHoliday(String id) =>
+      _delete('/holiday/$id');
 
   // ─── Schedule ───────────────────────────────────────────────────────
 

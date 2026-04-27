@@ -1,20 +1,59 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../shared/animations/animations.dart';
 import '../../../shared/theme/colors.dart';
+import '../../../shared/widgets/tatva_snackbar.dart';
 import '../../../models/user_model.dart';
 import '../../../models/class_model.dart';
+import '../../../services/api_service.dart';
 
-class StudentProfileTab extends StatelessWidget {
+class StudentProfileTab extends StatefulWidget {
   final UserModel? user;
   final ClassModel? primaryClass;
   final VoidCallback onLogout;
+  final ValueChanged<String> onPhotoUpdated;
 
   const StudentProfileTab({
     super.key,
     required this.user,
     required this.primaryClass,
     required this.onLogout,
+    required this.onPhotoUpdated,
   });
+
+  @override
+  State<StudentProfileTab> createState() => _StudentProfileTabState();
+}
+
+class _StudentProfileTabState extends State<StudentProfileTab> {
+  bool _uploading = false;
+
+  Future<void> _pickAndUploadPhoto() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    if (file.bytes == null || file.name.isEmpty) return;
+
+    setState(() => _uploading = true);
+    try {
+      final url = await ApiService().uploadProfilePhoto(file.bytes!, file.name);
+      if (url != null && mounted) {
+        widget.onPhotoUpdated(url);
+        TatvaSnackbar.show(context, 'Profile photo updated');
+      } else if (mounted) {
+        TatvaSnackbar.show(context, 'Upload failed', color: TatvaColors.error);
+      }
+    } catch (_) {
+      if (mounted) {
+        TatvaSnackbar.show(context, 'Upload failed', color: TatvaColors.error);
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,17 +62,47 @@ class StudentProfileTab extends StatelessWidget {
       child: Column(children: [
         const SizedBox(height: 16),
         FadeSlideIn(
-            child: HeroAvatar(
-                heroTag: 'student_avatar',
-                initial: user?.initial ?? '?',
-                radius: 46,
-                bgColor: TatvaColors.info.withOpacity(0.1),
-                textColor: TatvaColors.info,
-                borderColor: TatvaColors.accent)),
+            child: GestureDetector(
+                onLongPress: _uploading ? null : _pickAndUploadPhoto,
+                child: Stack(
+                  children: [
+                    HeroAvatar(
+                        heroTag: 'student_avatar',
+                        initial: widget.user?.initial ?? '?',
+                        radius: 46,
+                        bgColor: TatvaColors.info.withOpacity(0.1),
+                        textColor: TatvaColors.info,
+                        borderColor: TatvaColors.accent,
+                        photoUrl: widget.user?.photoUrl ?? ''),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: _uploading ? null : _pickAndUploadPhoto,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: TatvaColors.info,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: _uploading
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.camera_alt,
+                                  size: 14, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                ))),
         const SizedBox(height: 16),
         FadeSlideIn(
             delayMs: 80,
-            child: Text(user?.name ?? '',
+            child: Text(widget.user?.name ?? '',
                 style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -42,7 +111,7 @@ class StudentProfileTab extends StatelessWidget {
         const SizedBox(height: 4),
         FadeSlideIn(
             delayMs: 100,
-            child: Text(user?.email ?? '',
+            child: Text(widget.user?.email ?? '',
                 style: const TextStyle(
                     fontSize: 13, color: TatvaColors.neutral400))),
         const SizedBox(height: 10),
@@ -88,12 +157,12 @@ class StudentProfileTab extends StatelessWidget {
                           child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                            Text(primaryClass?.name ?? '',
+                            Text(widget.primaryClass?.name ?? '',
                                 style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                     color: TatvaColors.neutral900)),
-                            Text(primaryClass?.subject ?? '',
+                            Text(widget.primaryClass?.subject ?? '',
                                 style: const TextStyle(
                                     fontSize: 12,
                                     color: TatvaColors.neutral400)),
@@ -106,7 +175,7 @@ class StudentProfileTab extends StatelessWidget {
                               borderRadius: BorderRadius.circular(10),
                               border:
                                   Border.all(color: TatvaColors.accent.withOpacity(0.3))),
-                          child: Text(primaryClass?.classCode ?? '',
+                          child: Text(widget.primaryClass?.classCode ?? '',
                               style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
@@ -129,7 +198,7 @@ class StudentProfileTab extends StatelessWidget {
                 CircleAvatar(
                     radius: 22,
                     backgroundColor: TatvaColors.primary.withOpacity(0.1),
-                    child: Text((primaryClass?.teacherName ?? '?').isNotEmpty ? primaryClass!.teacherName[0] : '?',
+                    child: Text((widget.primaryClass?.teacherName ?? '?').isNotEmpty ? widget.primaryClass!.teacherName[0] : '?',
                         style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -139,12 +208,12 @@ class StudentProfileTab extends StatelessWidget {
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                      Text(primaryClass?.teacherName ?? '',
+                      Text(widget.primaryClass?.teacherName ?? '',
                           style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
                               color: TatvaColors.neutral900)),
-                      Text('Your Teacher · ${primaryClass?.subject ?? ''}',
+                      Text('Your Teacher · ${widget.primaryClass?.subject ?? ''}',
                           style: const TextStyle(
                               fontSize: 12,
                               color: TatvaColors.neutral400)),
@@ -153,7 +222,7 @@ class StudentProfileTab extends StatelessWidget {
                         const Icon(Icons.email_outlined,
                             size: 11, color: TatvaColors.neutral400),
                         const SizedBox(width: 4),
-                        Text(primaryClass?.teacherEmail ?? '',
+                        Text(widget.primaryClass?.teacherEmail ?? '',
                             style: const TextStyle(
                                 fontSize: 10,
                                 color: TatvaColors.neutral400)),
@@ -201,7 +270,7 @@ class StudentProfileTab extends StatelessWidget {
         FadeSlideIn(
             delayMs: 200,
             child: BouncyTap(
-                onTap: onLogout,
+                onTap: widget.onLogout,
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),

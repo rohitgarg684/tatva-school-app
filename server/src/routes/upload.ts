@@ -141,6 +141,23 @@ const router = Router();
 router.use(requireAuth);
 
 router.post(
+  "/profile-photo",
+  imageUpload.single("file"),
+  asyncHandler(async (req: Request, res: Response) => {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    if (!isValidImage(req.file.buffer))
+      return res.status(400).json({ error: "Invalid image content" });
+
+    const uid = req.uid!;
+    const storagePath = `profile-photos/${uid}/${generateFileName(req.file.mimetype)}`;
+    const url = await uploadToStorage(req.file.buffer, storagePath, req.file.mimetype);
+
+    await db.collection(Collections.USERS).doc(uid).update({ photoUrl: url });
+    res.json({ url });
+  })
+);
+
+router.post(
   "/document/upload",
   requireRole("Teacher", "Principal"),
   docUpload.single("file"),
@@ -262,6 +279,7 @@ router.post(
           studentUid: uid,
           files: fileUrls.length > 0 ? admin.firestore.FieldValue.arrayUnion(...fileUrls) : [],
           note,
+          status: "pending",
           submittedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
         { merge: true }
@@ -311,6 +329,8 @@ router.get(
           studentUid: uid,
           files: [],
           note: "",
+          status: "pending",
+          commentCount: 0,
           submittedAt: null,
         });
       }
@@ -348,6 +368,54 @@ router.get(
     res.json({
       submission: { id: snap.id, ...data, submittedAt: data.submittedAt?.toDate?.()?.toISOString?.() || null },
     });
+  })
+);
+
+router.delete(
+  "/homework/:id/submissions/files",
+  requireRole("Student"),
+  asyncHandler(async (req: Request, res: Response) => {
+    const homeworkId = sanitizeId(req.params.id as string);
+    const uid = req.uid!;
+    const { url } = req.body;
+    if (!url || typeof url !== "string")
+      return res.status(400).json({ error: "url required" });
+
+    const subRef = db.collection(Collections.HOMEWORK_SUBMISSIONS).doc(`${homeworkId}_${uid}`);
+    const snap = await subRef.get();
+    if (!snap.exists) return res.status(404).json({ error: "Submission not found" });
+
+    const data = snap.data()!;
+    const files: { url: string; name: string; type: string }[] = data.files || [];
+    const fileEntry = files.find((f) => f.url === url);
+    if (!fileEntry) return res.status(404).json({ error: "File not found in submission" });
+
+    try {
+      const bucket = admin.storage().bucket(env.storageBucket);
+      const decodedUrl = decodeURIComponent(url);
+      const pathMatch = decodedUrl.match(/\/o\/(.+?)\?/);
+      if (pathMatch) {
+        const storagePath = decodeURIComponent(pathMatch[1]);
+        await bucket.file(storagePath).delete().catch(() => {});
+      }
+    } catch {}
+
+    await subRef.update({
+      files: admin.firestore.FieldValue.arrayRemove(fileEntry),
+    });
+
+    const updatedSnap = await subRef.get();
+    const updatedData = updatedSnap.data()!;
+    const remainingFiles = updatedData.files || [];
+    const remainingNote = updatedData.note || "";
+    if (remainingFiles.length === 0 && !remainingNote) {
+      await db.collection(Collections.HOMEWORK).doc(homeworkId).update({
+        submittedBy: admin.firestore.FieldValue.arrayRemove(uid),
+      });
+    }
+
+    invalidateDashboards("homework_");
+    res.json({ deleted: true });
   })
 );
 

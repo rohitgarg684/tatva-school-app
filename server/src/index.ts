@@ -22,6 +22,7 @@ import behaviorRoutes from "./routes/behavior";
 import contentRoutes from "./routes/content";
 import dashboardRoutes from "./routes/dashboards";
 import uploadRoutes from "./routes/upload";
+import holidayRoutes from "./routes/holidays";
 
 const app = express();
 
@@ -53,6 +54,7 @@ app.use("/api", actionLimiter, contentRoutes);
 app.use("/api/dashboard", dashboardLimiter, dashboardRoutes);
 app.use("/api/document/upload", uploadLimiter);
 app.use("/api", uploadRoutes);
+app.use("/api", actionLimiter, holidayRoutes);
 
 // Global error handler
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {

@@ -7,6 +7,7 @@ import '../../../services/api_service.dart';
 import '../../../models/class_model.dart';
 import '../../../models/schedule_model.dart';
 import '../../../models/schedule_event.dart';
+import '../../../models/holiday.dart';
 
 class _DayItem {
   final int startMin, endMin;
@@ -44,6 +45,9 @@ class _TeacherScheduleTabState extends State<TeacherScheduleTab> {
   bool _calLoading = false;
   bool _calLoaded = false;
   DateTime _calWeekStart = DateTime.now();
+  List<Holiday> _holidays = [];
+  bool _holidaysLoading = false;
+  bool _holidaysLoaded = false;
 
   Map<String, Map<String, String>> get _schedGsMap {
     final gsMap = <String, Map<String, String>>{};
@@ -133,14 +137,17 @@ class _TeacherScheduleTabState extends State<TeacherScheduleTab> {
           padding: const EdgeInsets.all(3),
           child: Row(children: [
             _schedModeBtn('My Week', 0),
-            _schedModeBtn('Edit Timetable', 1),
+            _schedModeBtn('Timetable', 1),
+            _schedModeBtn('Holidays', 2),
           ]),
         ),
         const SizedBox(height: 16),
         if (_schedViewMode == 0)
           _buildMyWeekCalendar()
+        else if (_schedViewMode == 1)
+          _buildTimetableEditor()
         else
-          _buildTimetableEditor(),
+          _buildHolidaysManager(),
       ]),
     );
   }
@@ -2078,4 +2085,349 @@ fontSize: 13, color: Colors.grey.shade400),
             borderSide:
                 BorderSide(color: TatvaColors.accent.withOpacity(0.5), width: 1.5)),
       );
+
+  // ─── Holidays Manager ─────────────────────────────────────────────
+
+  int get _schoolYear {
+    final now = DateTime.now();
+    return now.month >= 8 ? now.year + 1 : now.year;
+  }
+
+  Future<void> _loadHolidays() async {
+    if (_holidaysLoading) return;
+    setState(() => _holidaysLoading = true);
+    try {
+      final raw = await _api.getHolidays(_schoolYear);
+      _holidays = raw.map((m) => Holiday.fromJson(m)).toList();
+    } catch (e) {
+      debugPrint('Holidays load error: $e');
+      _holidays = [];
+    }
+    if (mounted) setState(() { _holidaysLoading = false; _holidaysLoaded = true; });
+  }
+
+  Widget _buildHolidaysManager() {
+    if (!_holidaysLoaded && !_holidaysLoading) {
+      Future.microtask(_loadHolidays);
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Expanded(
+          child: Text('School Year ${_schoolYear - 1}–$_schoolYear',
+              style: const TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w700, color: TatvaColors.neutral900)),
+        ),
+        _addHolidayButton(),
+      ]),
+      const SizedBox(height: 16),
+      if (_holidaysLoading && !_holidaysLoaded)
+        const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+      else if (_holidays.isEmpty)
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.all(40),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.beach_access_outlined, color: TatvaColors.neutral400, size: 48),
+              const SizedBox(height: 12),
+              const Text('No holidays defined yet', style: TextStyle(fontSize: 15, color: TatvaColors.neutral400)),
+              const SizedBox(height: 4),
+              const Text('Tap + to add holidays for this school year',
+                  style: TextStyle(fontSize: 12, color: TatvaColors.neutral400)),
+            ]),
+          ),
+        )
+      else
+        ..._holidays.asMap().entries.map((entry) {
+          final i = entry.key;
+          final h = entry.value;
+          return FadeSlideIn(
+            delayMs: i * 40,
+            child: _holidayCard(h),
+          );
+        }),
+      const SizedBox(height: 24),
+    ]);
+  }
+
+  Widget _addHolidayButton() {
+    return GestureDetector(
+      onTap: () => _showHolidayForm(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+            color: TatvaColors.primary, borderRadius: BorderRadius.circular(10)),
+        child: const Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.add, size: 16, color: Colors.white),
+          SizedBox(width: 4),
+          Text('Add Holiday', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _holidayCard(Holiday h) {
+    final c = h.typeColor;
+    final startParsed = DateTime.tryParse(h.startDate);
+    final endParsed = DateTime.tryParse(h.endDate);
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    String dateLabel = '';
+    if (startParsed != null) {
+      dateLabel = '${months[startParsed.month - 1]} ${startParsed.day}';
+      if (endParsed != null && h.isMultiDay) {
+        dateLabel += ' – ${months[endParsed.month - 1]} ${endParsed.day}';
+        dateLabel += '  (${h.durationDays} days)';
+      }
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+          color: c.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: c.withOpacity(0.18))),
+      child: Row(children: [
+        Container(
+          width: 40, height: 40,
+          decoration: BoxDecoration(color: c.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+          child: Icon(h.typeIcon, size: 20, color: c),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(h.name, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: TatvaColors.neutral900)),
+            const SizedBox(height: 2),
+            Text(dateLabel, style: const TextStyle(fontSize: 12, color: TatvaColors.neutral400)),
+            if (h.description.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(h.description, maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11, color: TatvaColors.neutral400)),
+            ],
+          ]),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+          decoration: BoxDecoration(color: c.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+          child: Text(h.typeLabel, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: c)),
+        ),
+        const SizedBox(width: 4),
+        PopupMenuButton<String>(
+          icon: Icon(Icons.more_vert, size: 18, color: TatvaColors.neutral400),
+          itemBuilder: (_) => [
+            const PopupMenuItem(value: 'edit', child: Text('Edit')),
+            const PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: Colors.red))),
+          ],
+          onSelected: (v) {
+            if (v == 'edit') _showHolidayForm(existing: h);
+            if (v == 'delete') _confirmDeleteHoliday(h);
+          },
+        ),
+      ]),
+    );
+  }
+
+  void _confirmDeleteHoliday(Holiday h) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Holiday'),
+        content: Text('Delete "${h.name}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await _api.deleteHoliday(h.id);
+                _holidaysLoaded = false;
+                _loadHolidays();
+                if (mounted) TatvaSnackbar.success(context, 'Holiday deleted');
+              } catch (e) {
+                if (mounted) TatvaSnackbar.error(context, 'Failed to delete');
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showHolidayForm({Holiday? existing}) {
+    final nameCtrl = TextEditingController(text: existing?.name ?? '');
+    final descCtrl = TextEditingController(text: existing?.description ?? '');
+    String selectedType = existing?.type ?? 'custom';
+    DateTime startDate = DateTime.tryParse(existing?.startDate ?? '') ?? DateTime.now();
+    DateTime endDate = DateTime.tryParse(existing?.endDate ?? '') ?? DateTime.now();
+    bool saving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setSheet) {
+        String fmtDate(DateTime d) =>
+            '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+        String fmtDisplay(DateTime d) {
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          return '${months[d.month - 1]} ${d.day}, ${d.year}';
+        }
+
+        Future<void> pickDate(bool isStart) async {
+          final picked = await showDatePicker(
+            context: ctx,
+            initialDate: isStart ? startDate : endDate,
+            firstDate: DateTime(DateTime.now().year - 1),
+            lastDate: DateTime(DateTime.now().year + 2),
+          );
+          if (picked != null) {
+            setSheet(() {
+              if (isStart) {
+                startDate = picked;
+                if (endDate.isBefore(startDate)) endDate = startDate;
+              } else {
+                endDate = picked;
+              }
+            });
+          }
+        }
+
+        Future<void> save() async {
+          final name = nameCtrl.text.trim();
+          if (name.isEmpty) return;
+          setSheet(() => saving = true);
+          try {
+            if (existing != null) {
+              await _api.updateHoliday(existing.id,
+                  name: name, startDate: fmtDate(startDate), endDate: fmtDate(endDate),
+                  type: selectedType, description: descCtrl.text.trim());
+            } else {
+              await _api.createHoliday(
+                  name: name, startDate: fmtDate(startDate), endDate: fmtDate(endDate),
+                  type: selectedType, description: descCtrl.text.trim());
+            }
+            if (ctx.mounted) Navigator.pop(ctx);
+            _holidaysLoaded = false;
+            _loadHolidays();
+            if (mounted) TatvaSnackbar.success(context, existing != null ? 'Holiday updated' : 'Holiday added');
+          } catch (e) {
+            setSheet(() => saving = false);
+            if (mounted) TatvaSnackbar.error(context, 'Failed to save');
+          }
+        }
+
+        return Container(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
+          decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+            child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(
+                  color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
+              const SizedBox(height: 16),
+              Text(existing != null ? 'Edit Holiday' : 'Add Holiday',
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: TatvaColors.neutral900)),
+              const SizedBox(height: 20),
+              TextField(
+                controller: nameCtrl,
+                decoration: _hwFieldDecor('Holiday name'),
+                textCapitalization: TextCapitalization.words,
+              ),
+              const SizedBox(height: 12),
+              const Text('Type', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: TatvaColors.neutral900)),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, runSpacing: 8, children: Holiday.typeKeys.map((t) {
+                final active = selectedType == t;
+                final c = Holiday.typeColors[t]!;
+                return GestureDetector(
+                  onTap: () => setSheet(() => selectedType = t),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                        color: active ? c.withOpacity(0.15) : TatvaColors.bgLight,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: active ? c : Colors.grey.shade200)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Holiday.typeIcons[t], size: 14, color: active ? c : TatvaColors.neutral400),
+                      const SizedBox(width: 6),
+                      Text(Holiday.typeLabels[t]!, style: TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600,
+                          color: active ? c : TatvaColors.neutral400)),
+                    ]),
+                  ),
+                );
+              }).toList()),
+              const SizedBox(height: 16),
+              Row(children: [
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Start Date', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: TatvaColors.neutral900)),
+                  const SizedBox(height: 6),
+                  GestureDetector(
+                    onTap: () => pickDate(true),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      decoration: BoxDecoration(
+                          color: TatvaColors.bgLight, borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade200)),
+                      child: Row(children: [
+                        const Icon(Icons.calendar_today_outlined, size: 14, color: TatvaColors.neutral400),
+                        const SizedBox(width: 8),
+                        Text(fmtDisplay(startDate), style: const TextStyle(fontSize: 13, color: TatvaColors.neutral900)),
+                      ]),
+                    ),
+                  ),
+                ])),
+                const SizedBox(width: 12),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('End Date', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: TatvaColors.neutral900)),
+                  const SizedBox(height: 6),
+                  GestureDetector(
+                    onTap: () => pickDate(false),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      decoration: BoxDecoration(
+                          color: TatvaColors.bgLight, borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade200)),
+                      child: Row(children: [
+                        const Icon(Icons.calendar_today_outlined, size: 14, color: TatvaColors.neutral400),
+                        const SizedBox(width: 8),
+                        Text(fmtDisplay(endDate), style: const TextStyle(fontSize: 13, color: TatvaColors.neutral900)),
+                      ]),
+                    ),
+                  ),
+                ])),
+              ]),
+              const SizedBox(height: 12),
+              TextField(
+                controller: descCtrl,
+                decoration: _hwFieldDecor('Description (optional)'),
+                maxLines: 2,
+                textCapitalization: TextCapitalization.sentences,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: saving ? null : save,
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: TatvaColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                  child: saving
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : Text(existing != null ? 'Update Holiday' : 'Add Holiday',
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ])),
+          ),
+        );
+      }),
+    );
+  }
 }

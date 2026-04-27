@@ -40,6 +40,20 @@ class StudentDashboardData {
     this.activityFeed = const [],
     this.contentItems = const [],
   });
+
+  StudentDashboardData copyWithPhotoUrl(String url) => StudentDashboardData(
+        user: user.copyWith(photoUrl: url),
+        primaryClass: primaryClass,
+        grades: grades,
+        announcements: announcements,
+        homework: homework,
+        activeVotes: activeVotes,
+        behaviorPoints: behaviorPoints,
+        behaviorScore: behaviorScore,
+        attendance: attendance,
+        activityFeed: activityFeed,
+        contentItems: contentItems,
+      );
 }
 
 /// Data bundle returned for the teacher dashboard.
@@ -75,6 +89,23 @@ class TeacherDashboardData {
     this.allStudents = const [],
     this.contentItems = const [],
   });
+
+  TeacherDashboardData copyWithPhotoUrl(String url) => TeacherDashboardData(
+        user: user.copyWith(photoUrl: url),
+        classes: classes,
+        studentsInFirstClass: studentsInFirstClass,
+        parentsInFirstClass: parentsInFirstClass,
+        gradesInFirstClass: gradesInFirstClass,
+        allTeacherGrades: allTeacherGrades,
+        testTitles: testTitles,
+        announcements: announcements,
+        homework: homework,
+        classBehavior: classBehavior,
+        todayAttendance: todayAttendance,
+        activityFeed: activityFeed,
+        allStudents: allStudents,
+        contentItems: contentItems,
+      );
 }
 
 /// Data for a single child, used in multi-child parent dashboard.

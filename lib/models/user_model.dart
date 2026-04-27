@@ -8,6 +8,7 @@ class UserModel {
   final UserRole role;
   final List<String> classIds;
   final List<ChildInfo> children;
+  final String photoUrl;
   final String? fcmToken;
   final DateTime? createdAt;
 
@@ -18,6 +19,7 @@ class UserModel {
     required this.role,
     this.classIds = const [],
     this.children = const [],
+    this.photoUrl = '',
     this.fcmToken,
     this.createdAt,
   });
@@ -34,6 +36,7 @@ class UserModel {
       children: (data['children'] as List<dynamic>? ?? [])
           .map((c) => ChildInfo.fromJson(c as Map<String, dynamic>))
           .toList(),
+      photoUrl: data['photoUrl'] as String? ?? '',
       fcmToken: data['fcmToken'] as String?,
       createdAt: data['createdAt'] != null
           ? DateTime.tryParse(data['createdAt'] as String)
@@ -47,6 +50,7 @@ class UserModel {
       'email': email,
       'role': role.label,
       'uid': uid,
+      if (photoUrl.isNotEmpty) 'photoUrl': photoUrl,
       'classIds': classIds,
       'children': children.map((c) => c.toJson()).toList(),
       if (fcmToken != null) 'fcmToken': fcmToken,
@@ -60,6 +64,7 @@ class UserModel {
     UserRole? role,
     List<String>? classIds,
     List<ChildInfo>? children,
+    String? photoUrl,
     String? fcmToken,
   }) {
     return UserModel(
@@ -69,6 +74,7 @@ class UserModel {
       role: role ?? this.role,
       classIds: classIds ?? this.classIds,
       children: children ?? this.children,
+      photoUrl: photoUrl ?? this.photoUrl,
       fcmToken: fcmToken ?? this.fcmToken,
       createdAt: createdAt,
     );
