@@ -122,7 +122,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
               classes: _data?.classes ?? [],
               students: _data?.studentsInFirstClass ?? [],
               onRefresh: _loadUser,
-              onSwitchTab: _switchTab,
+              onSwitchTab: switchTab,
             ),
             TeacherBehaviorTab(
               classBehavior: _classBehavior,
