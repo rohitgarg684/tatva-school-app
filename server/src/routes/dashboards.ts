@@ -130,9 +130,10 @@ router.get(
 
     const filteredContent = (contentItems as ContentDoc[]).filter((c) => {
       const hasGrade = c.grade && c.grade.length > 0;
-      const hasStudents = Array.isArray(c.studentUids) && c.studentUids.length > 0;
+      const stuIds = c.studentUids || [];
+      const hasStudents = stuIds.length > 0;
       if (!hasGrade && !hasStudents) return true;
-      if (hasStudents && c.studentUids.includes(uid)) return true;
+      if (hasStudents && stuIds.includes(uid)) return true;
       if (hasGrade && userGrade && c.grade === userGrade) return true;
       return false;
     });
@@ -202,8 +203,8 @@ router.get(
         safe(queryDocs(Collections.ACTIVITIES, [{ field: "classId", op: "==", value: first.id }], { field: "createdAt", direction: "desc" }, Config.ACTIVITY_FEED_LIMIT), []),
       ]);
 
-      studentsInFirstClass = students;
-      parentsInFirstClass = parents;
+      studentsInFirstClass = students as StudentDoc[];
+      parentsInFirstClass = parents as StudentDoc[];
       gradesInFirstClass = grades;
       classBehavior = behavior;
       todayAttendance = att;
@@ -287,7 +288,7 @@ router.get(
 
     const children: Array<{ childName: string; classId: string }> = user.children || [];
     const classIdSet = new Set<string>();
-    const childrenData: { childUid: string; info: unknown; childClass: unknown; grades: GradeDoc[]; behavior: BehaviorPointDoc[]; attendance: AttendanceDoc[] }[] = [];
+    const childrenData: { childUid: string; info: unknown; childClass: unknown; grades: any[]; behaviorPoints: any[]; behaviorScore: number; attendance: any[] }[] = [];
 
     const classIdsFromChildren = children.map((c) => c.classId).filter(Boolean);
     const childClasses = classIdsFromChildren.length > 0
@@ -385,10 +386,11 @@ router.get(
 
     const filteredContent = (content as ContentDoc[]).filter((c) => {
       const hasGrade = c.grade && c.grade.length > 0;
-      const hasStudents = Array.isArray(c.studentUids) && c.studentUids.length > 0;
+      const stuIds = c.studentUids || [];
+      const hasStudents = stuIds.length > 0;
       if (!hasGrade && !hasStudents) return true;
-      if (hasStudents && childUids.some((u: string) => c.studentUids.includes(u))) return true;
-      if (hasGrade && childGrades.includes(c.grade)) return true;
+      if (hasStudents && childUids.some((u: string) => stuIds.includes(u))) return true;
+      if (hasGrade && childGrades.includes(c.grade!)) return true;
       return false;
     });
 

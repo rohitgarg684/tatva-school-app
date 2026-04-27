@@ -42,7 +42,9 @@ export interface AttendanceDoc {
 
 export interface ContentDoc {
   id: string;
+  grade?: string;
   grades?: string[];
+  studentUids?: string[];
   [key: string]: unknown;
 }
 
