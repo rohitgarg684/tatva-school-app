@@ -259,6 +259,7 @@ class TeacherHomeTab extends StatelessWidget {
       heroTag: 'teacher_avatar',
       userName: user?.name ?? '',
       subtitle: 'Tatva Academy · Teacher',
+      photoUrl: user?.photoUrl ?? '',
       bottomWidget: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(

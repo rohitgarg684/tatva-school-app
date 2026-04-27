@@ -33,6 +33,15 @@ You MUST follow every rule below. Violations waste money.
 - **Required constructor params.** In Dart, use `required` keyword for fields that must always be present. In TS, don't mark fields optional (`?`) unless truly optional.
 - **No lazy nullability.** Don't add `?` just to silence the compiler. Fix the root cause — initialize the field or restructure the code.
 
+## Code — Architecture & Refactoring
+- **Repo layer vs router.** Put business logic in the repository/service layer, not in route handlers. Don't repeat logic — share via the correct abstraction layer.
+- **Strongly typed everything.** All function params and return types must be explicitly typed. No `any`, no untyped maps, no implicit dynamic.
+- **Single-responsibility files.** Each file defines one functionality. Break large files into tiny, focused modules/components.
+- **Use OOP patterns.** Prefer polymorphism and inheritance over switch/if chains. Use factory pattern, builder pattern, and other design patterns where they reduce complexity.
+- **Don't clutter.** Remove dead code, unused imports, and redundant abstractions. Keep files lean.
+- **Sub-modules as needed.** When a module grows, split into sub-modules or sub-components proactively.
+- **Bug-fix with context.** When fixing bugs, revisit the surrounding code for related issues. Don't patch in isolation.
+
 ## Code — No Bloat
 - Zero narrating comments. Don't add `// Updated to fix X` or `// Added per user request`.
 - Don't create files unless the user explicitly asks for a new file.

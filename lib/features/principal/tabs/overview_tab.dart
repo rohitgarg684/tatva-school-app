@@ -346,6 +346,7 @@ class OverviewTab extends StatelessWidget {
       heroTag: 'principal_avatar',
       userName: user?.name ?? '',
       subtitle: 'Tatva Academy · Principal',
+      photoUrl: user?.photoUrl ?? '',
       bottomWidget: Column(children: [
         Container(height: 1, color: Colors.white.withOpacity(0.1)),
         const SizedBox(height: 16),

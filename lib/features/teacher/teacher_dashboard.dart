@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../shared/theme/colors.dart';
 import '../../shared/widgets/tatva_snackbar.dart';
+import '../../shared/widgets/user_avatar.dart';
 import '../../shared/widgets/bottom_nav_bar.dart';
 import '../../shared/mixins/dashboard_mixin.dart';
 import '../../services/dashboard_service.dart';
@@ -339,13 +340,6 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                 itemCount: classStudents.length,
                 itemBuilder: (_, i) {
                   final s = classStudents[i];
-                  final initials = s.name.isNotEmpty
-                      ? s.name
-                          .split(' ')
-                          .map((w) => w.isNotEmpty ? w[0] : '')
-                          .take(2)
-                          .join()
-                      : '?';
                   final colors = [
                     TatvaColors.primary,
                     TatvaColors.info,
@@ -363,14 +357,13 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: c.withOpacity(0.1))),
                     child: Row(children: [
-                      CircleAvatar(
+                      UserAvatar(
+                        name: s.name,
                         radius: 18,
-                        backgroundColor: c.withOpacity(0.12),
-                        child: Text(initials,
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: c)),
+                        bgColor: c.withOpacity(0.12),
+                        textColor: c,
+                        photoUrl: s.photoUrl,
+                        useDoubleInitials: true,
                       ),
                       const SizedBox(width: 12),
                       Expanded(

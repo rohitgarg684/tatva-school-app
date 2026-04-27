@@ -702,6 +702,7 @@ class StudentHomeTab extends StatelessWidget {
       heroTag: 'student_avatar',
       userName: user?.name ?? '',
       subtitle: '${primaryClass?.name ?? ''} · ${primaryClass?.subject ?? ''}',
+      photoUrl: user?.photoUrl ?? '',
       bottomWidget: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(

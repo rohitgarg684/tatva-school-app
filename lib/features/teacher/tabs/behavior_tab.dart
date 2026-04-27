@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../../shared/animations/animations.dart';
 import '../../../shared/theme/colors.dart';
 import '../../../shared/widgets/tatva_snackbar.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import '../../../services/api_service.dart';
 import '../../../models/user_model.dart';
 import '../../../models/class_model.dart';
@@ -91,15 +92,12 @@ class TeacherBehaviorTab extends StatelessWidget {
                 child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      CircleAvatar(
+                      UserAvatar(
+                          name: s.name,
                           radius: 20,
-                          backgroundColor:
-                              TatvaColors.primary.withOpacity(0.1),
-                          child: Text(s.initial,
-                              style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: TatvaColors.primary))),
+                          bgColor: TatvaColors.primary.withOpacity(0.1),
+                          textColor: TatvaColors.primary,
+                          photoUrl: s.photoUrl),
                       const SizedBox(height: 6),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 4),

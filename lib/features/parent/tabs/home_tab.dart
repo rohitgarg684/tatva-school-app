@@ -421,6 +421,7 @@ class ParentHomeTab extends StatelessWidget {
       heroTag: 'parent_avatar',
       userName: user?.name ?? '',
       subtitle: parentOfLabel,
+      photoUrl: user?.photoUrl ?? '',
       bottomWidget: Row(children: [
         _miniStat('${avg.toStringAsFixed(0)}%', 'Avg Grade', TatvaColors.accent),
         const SizedBox(width: 20),

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../shared/animations/animations.dart';
 import '../../../shared/theme/colors.dart';
 import '../../../shared/widgets/tatva_snackbar.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import '../../../shared/widgets/add_student_sheet.dart';
 import '../../../shared/widgets/pick_student_sheet.dart';
 import '../../../services/api_service.dart';
@@ -294,13 +295,6 @@ class TeacherClassesTab extends StatelessWidget {
                 itemCount: classStudents.length,
                 itemBuilder: (_, i) {
                   final s = classStudents[i];
-                  final initials = s.name.isNotEmpty
-                      ? s.name
-                          .split(' ')
-                          .map((w) => w.isNotEmpty ? w[0] : '')
-                          .take(2)
-                          .join()
-                      : '?';
                   final colors = [
                     TatvaColors.primary,
                     TatvaColors.info,
@@ -318,14 +312,13 @@ class TeacherClassesTab extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: c.withOpacity(0.1))),
                     child: Row(children: [
-                      CircleAvatar(
+                      UserAvatar(
+                        name: s.name,
                         radius: 18,
-                        backgroundColor: c.withOpacity(0.12),
-                        child: Text(initials,
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: c)),
+                        bgColor: c.withOpacity(0.12),
+                        textColor: c,
+                        photoUrl: s.photoUrl,
+                        useDoubleInitials: true,
                       ),
                       const SizedBox(width: 12),
                       Expanded(

@@ -8,6 +8,7 @@ class GreetingCard extends StatelessWidget {
   final String heroTag;
   final String userName;
   final String subtitle;
+  final String photoUrl;
   final Widget? bottomWidget;
 
   const GreetingCard({
@@ -16,6 +17,7 @@ class GreetingCard extends StatelessWidget {
     required this.heroTag,
     required this.userName,
     required this.subtitle,
+    this.photoUrl = '',
     this.bottomWidget,
   });
 
@@ -104,6 +106,7 @@ class GreetingCard extends StatelessWidget {
                     bgColor: Colors.white.withOpacity(0.15),
                     textColor: Colors.white,
                     borderColor: Colors.white.withOpacity(0.3),
+                    photoUrl: photoUrl,
                   ),
                 ]),
                 if (bottomWidget != null) ...[

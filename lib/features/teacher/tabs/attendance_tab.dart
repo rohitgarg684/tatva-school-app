@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../shared/animations/animations.dart';
 import '../../../shared/theme/colors.dart';
 import '../../../shared/widgets/tatva_snackbar.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import '../../../services/api_service.dart';
 import '../../../models/user_model.dart';
 import '../../../models/class_model.dart';
@@ -297,15 +298,12 @@ class _TeacherAttendanceTabState extends State<TeacherAttendanceTab> {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: Colors.grey.shade100)),
                       child: Row(children: [
-                        CircleAvatar(
+                        UserAvatar(
+                            name: s.name,
                             radius: 16,
-                            backgroundColor:
-                                TatvaColors.primary.withOpacity(0.1),
-                            child: Text(s.initial,
-                                style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: TatvaColors.primary))),
+                            bgColor: TatvaColors.primary.withOpacity(0.1),
+                            textColor: TatvaColors.primary,
+                            photoUrl: s.photoUrl),
                         const SizedBox(width: 10),
                         Expanded(
                             child: Text(s.name,
