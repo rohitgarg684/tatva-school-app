@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:printing/printing.dart';
 import '../../../services/dashboard_service.dart';
 import '../../../shared/theme/colors.dart';
 import '../../../shared/animations/animations.dart';
+import '../../../shared/utils/calendar_pdf.dart';
 import '../../../models/child_info.dart';
 import '../../../models/schedule_model.dart';
 import '../../../models/schedule_event.dart';
@@ -620,8 +622,34 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
 
   // ─── Holiday Calendar ──────────────────────────────────────────────
 
+  Future<void> _downloadPdf() async {
+    try {
+      final bytes = await generateSchoolYearPdf(_holidays, _schoolYear);
+      await Printing.sharePdf(bytes: bytes, filename: 'school_year_${_schoolYear - 1}_${_schoolYear}_holidays.pdf');
+    } catch (e) {
+      debugPrint('PDF error: $e');
+    }
+  }
+
   Widget _buildHolidayCalendar() {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Align(
+        alignment: Alignment.centerRight,
+        child: GestureDetector(
+          onTap: _downloadPdf,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+                color: TatvaColors.primary, borderRadius: BorderRadius.circular(10)),
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.picture_as_pdf_outlined, size: 16, color: Colors.white),
+              SizedBox(width: 6),
+              Text('Download PDF', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+            ]),
+          ),
+        ),
+      ),
+      const SizedBox(height: 12),
       _monthCalendarWidget(),
       if (_selectedCalDate.isNotEmpty) ...[
         const SizedBox(height: 16),

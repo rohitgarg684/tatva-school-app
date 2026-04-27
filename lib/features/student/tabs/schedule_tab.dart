@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:printing/printing.dart';
 import '../../../shared/animations/animations.dart';
 import '../../../shared/theme/colors.dart';
+import '../../../shared/utils/calendar_pdf.dart';
 import '../../../models/class_model.dart';
 import '../../../models/schedule_model.dart';
 import '../../../models/schedule_event.dart';
@@ -32,6 +34,8 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
   DateTime _weekStart = DateTime.now();
   List<Holiday> _holidays = [];
   bool _holidaysLoaded = false;
+  int _viewMode = 0; // 0 = weekly schedule, 1 = year calendar
+  String _selectedCalDate = '';
 
   String _parseGrade() {
     final name = widget.primaryClass?.name ?? '';
@@ -100,101 +104,124 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
         FadeSlideIn(
             delayMs: 60,
             child: Text(
-                '${widget.primaryClass?.name ?? ''} • Weekly Timetable',
+                '${widget.primaryClass?.name ?? ''} • Schedule & Holidays',
                 style: const TextStyle(
                     fontSize: 13, color: TatvaColors.neutral400))),
-        const SizedBox(height: 16),
-        Row(children: [
-          GestureDetector(
-            onTap: () => setState(() {
-              _weekStart = _weekStart.subtract(const Duration(days: 7));
-            }),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                  color: TatvaColors.bgCard,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade200)),
-              child: const Icon(Icons.chevron_left, color: TatvaColors.neutral400, size: 20),
-            ),
-          ),
-          Expanded(
-            child: Center(
-              child: Text(
-                  _weekLabel(_weekStart),
-                  style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: TatvaColors.neutral900)),
-            ),
-          ),
-          GestureDetector(
-            onTap: () => setState(() {
-              _weekStart = _weekStart.add(const Duration(days: 7));
-            }),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                  color: TatvaColors.bgCard,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade200)),
-              child: const Icon(Icons.chevron_right, color: TatvaColors.neutral400, size: 20),
-            ),
-          ),
-        ]),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            _dayChip('All', _selectedDay == 0, () => setState(() => _selectedDay = 0)),
-            ...List.generate(5, (i) {
-              final day = i + 1;
-              return _dayChip(
-                  ScheduleModel.dayNames[day],
-                  _selectedDay == day,
-                  () => setState(() => _selectedDay = day));
-            }),
-          ],
+        Container(
+          decoration: BoxDecoration(
+              color: TatvaColors.bgLight, borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.all(3),
+          child: Row(children: [
+            _modeBtn('Weekly Schedule', 0),
+            _modeBtn('Year Calendar', 1),
+          ]),
         ),
         const SizedBox(height: 16),
-        if (_loading && !_loaded)
-          const Center(child: Padding(
-              padding: EdgeInsets.all(40),
-              child: CircularProgressIndicator()))
-        else if (_weekData.isEmpty)
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.all(40),
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.calendar_today_outlined,
-                    color: TatvaColors.neutral400, size: 48),
-                const SizedBox(height: 12),
-                const Text('No schedule set yet',
-                    style: TextStyle(
-                        fontSize: 15,
-                        color: TatvaColors.neutral400)),
-              ]),
+        if (_viewMode == 0) ...[
+          Row(children: [
+            GestureDetector(
+              onTap: () => setState(() {
+                _weekStart = _weekStart.subtract(const Duration(days: 7));
+              }),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                    color: TatvaColors.bgCard,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade200)),
+                child: const Icon(Icons.chevron_left, color: TatvaColors.neutral400, size: 20),
+              ),
             ),
-          )
-        else if (_selectedDay == 0)
-          _buildWeekGrid(_weekData)
-        else
-          _buildDayDetail(_weekData, _selectedDay),
-        if (_weekEvents.isNotEmpty) ...[
+            Expanded(
+              child: Center(
+                child: Text(
+                    _weekLabel(_weekStart),
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: TatvaColors.neutral900)),
+              ),
+            ),
+            GestureDetector(
+              onTap: () => setState(() {
+                _weekStart = _weekStart.add(const Duration(days: 7));
+              }),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                    color: TatvaColors.bgCard,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade200)),
+                child: const Icon(Icons.chevron_right, color: TatvaColors.neutral400, size: 20),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _dayChip('All', _selectedDay == 0, () => setState(() => _selectedDay = 0)),
+              ...List.generate(5, (i) {
+                final day = i + 1;
+                return _dayChip(
+                    ScheduleModel.dayNames[day],
+                    _selectedDay == day,
+                    () => setState(() => _selectedDay = day));
+              }),
+            ],
+          ),
           const SizedBox(height: 16),
-          ..._weekEvents.map(_buildEventCard),
-        ],
-        if (_upcomingHolidays.isNotEmpty) ...[
-          const SizedBox(height: 24),
-          const Text('Upcoming Holidays',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: TatvaColors.neutral900)),
-          const SizedBox(height: 10),
-          ..._upcomingHolidays.asMap().entries.map((e) =>
-              FadeSlideIn(delayMs: e.key * 40, child: _buildHolidayCard(e.value))),
-        ],
+          if (_loading && !_loaded)
+            const Center(child: Padding(
+                padding: EdgeInsets.all(40),
+                child: CircularProgressIndicator()))
+          else if (_weekData.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(40),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.calendar_today_outlined,
+                      color: TatvaColors.neutral400, size: 48),
+                  const SizedBox(height: 12),
+                  const Text('No schedule set yet',
+                      style: TextStyle(
+                          fontSize: 15,
+                          color: TatvaColors.neutral400)),
+                ]),
+              ),
+            )
+          else if (_selectedDay == 0)
+            _buildWeekGrid(_weekData)
+          else
+            _buildDayDetail(_weekData, _selectedDay),
+          if (_weekEvents.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            ..._weekEvents.map(_buildEventCard),
+          ],
+        ] else
+          _buildYearCalendar(),
         const SizedBox(height: 24),
       ]),
     );
   }
+
+  Widget _modeBtn(String label, int mode) => Expanded(
+    child: GestureDetector(
+      onTap: () => setState(() => _viewMode = mode),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+            color: _viewMode == mode ? TatvaColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(10)),
+        child: Center(
+            child: Text(label,
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _viewMode == mode ? Colors.white : TatvaColors.neutral400))),
+      ),
+    ),
+  );
 
   Widget _dayChip(String label, bool isActive, VoidCallback onTap) {
     return Expanded(
@@ -642,5 +669,185 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
         ),
       ]),
     );
+  }
+
+  // ─── Year Calendar View ────────────────────────────────────────────
+
+  Widget _buildYearCalendar() {
+    final year = _schoolYear;
+    final schoolYearMonths = <DateTime>[];
+    for (int m = 8; m <= 12; m++) schoolYearMonths.add(DateTime(year - 1, m));
+    for (int m = 1; m <= 7; m++) schoolYearMonths.add(DateTime(year, m));
+
+    final holidayDates = <String, Holiday>{};
+    for (final h in _holidays) {
+      final s = DateTime.tryParse(h.startDate);
+      final e = DateTime.tryParse(h.endDate);
+      if (s == null || e == null) continue;
+      for (var d = s; !d.isAfter(e); d = d.add(const Duration(days: 1))) {
+        holidayDates[_fmtDate(d)] = h;
+      }
+    }
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Expanded(
+          child: Text('School Year ${year - 1}–$year',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: TatvaColors.neutral900)),
+        ),
+        GestureDetector(
+          onTap: _downloadPdf,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+                color: TatvaColors.primary, borderRadius: BorderRadius.circular(10)),
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.picture_as_pdf_outlined, size: 16, color: Colors.white),
+              SizedBox(width: 6),
+              Text('Download PDF', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+            ]),
+          ),
+        ),
+      ]),
+      const SizedBox(height: 16),
+      ...List.generate(4, (row) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: List.generate(3, (col) {
+              final idx = row * 3 + col;
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(left: col > 0 ? 6 : 0, right: col < 2 ? 6 : 0),
+                  child: _miniMonth(schoolYearMonths[idx], holidayDates),
+                ),
+              );
+            }),
+          ),
+        );
+      }),
+      if (_selectedCalDate.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        ..._holidays.where((h) => h.coversDate(_selectedCalDate)).map(_buildHolidayCard),
+      ],
+      const SizedBox(height: 16),
+      _buildYearLegend(),
+      const SizedBox(height: 20),
+      if (_upcomingHolidays.isNotEmpty) ...[
+        const Text('Upcoming Holidays',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: TatvaColors.neutral900)),
+        const SizedBox(height: 10),
+        ..._upcomingHolidays.asMap().entries.map((e) =>
+            FadeSlideIn(delayMs: e.key * 40, child: _buildHolidayCard(e.value))),
+      ],
+    ]);
+  }
+
+  Widget _miniMonth(DateTime monthDate, Map<String, Holiday> holidayDates) {
+    final year = monthDate.year;
+    final month = monthDate.month;
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    final firstWeekday = DateTime(year, month, 1).weekday % 7;
+    const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final todayStr = _fmtDate(DateTime.now());
+
+    return Container(
+      decoration: BoxDecoration(
+          color: TatvaColors.bgCard,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.grey.shade200)),
+      padding: const EdgeInsets.all(6),
+      child: Column(children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          decoration: BoxDecoration(
+              color: TatvaColors.primary, borderRadius: BorderRadius.circular(6)),
+          child: Center(
+            child: Text('${months[month]} $year',
+                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+              .map((d) => Expanded(
+                  child: Center(
+                      child: Text(d,
+                          style: TextStyle(fontSize: 8, fontWeight: FontWeight.w600, color: TatvaColors.neutral400)))))
+              .toList(),
+        ),
+        const SizedBox(height: 2),
+        ...List.generate(6, (week) {
+          final cells = <Widget>[];
+          bool hasAnyDay = false;
+          for (int col = 0; col < 7; col++) {
+            final idx = week * 7 + col - firstWeekday + 1;
+            if (idx < 1 || idx > daysInMonth) {
+              cells.add(const Expanded(child: SizedBox(height: 22)));
+            } else {
+              hasAnyDay = true;
+              final dateStr = '$year-${month.toString().padLeft(2, '0')}-${idx.toString().padLeft(2, '0')}';
+              final holiday = holidayDates[dateStr];
+              final isToday = dateStr == todayStr;
+              final isSelected = dateStr == _selectedCalDate;
+              final c = holiday?.typeColor;
+              cells.add(Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _selectedCalDate = isSelected ? '' : dateStr),
+                  child: Container(
+                    height: 22,
+                    margin: const EdgeInsets.all(0.5),
+                    decoration: BoxDecoration(
+                        color: isSelected
+                            ? TatvaColors.primary.withOpacity(0.15)
+                            : holiday != null
+                                ? c!.withOpacity(0.15)
+                                : Colors.transparent,
+                        borderRadius: BorderRadius.circular(4),
+                        border: isToday ? Border.all(color: TatvaColors.primary, width: 1.2) : null),
+                    child: Center(
+                      child: Text('$idx',
+                          style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: (isToday || holiday != null) ? FontWeight.w700 : FontWeight.w400,
+                              color: holiday != null ? c : TatvaColors.neutral900)),
+                    ),
+                  ),
+                ),
+              ));
+            }
+          }
+          if (!hasAnyDay) return const SizedBox.shrink();
+          return Row(children: cells);
+        }),
+      ]),
+    );
+  }
+
+  Widget _buildYearLegend() {
+    final usedTypes = <String>{};
+    for (final h in _holidays) usedTypes.add(h.type);
+    if (usedTypes.isEmpty) return const SizedBox.shrink();
+    return Wrap(spacing: 12, runSpacing: 6, children: usedTypes.map((t) {
+      final c = Holiday.typeColors[t] ?? TatvaColors.primary;
+      return Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 10, height: 10, decoration: BoxDecoration(
+            color: c.withOpacity(0.15), borderRadius: BorderRadius.circular(3),
+            border: Border.all(color: c, width: 0.5))),
+        const SizedBox(width: 4),
+        Text(Holiday.typeLabels[t] ?? t, style: const TextStyle(fontSize: 10, color: TatvaColors.neutral400)),
+      ]);
+    }).toList());
+  }
+
+  Future<void> _downloadPdf() async {
+    try {
+      final bytes = await generateSchoolYearPdf(_holidays, _schoolYear);
+      await Printing.sharePdf(bytes: bytes, filename: 'school_year_${_schoolYear - 1}_${_schoolYear}_holidays.pdf');
+    } catch (e) {
+      debugPrint('PDF error: $e');
+    }
   }
 }
