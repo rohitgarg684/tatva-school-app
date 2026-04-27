@@ -27,6 +27,12 @@ You MUST follow every rule below. Violations waste money.
 - **No subagents for simple work.** Task/subagents are for multi-step exploration only. Single searches, single-file edits → use tools directly.
 - **One StrReplace per change.** Use `replace_all: true` for repeated patterns. Keep `old_string` as short as uniquely possible.
 
+## Code — No Nullables
+- **Prefer non-nullable fields.** In Dart and TypeScript, default to required/non-nullable types. Only use nullable (`?`, `| null`, `| undefined`) when the domain genuinely allows absence (e.g. optional user input, unset config).
+- **Use defaults over nulls.** Prefer `''`, `0`, `false`, `[]`, `{}` as defaults instead of `null` when a sensible zero-value exists.
+- **Required constructor params.** In Dart, use `required` keyword for fields that must always be present. In TS, don't mark fields optional (`?`) unless truly optional.
+- **No lazy nullability.** Don't add `?` just to silence the compiler. Fix the root cause — initialize the field or restructure the code.
+
 ## Code — No Bloat
 - Zero narrating comments. Don't add `// Updated to fix X` or `// Added per user request`.
 - Don't create files unless the user explicitly asks for a new file.
