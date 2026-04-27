@@ -222,6 +222,11 @@ class TeacherHomeTab extends StatelessWidget {
                                 style: const TextStyle(
                                     fontSize: 12,
                                     color: TatvaColors.neutral400)),
+                          if (event.actorName.isNotEmpty)
+                            Text('by ${event.actorName}',
+                                style: const TextStyle(
+                                    fontSize: 10,
+                                    color: TatvaColors.neutral400)),
                         ]),
                   ),
                   if (ago.isNotEmpty)

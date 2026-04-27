@@ -151,6 +151,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
             TeacherScheduleTab(
               classes: _data?.classes ?? [],
               uid: _uid,
+              onRefresh: _loadUser,
             ),
             TeacherGradesTab(
               classes: _data?.classes ?? [],

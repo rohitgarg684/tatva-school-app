@@ -37,6 +37,7 @@ class StudentHomeTab extends StatelessWidget {
   final Animation<Offset> greetingSlide;
   final Animation<double> greetingScale;
   final String uid;
+  final void Function(int index, String option) onCastVote;
   final VoidCallback onSwitchToHomework;
   final Future<void> Function() onRefresh;
   final ApiService api;
@@ -62,6 +63,7 @@ class StudentHomeTab extends StatelessWidget {
     required this.onSwitchToHomework,
     required this.onRefresh,
     required this.uid,
+    required this.onCastVote,
     required this.api,
     this.grade,
     required this.onToggleAnnouncementLike,
@@ -485,11 +487,25 @@ class StudentHomeTab extends StatelessWidget {
                         child: Icon(icon, size: 16, color: TatvaColors.info)),
                     const SizedBox(width: 12),
                     Expanded(
-                        child: Text(event.title,
-                            style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: TatvaColors.neutral900))),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(event.title,
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: TatvaColors.neutral900)),
+                              if (event.body.isNotEmpty)
+                                Text(event.body,
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        color: TatvaColors.neutral500)),
+                              if (event.actorName.isNotEmpty)
+                                Text('by ${event.actorName}',
+                                    style: const TextStyle(
+                                        fontSize: 10,
+                                        color: TatvaColors.neutral400)),
+                            ])),
                     if (timeAgo.isNotEmpty)
                       Text(timeAgo,
                           style: const TextStyle(
@@ -535,6 +551,9 @@ class StudentHomeTab extends StatelessWidget {
       ...List.generate(visibleVotes.length, (i) {
         final v = visibleVotes[i];
         final total = v.totalVotes;
+        final hasVoted = v.hasVoted(uid);
+        final canVote = v.isVotingOpen && !hasVoted;
+        final originalIdx = activeVotes.indexOf(v);
         return Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
           child: Container(
@@ -558,6 +577,20 @@ class StudentHomeTab extends StatelessWidget {
                             color: TatvaColors.info,
                             fontWeight: FontWeight.w700))),
                 const Spacer(),
+                if (!v.isVotingOpen)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                            color: TatvaColors.neutral400.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(6)),
+                        child: const Text('Voting Closed',
+                            style: TextStyle(
+                                fontSize: 10,
+                                color: TatvaColors.neutral400,
+                                fontWeight: FontWeight.w700))),
+                  ),
                 const Icon(Icons.how_to_vote_outlined,
                     color: TatvaColors.neutral400, size: 13),
                 const SizedBox(width: 4),
@@ -573,14 +606,51 @@ class StudentHomeTab extends StatelessWidget {
                       color: TatvaColors.neutral900,
                       height: 1.4)),
               const SizedBox(height: 12),
-              ...v.options.map((opt) {
-                final count = v.votes[opt] ?? 0;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: _simpleVoteBar(
-                      _optionLabel(opt), count, total, _optionColor(opt)),
-                );
-              }),
+              if (canVote)
+                ...v.options.map((opt) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: GestureDetector(
+                        onTap: () => onCastVote(originalIdx, opt),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                          decoration: BoxDecoration(
+                              color: TatvaColors.info.withOpacity(0.06),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: TatvaColors.info.withOpacity(0.2))),
+                          child: Row(children: [
+                            Icon(Icons.radio_button_unchecked,
+                                color: TatvaColors.info, size: 16),
+                            const SizedBox(width: 10),
+                            Text(_optionLabel(opt),
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: TatvaColors.neutral900)),
+                          ]),
+                        ))))
+              else
+                ...v.options.map((opt) {
+                  final count = v.votes[opt] ?? 0;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: _simpleVoteBar(
+                        _optionLabel(opt), count, total, _optionColor(opt)),
+                  );
+                }),
+              if (hasVoted)
+                Container(
+                  margin: const EdgeInsets.only(top: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                      color: TatvaColors.success.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(8)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.check_circle_outline, color: TatvaColors.success, size: 13),
+                    const SizedBox(width: 5),
+                    const Text('Vote submitted',
+                        style: TextStyle(fontSize: 11, color: TatvaColors.success)),
+                  ]),
+                ),
             ]),
           ),
         );

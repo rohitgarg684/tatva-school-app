@@ -273,7 +273,7 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
     final allPeriodTimes = <String>{};
     for (final s in schedules) {
       for (final p in s.periods) {
-        allPeriodTimes.add(p.startTime);
+        if (p.subject.isNotEmpty) allPeriodTimes.add(p.startTime);
       }
     }
     final sortedTimes = allPeriodTimes.toList()..sort();
@@ -360,7 +360,7 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                 PeriodSlot? slot;
                 if (daySchedule.isNotEmpty) {
                   final matching = daySchedule.first.periods
-                      .where((p) => p.startTime == time);
+                      .where((p) => p.startTime == time && p.subject.isNotEmpty);
                   if (matching.isNotEmpty) slot = matching.first;
                 }
                 final isToday = DateTime.now().weekday == day;

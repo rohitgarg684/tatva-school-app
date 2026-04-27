@@ -20,11 +20,13 @@ class _DayItem {
 class TeacherScheduleTab extends StatefulWidget {
   final List<ClassModel> classes;
   final String uid;
+  final VoidCallback? onRefresh;
 
   const TeacherScheduleTab({
     super.key,
     required this.classes,
     required this.uid,
+    this.onRefresh,
   });
 
   @override
@@ -1456,6 +1458,7 @@ fontSize: 14, color: TatvaColors.neutral900),
                       Navigator.pop(context);
                       _calLoaded = false;
                       _loadCalendar();
+                      widget.onRefresh?.call();
                       TatvaSnackbar.show(context, 'Event added!');
                     },
                     child: Container(
@@ -2390,7 +2393,10 @@ fontSize: 13, color: Colors.grey.shade400),
               try {
                 await _api.deleteHoliday(h.id);
                 _holidaysLoaded = false;
+                _calLoaded = false;
                 _loadHolidays();
+                _loadCalendar();
+                widget.onRefresh?.call();
                 if (mounted) TatvaSnackbar.success(context, 'Holiday deleted');
               } catch (e) {
                 if (mounted) TatvaSnackbar.error(context, 'Failed to delete');
@@ -2467,6 +2473,8 @@ fontSize: 13, color: Colors.grey.shade400),
             _holidaysLoaded = false;
             _calLoaded = false;
             _loadHolidays();
+            _loadCalendar();
+            widget.onRefresh?.call();
             if (mounted) TatvaSnackbar.success(context, existing != null ? 'Holiday updated' : 'Holiday added');
           } catch (e) {
             setSheet(() => saving = false);

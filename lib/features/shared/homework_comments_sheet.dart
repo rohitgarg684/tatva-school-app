@@ -8,12 +8,14 @@ class HomeworkCommentsSheet extends StatefulWidget {
   final String homeworkId;
   final String studentUid;
   final String studentName;
+  final VoidCallback? onCommentAdded;
 
   const HomeworkCommentsSheet({
     super.key,
     required this.homeworkId,
     required this.studentUid,
     required this.studentName,
+    this.onCommentAdded,
   });
 
   static void show(
@@ -21,6 +23,7 @@ class HomeworkCommentsSheet extends StatefulWidget {
     required String homeworkId,
     required String studentUid,
     required String studentName,
+    VoidCallback? onCommentAdded,
   }) {
     HapticFeedback.lightImpact();
     showModalBottomSheet(
@@ -31,6 +34,7 @@ class HomeworkCommentsSheet extends StatefulWidget {
         homeworkId: homeworkId,
         studentUid: studentUid,
         studentName: studentName,
+        onCommentAdded: onCommentAdded,
       ),
     );
   }
@@ -77,6 +81,7 @@ class _HomeworkCommentsSheetState extends State<HomeworkCommentsSheet> {
       await ApiService()
           .addSubmissionComment(widget.homeworkId, widget.studentUid, text);
       _ctrl.clear();
+      widget.onCommentAdded?.call();
       await _load();
     } catch (_) {
       if (mounted) TatvaSnackbar.show(context, 'Failed to send');

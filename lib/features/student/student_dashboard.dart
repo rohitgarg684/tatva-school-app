@@ -7,7 +7,9 @@ import '../../services/dashboard_service.dart';
 import '../../services/api_service.dart';
 import '../../models/announcement_model.dart';
 import '../../models/content_item.dart';
+import '../../models/vote_model.dart';
 import '../../shared/utils/announcement_helpers.dart';
+import '../../shared/theme/colors.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/schedule_tab.dart';
 import 'tabs/homework_tab.dart';
@@ -39,6 +41,7 @@ class _StudentDashboardState extends State<StudentDashboard>
 
   StudentDashboardData? _data;
   List<AnnouncementModel> _announcements = [];
+  List<VoteModel> _activeVotes = [];
   final Set<String> _completedIds = {};
   final Map<String, Map<String, dynamic>> _mySubmissions = {};
 
@@ -62,6 +65,7 @@ class _StudentDashboardState extends State<StudentDashboard>
       final data = await _dashSvc.loadStudentDashboard(overrideUid: _uid, forceRefresh: true);
       _data = data;
       _announcements = List.of(data.announcements);
+      _activeVotes = List.of(data.activeVotes);
       _completedIds.clear();
       _mySubmissions.clear();
       for (final hw in data.homework) {
@@ -110,6 +114,28 @@ class _StudentDashboardState extends State<StudentDashboard>
     _api.toggleAnnouncementLike(ann.id);
   }
 
+  void _castVote(int index, String option) async {
+    if (_activeVotes[index].hasVoted(_uid)) return;
+    final voteId = _activeVotes[index].id;
+    final old = _activeVotes[index];
+    final updatedVotes = Map<String, int>.from(old.votes);
+    updatedVotes[option] = (updatedVotes[option] ?? 0) + 1;
+    setState(() {
+      _activeVotes[index] = old.copyWith(
+        votes: updatedVotes,
+        voters: [...old.voters, _uid],
+      );
+    });
+    _api.castVote(voteId, option);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: const Text('Vote submitted!'),
+      backgroundColor: TatvaColors.success,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ));
+  }
+
   void _handleMarkCompleted(ContentItem item) {
     setState(() {
       final idx = (_data?.contentItems ?? []).indexOf(item);
@@ -148,7 +174,7 @@ class _StudentDashboardState extends State<StudentDashboard>
           behaviorScore: _data?.behaviorScore ?? 0,
           attendance: _data?.attendance ?? [],
           activityFeed: _data?.activityFeed ?? [],
-          activeVotes: _data?.activeVotes ?? [],
+          activeVotes: _activeVotes,
           motivationalText: _motivationalText,
           greetingFade: greetingFade,
           greetingSlide: greetingSlide,
@@ -156,6 +182,7 @@ class _StudentDashboardState extends State<StudentDashboard>
           onSwitchToHomework: () => switchTab(2),
           onRefresh: _loadUser,
           uid: _uid,
+          onCastVote: _castVote,
           api: _api,
           grade: _data?.primaryClass?.grade,
           onToggleAnnouncementLike: _handleToggleAnnouncementLike,

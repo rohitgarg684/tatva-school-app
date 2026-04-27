@@ -125,13 +125,6 @@ class AnnouncementCard extends StatelessWidget {
               const SizedBox(width: 8),
               _gradeBadge(a.grades),
             ],
-            const Spacer(),
-            if (a.createdAt != null)
-              Text(
-                formatTimeAgo(a.createdAt!),
-                style: const TextStyle(
-                    fontSize: 10, color: TatvaColors.neutral400),
-              ),
           ]),
           const SizedBox(height: 8),
           Row(children: [
@@ -155,6 +148,13 @@ class AnnouncementCard extends StatelessWidget {
                 ],
               ]),
             ),
+            const Spacer(),
+            if (a.createdAt != null)
+              Text(
+                formatTimeAgo(a.createdAt!),
+                style: const TextStyle(
+                    fontSize: 10, color: TatvaColors.neutral400),
+              ),
           ]),
         ],
       ),

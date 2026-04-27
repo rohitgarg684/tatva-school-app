@@ -358,6 +358,7 @@ class StudentHomeworkTab extends StatelessWidget {
               homeworkId: hw.id,
               studentUid: uid,
               studentName: 'My Submission',
+              onCommentAdded: onRefresh,
             ),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
@@ -539,6 +540,7 @@ class StudentHomeworkTab extends StatelessWidget {
                     homeworkId: hw.id,
                     studentUid: uid,
                     studentName: 'My Questions',
+                    onCommentAdded: onRefresh,
                   ),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
