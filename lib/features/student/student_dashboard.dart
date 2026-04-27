@@ -82,10 +82,13 @@ class _StudentDashboardState extends State<StudentDashboard>
   }
 
   Future<void> _fetchMySubmissions() async {
-    for (final hwId in _completedIds) {
+    for (final hwId in Set<String>.from(_completedIds)) {
       try {
         final sub = await _api.getMyHomeworkSubmission(hwId);
-        if (sub != null) _mySubmissions[hwId] = sub;
+        if (sub != null) {
+          _mySubmissions[hwId] = sub;
+          if (sub['status'] == 'returned') _completedIds.remove(hwId);
+        }
       } catch (_) {}
     }
   }

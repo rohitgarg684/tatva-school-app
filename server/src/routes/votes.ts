@@ -67,15 +67,11 @@ router.put(
   requireRole("Principal", "Teacher"),
   asyncHandler(async (req, res) => {
     const voteId = req.params.voteId as string;
-    const uid = req.uid!;
     const ref = db.collection(Collections.VOTES).doc(voteId);
     const snap = await ref.get();
     if (!snap.exists) return res.status(404).json({ error: "Vote not found" });
 
     const data = snap.data()!;
-    if (data.createdBy !== uid)
-      return res.status(403).json({ error: "Only the creator can edit this vote" });
-
     const updates: Record<string, unknown> = {};
     const { question, type, options, votingDeadline, resultsVisibleUntil } = req.body;
     if (question) updates.question = question;
@@ -102,14 +98,9 @@ router.delete(
   requireRole("Principal", "Teacher"),
   asyncHandler(async (req, res) => {
     const voteId = req.params.voteId as string;
-    const uid = req.uid!;
     const ref = db.collection(Collections.VOTES).doc(voteId);
     const snap = await ref.get();
     if (!snap.exists) return res.status(404).json({ error: "Vote not found" });
-
-    const data = snap.data()!;
-    if (data.createdBy !== uid && req.role !== "Principal")
-      return res.status(403).json({ error: "Not authorized to delete this vote" });
 
     await ref.delete();
     invalidateDashboards("votes_visible");
@@ -162,14 +153,9 @@ router.post(
   requireRole("Principal", "Teacher"),
   asyncHandler(async (req, res) => {
     const voteId = req.params.voteId as string;
-    const uid = req.uid!;
     const ref = db.collection(Collections.VOTES).doc(voteId);
     const snap = await ref.get();
     if (!snap.exists) return res.status(404).json({ error: "Vote not found" });
-
-    const data = snap.data()!;
-    if (data.createdBy !== uid && req.role !== "Principal")
-      return res.status(403).json({ error: "Not authorized" });
 
     await ref.update({ active: false });
     invalidateDashboards("votes_visible");
@@ -191,9 +177,7 @@ router.get(
       .collection(Collections.VOTES)
       .orderBy("createdAt", "desc");
 
-    if (role === "Teacher") {
-      query = query.where("createdBy", "==", uid);
-    }
+    
 
     if (after) {
       query = query.where("createdAt", "<", new Date(after));

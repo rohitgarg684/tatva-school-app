@@ -185,8 +185,6 @@ class _VoteCard extends StatelessWidget {
     final isOpen = vote.isVotingOpen;
     final deadline = vote.votingDeadline;
     final resultsUntil = vote.resultsVisibleUntil;
-    final isCreator = vote.createdBy == uid;
-
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -225,8 +223,7 @@ class _VoteCard extends StatelessWidget {
                     fontWeight: FontWeight.w700)),
           ),
           const Spacer(),
-          if (isCreator)
-            PopupMenuButton<String>(
+          PopupMenuButton<String>(
               icon: Icon(Icons.more_vert, color: TatvaColors.neutral400, size: 18),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),

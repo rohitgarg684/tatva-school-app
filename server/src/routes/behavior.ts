@@ -47,6 +47,7 @@ router.post(
       targetUid: studentUid,
       classId,
       title: `${(points || 1) > 0 ? '+' : ''}${points || 1} ${categoryId}`,
+      body: studentName ? `Awarded to ${studentName}` : "",
       metadata: { categoryId, points: points || 1, note: note || "" },
     });
 
