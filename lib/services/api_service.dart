@@ -772,4 +772,15 @@ class ApiService {
 
   Future<Map<String, dynamic>> undoCancelPeriod(String id) =>
       _delete('/period-cancellation/$id');
+
+  // ─── Daily Defaults (Yoga, Lunch Break) ──────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getDailyDefaults() async {
+    final data = await _get('/daily-defaults');
+    return (data['slots'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+  }
+
+  Future<Map<String, dynamic>> setDailyDefaults(
+          List<Map<String, dynamic>> slots) =>
+      _put('/daily-defaults', {'slots': slots});
 }

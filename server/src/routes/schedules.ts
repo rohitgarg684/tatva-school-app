@@ -219,4 +219,36 @@ router.delete(
   })
 );
 
+// ─── Daily Default Slots (Yoga, Lunch Break) ─────────────────────────
+
+router.get(
+  "/daily-defaults",
+  asyncHandler(async (_req, res) => {
+    const doc = await db.collection(Collections.SCHOOL_SETTINGS).doc("daily_defaults").get();
+    const data = doc.exists ? doc.data() : null;
+    res.json({
+      slots: data?.slots ?? [
+        { subject: "Yoga", startTime: "08:00", endTime: "08:30" },
+        { subject: "Lunch Break", startTime: "12:30", endTime: "13:00" },
+      ],
+    });
+  })
+);
+
+router.put(
+  "/daily-defaults",
+  requireRole("Teacher", "Principal"),
+  asyncHandler(async (req, res) => {
+    const { slots } = req.body;
+    if (!Array.isArray(slots))
+      return res.status(400).json({ error: "slots[] required" });
+
+    await db.collection(Collections.SCHOOL_SETTINGS).doc("daily_defaults").set(
+      { slots, updatedBy: req.uid, updatedAt: FieldValue.serverTimestamp() },
+      { merge: true }
+    );
+    res.json({ saved: true });
+  })
+);
+
 export default router;

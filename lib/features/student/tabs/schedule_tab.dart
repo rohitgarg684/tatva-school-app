@@ -39,6 +39,8 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
   String _firstDay = '';
   String _lastDay = '';
   bool _schoolDatesLoaded = false;
+  List<PeriodSlot> _dailyDefaults = [];
+  bool _dailyDefaultsLoaded = false;
 
   String _parseGrade() {
     final name = widget.primaryClass?.name ?? '';
@@ -52,6 +54,41 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
     return match?.group(1) ?? 'A';
   }
 
+  bool _isSpecialSlot(PeriodSlot p) =>
+      p.subject == 'Yoga' || p.subject == 'Lunch Break';
+
+  List<ScheduleModel> _withDailyDefaults(List<ScheduleModel> schedules) {
+    if (_dailyDefaults.isEmpty) return schedules;
+    final result = <ScheduleModel>[];
+    for (int day = 1; day <= 5; day++) {
+      final dayScheds = schedules.where((s) => s.dayOfWeek == day).toList();
+      final periods = dayScheds.isNotEmpty
+          ? List<PeriodSlot>.from(dayScheds.first.periods)
+          : <PeriodSlot>[];
+      final usedTimes = periods
+          .where((p) => p.subject.trim().isNotEmpty)
+          .map((p) => p.startTime)
+          .toSet();
+      for (final def in _dailyDefaults) {
+        if (!usedTimes.contains(def.startTime)) {
+          periods.add(def);
+        }
+      }
+      periods.sort((a, b) => a.startTime.compareTo(b.startTime));
+      if (dayScheds.isNotEmpty) {
+        result.add(dayScheds.first.copyWith(periods: periods));
+      } else {
+        result.add(ScheduleModel(
+          grade: _parseGrade(),
+          section: _parseSection(),
+          dayOfWeek: day,
+          periods: periods,
+        ));
+      }
+    }
+    return result;
+  }
+
   void _loadData() async {
     if (_loading) return;
     setState(() => _loading = true);
@@ -63,15 +100,29 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
       final results = await Future.wait([
         widget.api.getScheduleWithCancellations(_parseGrade(), _parseSection()),
         widget.api.getScheduleEvents(dateStr(ws), dateStr(we)),
+        if (!_dailyDefaultsLoaded) widget.api.getDailyDefaults(),
       ]);
       final data = results[0] as Map<String, dynamic>;
       final raw = (data['schedules'] as List?)
               ?.cast<Map<String, dynamic>>() ?? [];
-      _weekData = raw.map((m) => ScheduleModel.fromJson(m)).toList();
+      _weekData = _withDailyDefaults(
+          raw.map((m) => ScheduleModel.fromJson(m)).toList());
       _cancellations = (data['cancellations'] as List?)
               ?.cast<Map<String, dynamic>>() ?? [];
       final evRaw = results[1] as List<Map<String, dynamic>>;
       _events = evRaw.map((m) => ScheduleEvent.fromJson(m)).toList();
+      if (!_dailyDefaultsLoaded && results.length > 2) {
+        final defRaw = results[2] as List<Map<String, dynamic>>;
+        _dailyDefaults = defRaw
+            .map((m) => PeriodSlot(
+                  period: 0,
+                  startTime: m['startTime'] as String? ?? '',
+                  endTime: m['endTime'] as String? ?? '',
+                  subject: m['subject'] as String? ?? '',
+                ))
+            .toList();
+        _dailyDefaultsLoaded = true;
+      }
     } catch (e) {
       debugPrint('Schedule load error: $e');
       _weekData = [];
@@ -273,7 +324,7 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
     final allPeriodTimes = <String>{};
     for (final s in schedules) {
       for (final p in s.periods) {
-        if (p.subject.isNotEmpty) allPeriodTimes.add(p.startTime);
+        if (p.subject.trim().isNotEmpty) allPeriodTimes.add(p.startTime);
       }
     }
     final sortedTimes = allPeriodTimes.toList()..sort();
@@ -288,7 +339,7 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
     int colorIndex = 0;
     for (final s in schedules) {
       for (final p in s.periods) {
-        if (p.subject.isNotEmpty && !subjectColorMap.containsKey(p.subject)) {
+        if (p.subject.trim().isNotEmpty && !subjectColorMap.containsKey(p.subject)) {
           subjectColorMap[p.subject] = colors[colorIndex % colors.length];
           colorIndex++;
         }
@@ -360,7 +411,7 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                 PeriodSlot? slot;
                 if (daySchedule.isNotEmpty) {
                   final matching = daySchedule.first.periods
-                      .where((p) => p.startTime == time && p.subject.isNotEmpty);
+                      .where((p) => p.startTime == time && p.subject.trim().isNotEmpty);
                   if (matching.isNotEmpty) slot = matching.first;
                 }
                 final isToday = DateTime.now().weekday == day;
@@ -492,9 +543,10 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
                         fontWeight: FontWeight.w600,
                         color: cancelled ? Colors.grey : c,
                         decoration: cancelled ? TextDecoration.lineThrough : TextDecoration.none)),
-                Text('Period ${p.period}',
-                    style: const TextStyle(
-                        fontSize: 10, color: TatvaColors.neutral400)),
+                if (!_isSpecialSlot(p))
+                  Text('Period ${p.period}',
+                      style: const TextStyle(
+                          fontSize: 10, color: TatvaColors.neutral400)),
               ]),
               const SizedBox(width: 14),
               Expanded(

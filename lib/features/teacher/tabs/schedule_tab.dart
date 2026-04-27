@@ -53,6 +53,9 @@ class _TeacherScheduleTabState extends State<TeacherScheduleTab> {
   String _firstDay = '';
   String _lastDay = '';
   bool _schoolDatesLoaded = false;
+  List<Map<String, dynamic>> _dailyDefaultSlots = [];
+  bool _dailyDefaultsLoaded = false;
+  bool _dailyDefaultsSaving = false;
 
   Map<String, Map<String, String>> get _schedGsMap {
     final gsMap = <String, Map<String, String>>{};
@@ -692,6 +695,187 @@ fontSize: 13, color: TatvaColors.neutral400)),
     );
   }
 
+  // ─── Daily Defaults (Yoga / Lunch Break) ──────────────────────────────────
+
+  Future<void> _loadDailyDefaults() async {
+    try {
+      final raw = await _api.getDailyDefaults();
+      if (mounted) setState(() {
+        _dailyDefaultSlots = raw;
+        _dailyDefaultsLoaded = true;
+      });
+    } catch (e) {
+      debugPrint('Daily defaults load error: $e');
+      if (mounted) setState(() => _dailyDefaultsLoaded = true);
+    }
+  }
+
+  Future<void> _saveDailyDefaults() async {
+    setState(() => _dailyDefaultsSaving = true);
+    try {
+      await _api.setDailyDefaults(_dailyDefaultSlots);
+      if (mounted) TatvaSnackbar.show(context, 'Daily schedule saved');
+    } catch (e) {
+      debugPrint('Save daily defaults error: $e');
+      if (mounted) TatvaSnackbar.show(context, 'Failed to save');
+    }
+    if (mounted) setState(() => _dailyDefaultsSaving = false);
+  }
+
+  void _showEditDailySlotSheet(int index) {
+    final slot = _dailyDefaultSlots[index];
+    final startCtrl = TextEditingController(text: slot['startTime'] as String? ?? '');
+    final endCtrl = TextEditingController(text: slot['endTime'] as String? ?? '');
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: TatvaColors.bgCard,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Center(child: Container(
+                width: 36, height: 3,
+                decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 20),
+            Text('Edit ${slot['subject']} Timing',
+                style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: TatvaColors.neutral900)),
+            const SizedBox(height: 4),
+            const Text('This applies to all days for every class',
+                style: TextStyle(fontSize: 12, color: TatvaColors.neutral400)),
+            const SizedBox(height: 24),
+            Row(children: [
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Start Time', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: TatvaColors.neutral400)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: startCtrl,
+                    style: const TextStyle(fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'HH:MM',
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
+              )),
+              const SizedBox(width: 16),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('End Time', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: TatvaColors.neutral400)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: endCtrl,
+                    style: const TextStyle(fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'HH:MM',
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
+              )),
+            ]),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  final updated = Map<String, dynamic>.from(slot);
+                  updated['startTime'] = startCtrl.text.trim();
+                  updated['endTime'] = endCtrl.text.trim();
+                  setState(() => _dailyDefaultSlots[index] = updated);
+                  Navigator.pop(context);
+                  _saveDailyDefaults();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: TatvaColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDailyDefaultsSection() {
+    if (!_dailyDefaultsLoaded) {
+      Future.microtask(_loadDailyDefaults);
+      return const SizedBox.shrink();
+    }
+    if (_dailyDefaultSlots.isEmpty) return const SizedBox.shrink();
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        const Icon(Icons.schedule_rounded, size: 16, color: TatvaColors.neutral400),
+        const SizedBox(width: 6),
+        const Text('Daily Activities',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: TatvaColors.neutral900)),
+        const Spacer(),
+        if (_dailyDefaultsSaving)
+          const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 1.5)),
+      ]),
+      const SizedBox(height: 4),
+      const Text('Yoga & Lunch Break show on every day for all classes',
+          style: TextStyle(fontSize: 11, color: TatvaColors.neutral400)),
+      const SizedBox(height: 10),
+      ...List.generate(_dailyDefaultSlots.length, (i) {
+        final slot = _dailyDefaultSlots[i];
+        final subj = slot['subject'] as String? ?? '';
+        final st = slot['startTime'] as String? ?? '';
+        final et = slot['endTime'] as String? ?? '';
+        final isYoga = subj == 'Yoga';
+        final c = isYoga ? TatvaColors.accent : TatvaColors.success;
+        final icon = isYoga ? Icons.self_improvement_rounded : Icons.restaurant_rounded;
+        return GestureDetector(
+          onTap: () => _showEditDailySlotSheet(i),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: c.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: c.withOpacity(0.2)),
+            ),
+            child: Row(children: [
+              Icon(icon, size: 20, color: c),
+              const SizedBox(width: 12),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(subj, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c)),
+                  Text('$st – $et', style: const TextStyle(fontSize: 12, color: TatvaColors.neutral400)),
+                ],
+              )),
+              Icon(Icons.edit_rounded, size: 16, color: c.withOpacity(0.4)),
+            ]),
+          ),
+        );
+      }),
+    ]);
+  }
+
   // ─── TIMETABLE EDITOR (existing) ──────────────────────────────────────────
 
   Widget _buildTimetableEditor() {
@@ -982,6 +1166,8 @@ fontSize: 11, color: Colors.grey.shade300)),
           ]),
         ),
       ),
+      const SizedBox(height: 24),
+      _buildDailyDefaultsSection(),
       const SizedBox(height: 24),
     ]);
   }
