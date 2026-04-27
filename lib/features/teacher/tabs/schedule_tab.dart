@@ -56,6 +56,7 @@ class _TeacherScheduleTabState extends State<TeacherScheduleTab> {
   List<Map<String, dynamic>> _dailyDefaultSlots = [];
   bool _dailyDefaultsLoaded = false;
   bool _dailyDefaultsSaving = false;
+  String _dailyDefaultsGrade = '';
 
   Map<String, Map<String, String>> get _schedGsMap {
     final gsMap = <String, Map<String, String>>{};
@@ -697,12 +698,19 @@ fontSize: 13, color: TatvaColors.neutral400)),
 
   // ─── Daily Defaults (Yoga / Lunch Break) ──────────────────────────────────
 
+  String get _selectedGrade {
+    final gs = _schedGsMap[_tSchedSelectedGS];
+    return gs?['grade'] ?? '0';
+  }
+
   Future<void> _loadDailyDefaults() async {
+    final grade = _selectedGrade;
     try {
-      final raw = await _api.getDailyDefaults();
+      final raw = await _api.getDailyDefaults(grade);
       if (mounted) setState(() {
         _dailyDefaultSlots = raw;
         _dailyDefaultsLoaded = true;
+        _dailyDefaultsGrade = grade;
       });
     } catch (e) {
       debugPrint('Daily defaults load error: $e');
@@ -713,8 +721,8 @@ fontSize: 13, color: TatvaColors.neutral400)),
   Future<void> _saveDailyDefaults() async {
     setState(() => _dailyDefaultsSaving = true);
     try {
-      await _api.setDailyDefaults(_dailyDefaultSlots);
-      if (mounted) TatvaSnackbar.show(context, 'Daily schedule saved');
+      await _api.setDailyDefaults(_selectedGrade, _dailyDefaultSlots);
+      if (mounted) TatvaSnackbar.show(context, 'Daily schedule saved for Grade $_selectedGrade');
     } catch (e) {
       debugPrint('Save daily defaults error: $e');
       if (mounted) TatvaSnackbar.show(context, 'Failed to save');
@@ -752,8 +760,8 @@ fontSize: 13, color: TatvaColors.neutral400)),
                     fontWeight: FontWeight.bold,
                     color: TatvaColors.neutral900)),
             const SizedBox(height: 4),
-            const Text('This applies to all days for every class',
-                style: TextStyle(fontSize: 12, color: TatvaColors.neutral400)),
+            Text('Applies to all days for Grade $_selectedGrade',
+                style: const TextStyle(fontSize: 12, color: TatvaColors.neutral400)),
             const SizedBox(height: 24),
             Row(children: [
               Expanded(child: Column(
@@ -820,7 +828,9 @@ fontSize: 13, color: TatvaColors.neutral400)),
   }
 
   Widget _buildDailyDefaultsSection() {
-    if (!_dailyDefaultsLoaded) {
+    final grade = _selectedGrade;
+    if (!_dailyDefaultsLoaded || _dailyDefaultsGrade != grade) {
+      if (_dailyDefaultsGrade != grade) _dailyDefaultsLoaded = false;
       Future.microtask(_loadDailyDefaults);
       return const SizedBox.shrink();
     }
@@ -830,15 +840,15 @@ fontSize: 13, color: TatvaColors.neutral400)),
       Row(children: [
         const Icon(Icons.schedule_rounded, size: 16, color: TatvaColors.neutral400),
         const SizedBox(width: 6),
-        const Text('Daily Activities',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: TatvaColors.neutral900)),
+        Text('Daily Activities — Grade $grade',
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: TatvaColors.neutral900)),
         const Spacer(),
         if (_dailyDefaultsSaving)
           const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 1.5)),
       ]),
       const SizedBox(height: 4),
-      const Text('Yoga & Lunch Break show on every day for all classes',
-          style: TextStyle(fontSize: 11, color: TatvaColors.neutral400)),
+      Text('Yoga & Lunch Break times for Grade $grade students',
+          style: const TextStyle(fontSize: 11, color: TatvaColors.neutral400)),
       const SizedBox(height: 10),
       ...List.generate(_dailyDefaultSlots.length, (i) {
         final slot = _dailyDefaultSlots[i];

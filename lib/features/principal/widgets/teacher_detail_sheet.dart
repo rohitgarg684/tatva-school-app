@@ -4,6 +4,7 @@ import '../../../models/class_model.dart';
 import '../../../models/grade_model.dart';
 import '../../../models/user_model.dart';
 import '../../../shared/theme/colors.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import '../../messaging/messaging_screen.dart';
 import 'report_stat_card.dart';
 
@@ -46,14 +47,12 @@ class TeacherDetailSheet {
                     color: Colors.grey.shade300,
                     borderRadius: BorderRadius.circular(2))),
             SizedBox(height: 20),
-            CircleAvatar(
+            UserAvatar(
+              name: teacher.name,
               radius: 32,
-              backgroundColor: color.withOpacity(0.12),
-              child: Text(teacher.initial,
-                  style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: color)),
+              bgColor: color.withOpacity(0.12),
+              textColor: color,
+              photoUrl: teacher.photoUrl,
             ),
             SizedBox(height: 12),
             Text(teacher.name,
@@ -167,6 +166,7 @@ class TeacherDetailSheet {
                               otherUserName: teacher.name,
                               otherUserRole: 'Teacher',
                               otherUserEmail: teacher.email,
+                              otherPhotoUrl: teacher.photoUrl,
                               avatarColor: color,
                             ),
                           ),

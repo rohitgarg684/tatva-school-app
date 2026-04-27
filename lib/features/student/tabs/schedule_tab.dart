@@ -55,7 +55,7 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
   }
 
   bool _isSpecialSlot(PeriodSlot p) =>
-      p.subject == 'Yoga' || p.subject == 'Lunch Break';
+      _dailyDefaults.any((d) => d.subject == p.subject && d.startTime == p.startTime);
 
   List<ScheduleModel> _withDailyDefaults(List<ScheduleModel> schedules) {
     if (_dailyDefaults.isEmpty) return schedules;
@@ -100,7 +100,7 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
       final results = await Future.wait([
         widget.api.getScheduleWithCancellations(_parseGrade(), _parseSection()),
         widget.api.getScheduleEvents(dateStr(ws), dateStr(we)),
-        if (!_dailyDefaultsLoaded) widget.api.getDailyDefaults(),
+        if (!_dailyDefaultsLoaded) widget.api.getDailyDefaults(_parseGrade()),
       ]);
       final data = results[0] as Map<String, dynamic>;
       final raw = (data['schedules'] as List?)

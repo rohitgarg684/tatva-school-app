@@ -6,12 +6,14 @@ import '../../repositories/auth_repository.dart';
 import '../../services/api_service.dart';
 import '../../shared/animations/animations.dart';
 import '../../shared/theme/colors.dart';
+import '../../shared/widgets/user_avatar.dart';
 
 class MessagingScreen extends StatefulWidget {
   final String otherUserId;
   final String otherUserName;
   final String otherUserRole;
   final String otherUserEmail;
+  final String otherPhotoUrl;
   final Color avatarColor;
 
   const MessagingScreen({
@@ -20,6 +22,7 @@ class MessagingScreen extends StatefulWidget {
     required this.otherUserName,
     required this.otherUserRole,
     required this.otherUserEmail,
+    this.otherPhotoUrl = '',
     this.avatarColor = const Color(0xFF2E6B4F),
   });
 
@@ -131,18 +134,12 @@ class _MessagingScreenState extends State<MessagingScreen>
           onPressed: () => Navigator.pop(context),
         ),
         title: Row(children: [
-          CircleAvatar(
+          UserAvatar(
+            name: widget.otherUserName,
             radius: 18,
-            backgroundColor: widget.avatarColor.withOpacity(0.12),
-            child: Text(
-              widget.otherUserName.isNotEmpty
-                  ? widget.otherUserName[0].toUpperCase()
-                  : '?',
-              style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: widget.avatarColor),
-            ),
+            bgColor: widget.avatarColor.withOpacity(0.12),
+            textColor: widget.avatarColor,
+            photoUrl: widget.otherPhotoUrl,
           ),
           const SizedBox(width: 10),
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -196,18 +193,12 @@ fontSize: 11, color: textLight)),
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       if (!isMe) ...[
-                        CircleAvatar(
+                        UserAvatar(
+                          name: widget.otherUserName,
                           radius: 14,
-                          backgroundColor: widget.avatarColor.withOpacity(0.12),
-                          child: Text(
-                            widget.otherUserName.isNotEmpty
-                                ? widget.otherUserName[0].toUpperCase()
-                                : '?',
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: widget.avatarColor),
-                          ),
+                          bgColor: widget.avatarColor.withOpacity(0.12),
+                          textColor: widget.avatarColor,
+                          photoUrl: widget.otherPhotoUrl,
                         ),
                         const SizedBox(width: 8),
                       ],

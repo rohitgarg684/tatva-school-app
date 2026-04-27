@@ -5,6 +5,7 @@ import '../../../models/student_model.dart';
 import '../../../models/user_model.dart';
 import '../../../shared/animations/animations.dart';
 import '../../../shared/theme/colors.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import '../../messaging/messaging_screen.dart';
 
 class StudentUserDetailSheet {
@@ -45,14 +46,12 @@ class StudentUserDetailSheet {
                     color: Colors.grey.shade300,
                     borderRadius: BorderRadius.circular(2))),
             SizedBox(height: 16),
-            CircleAvatar(
+            UserAvatar(
+              name: student.name,
               radius: 28,
-              backgroundColor: color.withOpacity(0.12),
-              child: Text(student.initial,
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: color)),
+              bgColor: color.withOpacity(0.12),
+              textColor: color,
+              photoUrl: student.photoUrl,
             ),
             SizedBox(height: 10),
             Text(student.name,
@@ -157,6 +156,7 @@ class StudentUserDetailSheet {
                             otherUserName: student.name,
                             otherUserRole: 'Student',
                             otherUserEmail: student.email,
+                            otherPhotoUrl: student.photoUrl,
                             avatarColor: color,
                           ),
                         ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../messaging/messaging_screen.dart';
 import '../../../shared/animations/animations.dart';
 import '../../../shared/theme/colors.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import '../../../models/user_model.dart';
 
 class TeacherMessagesTab extends StatelessWidget {
@@ -44,6 +45,7 @@ class TeacherMessagesTab extends StatelessWidget {
                                     otherUserRole:
                                         'Parent · ${p.children.isNotEmpty ? p.children.first.childName : ''}',
                                     otherUserEmail: p.email,
+                                    otherPhotoUrl: p.photoUrl,
                                     avatarColor: TatvaColors.primary,
                                   ))),
                       child: Container(
@@ -53,15 +55,12 @@ class TeacherMessagesTab extends StatelessWidget {
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(color: Colors.grey.shade100)),
                           child: Row(children: [
-                            CircleAvatar(
+                            UserAvatar(
+                                name: p.name,
                                 radius: 22,
-                                backgroundColor:
-                                    TatvaColors.primary.withOpacity(0.1),
-                                child: Text(p.initial,
-                                    style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: TatvaColors.primary))),
+                                bgColor: TatvaColors.primary.withOpacity(0.1),
+                                textColor: TatvaColors.primary,
+                                photoUrl: p.photoUrl),
                             const SizedBox(width: 14),
                             Expanded(
                                 child: Column(

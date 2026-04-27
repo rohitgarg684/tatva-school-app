@@ -775,12 +775,12 @@ class ApiService {
 
   // ─── Daily Defaults (Yoga, Lunch Break) ──────────────────────────────
 
-  Future<List<Map<String, dynamic>>> getDailyDefaults() async {
-    final data = await _get('/daily-defaults');
+  Future<List<Map<String, dynamic>>> getDailyDefaults(String grade) async {
+    final data = await _get('/daily-defaults/$grade');
     return (data['slots'] as List?)?.cast<Map<String, dynamic>>() ?? [];
   }
 
   Future<Map<String, dynamic>> setDailyDefaults(
-          List<Map<String, dynamic>> slots) =>
-      _put('/daily-defaults', {'slots': slots});
+          String grade, List<Map<String, dynamic>> slots) =>
+      _put('/daily-defaults/$grade', {'slots': slots});
 }

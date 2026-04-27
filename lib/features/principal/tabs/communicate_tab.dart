@@ -4,6 +4,7 @@ import '../../../models/vote_model.dart';
 import '../../../services/api_service.dart';
 import '../../../shared/animations/animations.dart';
 import '../../../shared/theme/colors.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import '../../messaging/messaging_screen.dart';
 
 class CommunicateTab extends StatelessWidget {
@@ -205,6 +206,7 @@ class CommunicateTab extends StatelessWidget {
                         otherUserName: p.name,
                         otherUserRole: 'Parent of $childName',
                         otherUserEmail: p.email,
+                        otherPhotoUrl: p.photoUrl,
                         avatarColor: pColor,
                       ),
                     ),
@@ -218,15 +220,12 @@ class CommunicateTab extends StatelessWidget {
                         border: Border.all(
                             color: Colors.grey.shade100)),
                     child: Row(children: [
-                      CircleAvatar(
+                      UserAvatar(
+                        name: p.name,
                         radius: 22,
-                        backgroundColor:
-                            pColor.withOpacity(0.12),
-                        child: Text(p.initial,
-                            style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: pColor)),
+                        bgColor: pColor.withOpacity(0.12),
+                        textColor: pColor,
+                        photoUrl: p.photoUrl,
                       ),
                       SizedBox(width: 14),
                       Expanded(

@@ -82,6 +82,7 @@ class AppRouter {
     required String otherUserName,
     required String otherUserRole,
     required String otherUserEmail,
+    String otherPhotoUrl = '',
     Color avatarColor = const Color(0xFF2E6B4F),
   }) {
     Navigator.push(
@@ -92,6 +93,7 @@ class AppRouter {
           otherUserName: otherUserName,
           otherUserRole: otherUserRole,
           otherUserEmail: otherUserEmail,
+          otherPhotoUrl: otherPhotoUrl,
           avatarColor: avatarColor,
         ),
       ),

@@ -30,6 +30,7 @@ class ProfileTab extends StatelessWidget {
               bgColor: TatvaColors.purple.withOpacity(0.1),
               textColor: TatvaColors.purple,
               borderColor: TatvaColors.accent,
+              photoUrl: user?.photoUrl ?? '',
             ),
           ),
           SizedBox(height: 16),

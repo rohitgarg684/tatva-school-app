@@ -4,6 +4,7 @@ import '../../../models/class_model.dart';
 import '../../../models/grade_model.dart';
 import '../../../models/user_model.dart';
 import '../../../shared/theme/colors.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import 'report_stat_card.dart';
 
 class ClassDetailSheet {
@@ -152,15 +153,12 @@ class ClassDetailSheet {
                                 borderRadius:
                                     BorderRadius.circular(12)),
                             child: Row(children: [
-                              CircleAvatar(
+                              UserAvatar(
+                                name: s.name,
                                 radius: 18,
-                                backgroundColor:
-                                    color.withOpacity(0.1),
-                                child: Text(s.initial,
-                                    style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                        color: color)),
+                                bgColor: color.withOpacity(0.1),
+                                textColor: color,
+                                photoUrl: s.photoUrl,
                               ),
                               SizedBox(width: 12),
                               Expanded(

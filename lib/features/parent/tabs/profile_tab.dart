@@ -35,7 +35,8 @@ class ParentProfileTab extends StatelessWidget {
                   radius: 46,
                   bgColor: TatvaColors.purple.withOpacity(0.1),
                   textColor: TatvaColors.purple,
-                  borderColor: TatvaColors.accent)),
+                  borderColor: TatvaColors.accent,
+                  photoUrl: user?.photoUrl ?? '')),
           const SizedBox(height: 16),
           FadeSlideIn(
               delayMs: 80,

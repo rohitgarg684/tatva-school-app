@@ -3,6 +3,7 @@ import '../../../models/class_model.dart';
 import '../../../models/user_model.dart';
 import '../../../shared/animations/animations.dart';
 import '../../../shared/theme/colors.dart';
+import '../../../shared/widgets/user_avatar.dart';
 
 class TeacherWorkloadTab extends StatelessWidget {
   final int teacherCount;
@@ -109,15 +110,12 @@ class TeacherWorkloadTab extends StatelessWidget {
                             Border.all(color: Colors.grey.shade100)),
                     child: Column(children: [
                       Row(children: [
-                        CircleAvatar(
+                        UserAvatar(
+                            name: t.name,
                             radius: 22,
-                            backgroundColor:
-                                tColor.withOpacity(0.12),
-                            child: Text(t.initial,
-                                style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: tColor))),
+                            bgColor: tColor.withOpacity(0.12),
+                            textColor: tColor,
+                            photoUrl: t.photoUrl),
                         SizedBox(width: 14),
                         Expanded(
                             child: Column(
