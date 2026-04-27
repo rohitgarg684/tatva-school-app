@@ -1,22 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../messaging/messaging_screen.dart';
-import '../../shared/animations/animations.dart';
-import '../auth/welcome_screen.dart';
 import '../../shared/theme/colors.dart';
 import '../../shared/widgets/bottom_nav_bar.dart';
-import '../../shared/widgets/logout_sheet.dart';
-import '../../core/router/app_router.dart';
+import '../../shared/mixins/dashboard_mixin.dart';
 import '../../repositories/auth_repository.dart';
 import '../../services/dashboard_service.dart';
 import '../../services/api_service.dart';
-import '../../models/user_model.dart';
-import '../../models/child_info.dart';
 import '../../models/announcement_model.dart';
 import '../../models/vote_model.dart';
-import '../../models/activity_event.dart';
-import '../../models/content_item.dart';
 import '../../models/weekly_report.dart';
+import '../../shared/utils/announcement_helpers.dart';
 import 'widgets/teacher_profile_sheet.dart';
 import 'widgets/weekly_report_sheet.dart';
 import 'tabs/home_tab.dart';
@@ -35,7 +28,7 @@ class ParentDashboard extends StatefulWidget {
 }
 
 class _ParentDashboardState extends State<ParentDashboard>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, DashboardMixin {
   static const List<TabItem> _tabs = [
     TabItem(icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: 'Home'),
     TabItem(icon: Icons.calendar_view_week_outlined, activeIcon: Icons.calendar_view_week_rounded, label: 'Schedule'),
@@ -46,9 +39,6 @@ class _ParentDashboardState extends State<ParentDashboard>
     TabItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Profile'),
   ];
 
-  int _currentTab = 0;
-  bool isLoading = true;
-
   final _dashSvc = DashboardService();
   final _api = ApiService();
   String _uid = '';
@@ -58,48 +48,16 @@ class _ParentDashboardState extends State<ParentDashboard>
   List<AnnouncementModel> _announcements = [];
   List<VoteModel> _activeVotes = [];
 
-  late AnimationController _shimmerController;
-  late AnimationController _greetingController;
-  late AnimationController _tabController;
-  late Animation<double> _shimmerAnim;
-  late Animation<double> _greetingFade;
-  late Animation<Offset> _greetingSlide;
-  late Animation<double> _greetingScale;
-  late Animation<double> _tabFade;
-
   @override
   void initState() {
     super.initState();
-    _shimmerController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1200))
-      ..repeat();
-    _shimmerAnim = Tween<double>(begin: -1, end: 2).animate(_shimmerController);
-    _greetingController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1000));
-    _greetingFade = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
-        parent: _greetingController,
-        curve: const Interval(0, 0.6, curve: Curves.easeOut)));
-    _greetingSlide =
-        Tween<Offset>(begin: const Offset(0, 0.15), end: Offset.zero).animate(
-            CurvedAnimation(
-                parent: _greetingController,
-                curve: const Interval(0, 0.7, curve: Curves.easeOutCubic)));
-    _greetingScale = Tween<double>(begin: 0.96, end: 1.0).animate(
-        CurvedAnimation(
-            parent: _greetingController,
-            curve: const Interval(0, 0.7, curve: Curves.easeOut)));
-    _tabController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 350));
-    _tabFade = Tween<double>(begin: 0, end: 1).animate(
-        CurvedAnimation(parent: _tabController, curve: Curves.easeOut));
+    initDashboardAnimations();
     _loadData();
   }
 
   @override
   void dispose() {
-    _shimmerController.dispose();
-    _greetingController.dispose();
-    _tabController.dispose();
+    disposeDashboardAnimations();
     super.dispose();
   }
 
@@ -117,18 +75,7 @@ class _ParentDashboardState extends State<ParentDashboard>
     } catch (e) {
       debugPrint('ParentDashboard._loadData error: $e');
     }
-    if (!mounted) return;
-    setState(() => isLoading = false);
-    _greetingController.forward();
-    _tabController.forward();
-  }
-
-  void _switchTab(int index) {
-    if (index == _currentTab) return;
-    HapticFeedback.selectionClick();
-    _tabController.reset();
-    setState(() => _currentTab = index);
-    _tabController.forward();
+    onDataLoaded();
   }
 
   void _castVote(int index, String option) async {
@@ -183,27 +130,11 @@ class _ParentDashboardState extends State<ParentDashboard>
   }
 
   void _toggleAnnouncementLike(AnnouncementModel ann) {
-    if (ann.id.isEmpty) return;
-    setState(() {
-      final idx = _announcements.indexWhere((a) => a.id == ann.id);
-      if (idx < 0) return;
-      final current = _announcements[idx];
-      final liked = current.likedBy.contains(_uid);
-      final newLikedBy = List<String>.from(current.likedBy);
-      liked ? newLikedBy.remove(_uid) : newLikedBy.add(_uid);
-      _announcements[idx] = current.copyWith(likedBy: newLikedBy);
-    });
+    setState(() => _announcements = toggleAnnouncementLike(_announcements, ann.id, _uid));
     _api.toggleAnnouncementLike(ann.id);
   }
 
-  void _logout() {
-    LogoutSheet.show(context, onConfirm: () async {
-      await AuthRepository().signOut();
-      if (context.mounted) {
-        AppRouter.toWelcomeAndClearStack(context);
-      }
-    });
-  }
+  void _logout() => logout();
 
   Future<void> _generateWeeklyReport() async {
     final child = _currentChild;
@@ -328,60 +259,9 @@ class _ParentDashboardState extends State<ParentDashboard>
 
   @override
   Widget build(BuildContext context) {
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark));
-    return Scaffold(
-      backgroundColor: TatvaColors.bgLight,
-      body: isLoading ? _buildShimmer() : _buildBody(),
-      bottomNavigationBar: isLoading ? null : _buildBottomNav(),
-    );
-  }
-
-  Widget _buildShimmer() => SafeArea(
-      child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(children: [
-            _sBox(double.infinity, 200, r: 24),
-            const SizedBox(height: 20),
-            Row(children: [
-              Expanded(child: _sBox(double.infinity, 88)),
-              const SizedBox(width: 10),
-              Expanded(child: _sBox(double.infinity, 88)),
-              const SizedBox(width: 10),
-              Expanded(child: _sBox(double.infinity, 88))
-            ]),
-            const SizedBox(height: 20),
-            _sBox(double.infinity, 80),
-            const SizedBox(height: 10),
-            _sBox(double.infinity, 80),
-          ])));
-
-  Widget _sBox(double w, double h, {double r = 12}) => AnimatedBuilder(
-      animation: _shimmerAnim,
-      builder: (_, __) => Container(
-          width: w,
-          height: h,
-          decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(r),
-              gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: const [
-                    Color(0xFFE8F0E8),
-                    Color(0xFFF5FAF5),
-                    Color(0xFFE8F0E8)
-                  ],
-                  stops: [
-                    (_shimmerAnim.value - 1).clamp(0.0, 1.0),
-                    _shimmerAnim.value.clamp(0.0, 1.0),
-                    (_shimmerAnim.value + 1).clamp(0.0, 1.0)
-                  ]))));
-
-  Widget _buildBody() => SafeArea(
-      child: FadeTransition(
-          opacity: _tabFade,
-          child: IndexedStack(index: _currentTab, children: [
+    return buildDashboardScaffold(
+      tabs: _tabs,
+      bodyBuilder: () => IndexedStack(index: currentTab, children: [
             ParentHomeTab(
               user: _data?.user,
               currentChild: _currentChild,
@@ -389,14 +269,17 @@ class _ParentDashboardState extends State<ParentDashboard>
               selectedChildIndex: _selectedChildIndex,
               announcements: _announcements,
               activityFeed: _data?.activityFeed ?? [],
-              greetingFade: _greetingFade,
-              greetingSlide: _greetingSlide,
-              greetingScale: _greetingScale,
+              greetingFade: greetingFade,
+              greetingSlide: greetingSlide,
+              greetingScale: greetingScale,
               onShowTeacherProfile: _showTeacherProfile,
-              onSwitchTab: _switchTab,
+              onSwitchTab: switchTab,
               onRefresh: _loadData,
               childSwitcher: _childSwitcher(),
               uid: _uid,
+              api: _api,
+              grade: _currentChild?.childClass?.grade,
+              childUid: _currentChild?.childUid,
               onToggleAnnouncementLike: _toggleAnnouncementLike,
             ),
             ParentScheduleTab(
@@ -423,9 +306,7 @@ class _ParentDashboardState extends State<ParentDashboard>
               onGenerateReport: _generateWeeklyReport,
               onLogout: _logout,
             ),
-          ])));
-
-  Widget _buildBottomNav() {
-    return TatvaBottomNavBar(items: _tabs, currentIndex: _currentTab, onTap: _switchTab);
+          ]),
+    );
   }
 }

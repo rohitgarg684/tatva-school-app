@@ -1,12 +1,13 @@
 import { Router } from "express";
 import * as admin from "firebase-admin";
 import { requireAuth, requireRole } from "../middleware/auth";
-import { db } from "../lib/firestore-helpers";
-import { cacheDeletePrefix } from "../lib/cache";
+import { db, getDoc } from "../lib/firestore-helpers";
+import { invalidateDashboards } from "../lib/cache-invalidation";
 import { asyncHandler } from "../lib/async-handler";
 import { deleteDocument } from "../lib/crud-helpers";
 import { Collections } from "../lib/collections";
 import { Config } from "../lib/config";
+import { logActivity } from "../lib/activity-logger";
 
 const router = Router();
 router.use(requireAuth);
@@ -56,8 +57,20 @@ router.post(
       res.json({ id: ref.id, created: true });
     }
 
-    cacheDeletePrefix("student_dash_");
-    cacheDeletePrefix("teacher_dash_");
+    const teacherDoc = await getDoc(Collections.USERS, req.uid!);
+    logActivity({
+      type: "gradeEntered",
+      actorUid: req.uid!,
+      actorName: teacherDoc?.name || "",
+      actorRole: req.role || "Teacher",
+      targetUid: studentUid,
+      classId,
+      title: `Grade entered: ${assessmentName}`,
+      body: `${subject} — ${score}/${total || Config.DEFAULT_SCORE_TOTAL}`,
+      metadata: { assessmentName, subject, score, total: total || Config.DEFAULT_SCORE_TOTAL },
+    });
+
+    invalidateDashboards("grades_");
   })
 );
 
@@ -96,7 +109,7 @@ router.post(
       total: total || Config.DEFAULT_SCORE_TOTAL,
       createdAt: FieldValue.serverTimestamp(),
     });
-    cacheDeletePrefix("teacher_dash_");
+    invalidateDashboards("grades_");
     res.json({ id: ref.id, created: true });
   })
 );

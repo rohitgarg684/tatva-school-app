@@ -2,10 +2,11 @@ import { Router } from "express";
 import * as admin from "firebase-admin";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { db, getDoc, serializeDocs } from "../lib/firestore-helpers";
-import { cacheDeletePrefix } from "../lib/cache";
+import { invalidateDashboards } from "../lib/cache-invalidation";
 import { asyncHandler } from "../lib/async-handler";
 import { Collections } from "../lib/collections";
 import { Config } from "../lib/config";
+import { logActivity } from "../lib/activity-logger";
 
 const router = Router();
 router.use(requireAuth);
@@ -38,11 +39,16 @@ router.post(
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    cacheDeletePrefix("announcements_");
-    cacheDeletePrefix("teacher_dash_");
-    cacheDeletePrefix("student_dash_");
-    cacheDeletePrefix("parent_dash_");
-    cacheDeletePrefix("principal_dash_");
+    logActivity({
+      type: "announcement",
+      actorUid: uid,
+      actorName: userDoc?.name || "",
+      actorRole: req.role || "",
+      title: `Announcement: ${title}`,
+      body: bodyText,
+    });
+
+    invalidateDashboards("announcements_");
     res.json({ id: ref.id, created: true });
   })
 );
@@ -76,6 +82,39 @@ router.get(
   })
 );
 
+router.get(
+  "/announcements/paginated",
+  asyncHandler(async (req, res) => {
+    const grade = req.query.grade as string | undefined;
+    const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+    const after = req.query.after as string | undefined;
+
+    let query: FirebaseFirestore.Query = db
+      .collection(Collections.ANNOUNCEMENTS)
+      .orderBy("createdAt", "desc");
+
+    if (after) {
+      query = query.where("createdAt", "<", new Date(after));
+    }
+
+    const fetchLimit = grade ? limit * 3 : limit + 1;
+    const snap = await query.limit(fetchLimit).get();
+    let docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    if (grade) {
+      docs = docs.filter(
+        (d: any) =>
+          d.audience === "Everyone" ||
+          (Array.isArray(d.grades) && d.grades.includes(grade))
+      );
+    }
+
+    const hasMore = docs.length > limit;
+    const items = serializeDocs(docs.slice(0, limit));
+    res.json({ items, hasMore });
+  })
+);
+
 router.post(
   "/announcement/:id/like",
   asyncHandler(async (req, res) => {
@@ -96,11 +135,7 @@ router.post(
         : FieldValue.arrayUnion(uid),
     });
 
-    cacheDeletePrefix("announcements_");
-    cacheDeletePrefix("teacher_dash_");
-    cacheDeletePrefix("student_dash_");
-    cacheDeletePrefix("parent_dash_");
-    cacheDeletePrefix("principal_dash_");
+    invalidateDashboards("announcements_");
     res.json({ id, liked: !isLiked });
   })
 );
@@ -135,11 +170,7 @@ router.put(
     }
 
     await ref.update(updates);
-    cacheDeletePrefix("announcements_");
-    cacheDeletePrefix("teacher_dash_");
-    cacheDeletePrefix("student_dash_");
-    cacheDeletePrefix("parent_dash_");
-    cacheDeletePrefix("principal_dash_");
+    invalidateDashboards("announcements_");
     res.json({ id, updated: true });
   })
 );
@@ -162,11 +193,7 @@ router.delete(
     }
 
     await ref.delete();
-    cacheDeletePrefix("announcements_");
-    cacheDeletePrefix("teacher_dash_");
-    cacheDeletePrefix("student_dash_");
-    cacheDeletePrefix("parent_dash_");
-    cacheDeletePrefix("principal_dash_");
+    invalidateDashboards("announcements_");
     res.json({ deleted: true });
   })
 );

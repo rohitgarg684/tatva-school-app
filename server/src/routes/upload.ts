@@ -5,7 +5,7 @@ import multer from "multer";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { isValidImage, isValidDocument } from "../lib/file-validation";
 import { db, serializeDocs } from "../lib/firestore-helpers";
-import { cacheDeletePrefix } from "../lib/cache";
+import { invalidateDashboards } from "../lib/cache-invalidation";
 import { asyncHandler } from "../lib/async-handler";
 import { Collections } from "../lib/collections";
 import { env } from "../env";
@@ -222,8 +222,7 @@ router.post(
         attachments: admin.firestore.FieldValue.arrayUnion(...uploaded),
       });
 
-      cacheDeletePrefix("teacher_dash_");
-      cacheDeletePrefix("student_dash_");
+      invalidateDashboards("homework_");
       res.json({ uploaded });
     } catch (err: any) {
       if (handleMulterError(err, res)) return;
@@ -272,8 +271,7 @@ router.post(
         submittedBy: admin.firestore.FieldValue.arrayUnion(uid),
       });
 
-      cacheDeletePrefix("student_dash_");
-      cacheDeletePrefix("teacher_dash_");
+      invalidateDashboards("homework_");
       res.json({ submitted: true, files: fileUrls });
     } catch (err: any) {
       if (handleMulterError(err, res)) return;

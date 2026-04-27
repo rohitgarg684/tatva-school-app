@@ -2,9 +2,11 @@ import { Router } from "express";
 import * as admin from "firebase-admin";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { db, serializeDocs } from "../lib/firestore-helpers";
-import { cacheDeletePrefix } from "../lib/cache";
+import { invalidateDashboards } from "../lib/cache-invalidation";
 import { asyncHandler } from "../lib/async-handler";
 import { Collections } from "../lib/collections";
+import { getDoc } from "../lib/firestore-helpers";
+import { logActivity } from "../lib/activity-logger";
 
 const router = Router();
 router.use(requireAuth);
@@ -38,7 +40,22 @@ router.post(
     }
     await batch.commit();
 
-    cacheDeletePrefix("teacher_dash_");
+    const teacherDoc = await getDoc(Collections.USERS, req.uid!);
+    const teacherName = teacherDoc?.name || "";
+    for (const rec of records) {
+      logActivity({
+        type: "attendance",
+        actorUid: req.uid!,
+        actorName: teacherName,
+        actorRole: req.role || "Teacher",
+        targetUid: rec.studentUid,
+        title: `Attendance: ${rec.status || "Present"}`,
+        body: rec.date,
+        metadata: { date: rec.date, status: rec.status || "Present" },
+      });
+    }
+
+    invalidateDashboards("attendance_");
     res.json({ marked: records.length });
   })
 );

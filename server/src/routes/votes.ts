@@ -2,9 +2,10 @@ import { Router } from "express";
 import * as admin from "firebase-admin";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { db, getDoc } from "../lib/firestore-helpers";
-import { cacheDeletePrefix } from "../lib/cache";
+import { invalidateDashboards } from "../lib/cache-invalidation";
 import { asyncHandler } from "../lib/async-handler";
 import { Collections } from "../lib/collections";
+import { logActivity } from "../lib/activity-logger";
 
 const router = Router();
 router.use(requireAuth);
@@ -34,7 +35,15 @@ router.post(
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    cacheDeletePrefix("votes_active");
+    logActivity({
+      type: "voteCreated",
+      actorUid: uid,
+      actorName: userDoc?.name || "",
+      actorRole: req.role || "Principal",
+      title: `Vote: ${question}`,
+    });
+
+    invalidateDashboards("votes_active");
     res.json({ id: ref.id, created: true });
   })
 );
@@ -66,7 +75,7 @@ router.post(
       voters: FieldValue.arrayUnion(uid),
     });
 
-    cacheDeletePrefix("votes_active");
+    invalidateDashboards("votes_active");
     res.json({ voteId, voted: true, choice });
   })
 );
@@ -78,7 +87,7 @@ router.post(
     const voteId = req.params.voteId as string;
 
     await db.collection(Collections.VOTES).doc(voteId).update({ active: false });
-    cacheDeletePrefix("votes_active");
+    invalidateDashboards("votes_active");
 
     res.json({ voteId, closed: true });
   })

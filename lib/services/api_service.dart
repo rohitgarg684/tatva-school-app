@@ -127,6 +127,44 @@ class ApiService {
   Future<Map<String, dynamic>> markContentCompleted(String contentId) =>
       _post('/content/$contentId/complete', {});
 
+  Future<Map<String, dynamic>> createContent({
+    required String title,
+    required String description,
+    required String category,
+    String duration = '',
+    String grade = '',
+    List<String> studentUids = const [],
+  }) =>
+      _post('/content', {
+        'title': title,
+        'description': description,
+        'category': category,
+        'duration': duration,
+        'grade': grade,
+        'studentUids': studentUids,
+      });
+
+  Future<Map<String, dynamic>> updateContent(
+    String contentId, {
+    String? title,
+    String? description,
+    String? category,
+    String? duration,
+    String? grade,
+    List<String>? studentUids,
+  }) =>
+      _put('/content/$contentId', {
+        if (title != null) 'title': title,
+        if (description != null) 'description': description,
+        if (category != null) 'category': category,
+        if (duration != null) 'duration': duration,
+        if (grade != null) 'grade': grade,
+        if (studentUids != null) 'studentUids': studentUids,
+      });
+
+  Future<Map<String, dynamic>> deleteContent(String contentId) =>
+      _delete('/content/$contentId');
+
   Future<Map<String, dynamic>> castVote(String voteId, String choice) =>
       _post('/vote/$voteId/cast', {'choice': choice});
 
@@ -395,6 +433,24 @@ class ApiService {
 
   Future<Map<String, dynamic>> deleteAnnouncement(String id) =>
       _delete('/announcement/$id');
+
+  Future<Map<String, dynamic>> getAnnouncementsPaginated({
+    String? grade,
+    int limit = 10,
+    String? after,
+  }) => _get('/announcements/paginated?limit=$limit'
+      '${grade != null ? '&grade=$grade' : ''}'
+      '${after != null ? '&after=$after' : ''}');
+
+  Future<Map<String, dynamic>> getActivitiesPaginated({
+    String? targetUid,
+    String? classId,
+    int limit = 10,
+    String? after,
+  }) => _get('/dashboard/activities/paginated?limit=$limit'
+      '${targetUid != null ? '&targetUid=$targetUid' : ''}'
+      '${classId != null ? '&classId=$classId' : ''}'
+      '${after != null ? '&after=$after' : ''}');
 
   Future<Map<String, dynamic>> createVote({required String question}) =>
       _post('/vote', {'question': question});

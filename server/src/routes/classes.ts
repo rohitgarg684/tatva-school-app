@@ -2,7 +2,7 @@ import { Router } from "express";
 import * as admin from "firebase-admin";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { db, getDoc } from "../lib/firestore-helpers";
-import { cacheDeletePrefix } from "../lib/cache";
+import { invalidateDashboards } from "../lib/cache-invalidation";
 import { asyncHandler } from "../lib/async-handler";
 import { Collections } from "../lib/collections";
 
@@ -45,7 +45,7 @@ router.post(
       classIds: FieldValue.arrayUnion(ref.id),
     });
 
-    cacheDeletePrefix("teacher_dash_");
+    invalidateDashboards("classes_");
     res.json({ id: ref.id, created: true });
   })
 );
@@ -88,10 +88,7 @@ router.delete(
 
     await batch.commit();
 
-    cacheDeletePrefix("teacher_dash_");
-    cacheDeletePrefix("principal_dash_");
-    cacheDeletePrefix("student_dash_");
-    cacheDeletePrefix("parent_dash_");
+    invalidateDashboards("classes_");
     res.json({ id: classId, deleted: true });
   })
 );
@@ -141,9 +138,7 @@ router.post(
       classIds: FieldValue.arrayUnion(classId),
     });
 
-    cacheDeletePrefix("student_dash_");
-    cacheDeletePrefix("parent_dash_");
-    cacheDeletePrefix("teacher_dash_");
+    invalidateDashboards("classes_");
     res.json({ classId, joined: true });
   })
 );

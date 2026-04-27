@@ -2,35 +2,7 @@ import '../../models/attendance_record.dart';
 import '../../models/attendance_status.dart';
 import '../../models/weekly_report.dart';
 
-String formatTimeAgo(DateTime dt) {
-  final local = dt.toLocal();
-  final now = DateTime.now();
-  final diff = now.difference(local);
-  const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  final time = '${local.hour % 12 == 0 ? 12 : local.hour % 12}:${local.minute.toString().padLeft(2, '0')} ${local.hour < 12 ? 'AM' : 'PM'}';
-
-  String relative;
-  if (diff.inMinutes < 1) {
-    relative = 'now';
-  } else if (diff.inMinutes < 60) {
-    relative = '${diff.inMinutes}m ago';
-  } else if (diff.inHours < 24) {
-    relative = '${diff.inHours}h ago';
-  } else if (diff.inDays < 7) {
-    relative = '${diff.inDays}d ago';
-  } else {
-    relative = '${(diff.inDays / 7).floor()}w ago';
-  }
-
-  if (diff.inHours < 24) {
-    final isToday = local.day == now.day && local.month == now.month && local.year == now.year;
-    return '${isToday ? 'Today' : 'Yesterday'}, $time · $relative';
-  }
-  if (local.year == now.year) {
-    return '${months[local.month]} ${local.day}, $time · $relative';
-  }
-  return '${months[local.month]} ${local.day}, ${local.year} · $relative';
-}
+export '../../shared/utils/activity_helpers.dart' show formatTimeAgo;
 
 ({int present, int absent, int tardy, int total})
     computeAttendanceSummary(List<AttendanceRecord> records) {

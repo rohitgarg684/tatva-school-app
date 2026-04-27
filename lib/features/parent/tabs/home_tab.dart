@@ -5,10 +5,16 @@ import '../../../shared/animations/animations.dart';
 import '../../../shared/utils/greeting.dart';
 import '../../../shared/widgets/attendance_detail_sheet.dart';
 import '../../../shared/widgets/announcement_card.dart';
+import '../../../shared/widgets/greeting_card.dart';
+import '../../../shared/widgets/quick_action_button.dart';
 import '../../../models/user_model.dart';
 import '../../../models/child_info.dart';
 import '../../../models/announcement_model.dart';
 import '../../../models/activity_event.dart';
+import '../../../services/api_service.dart';
+import '../../../shared/screens/announcements_list_screen.dart';
+import '../../../shared/screens/activity_list_screen.dart';
+import '../../../shared/utils/activity_helpers.dart' as activity_helpers;
 import '../parent_helpers.dart';
 
 class ParentHomeTab extends StatelessWidget {
@@ -26,6 +32,9 @@ class ParentHomeTab extends StatelessWidget {
   final ValueChanged<int> onSwitchTab;
   final Future<void> Function() onRefresh;
   final Widget childSwitcher;
+  final ApiService api;
+  final String? grade;
+  final String? childUid;
   final void Function(AnnouncementModel) onToggleAnnouncementLike;
 
   const ParentHomeTab({
@@ -44,6 +53,9 @@ class ParentHomeTab extends StatelessWidget {
     required this.onRefresh,
     required this.childSwitcher,
     required this.uid,
+    required this.api,
+    this.grade,
+    this.childUid,
     required this.onToggleAnnouncementLike,
   });
 
@@ -276,26 +288,36 @@ class ParentHomeTab extends StatelessWidget {
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(children: [
-                  _qaBtn('Message\nTeacher', Icons.chat_outlined,
-                      TatvaColors.info, onShowTeacherProfile),
+                  Expanded(child: QuickActionButton(label: 'Message\nTeacher', icon: Icons.chat_outlined,
+                      color: TatvaColors.info, onTap: onShowTeacherProfile)),
                   const SizedBox(width: 8),
-                  _qaBtn('Progress\nReport', Icons.bar_chart_rounded,
-                      TatvaColors.purple, () => onSwitchTab(1)),
+                  Expanded(child: QuickActionButton(label: 'Progress\nReport', icon: Icons.bar_chart_rounded,
+                      color: TatvaColors.purple, onTap: () => onSwitchTab(1))),
                   const SizedBox(width: 8),
-                  _qaBtn('Cast\nVote', Icons.how_to_vote_outlined,
-                      TatvaColors.accent, () => onSwitchTab(5)),
+                  Expanded(child: QuickActionButton(label: 'Cast\nVote', icon: Icons.how_to_vote_outlined,
+                      color: TatvaColors.accent, onTap: () => onSwitchTab(5))),
                 ])),
             const SizedBox(height: 24),
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: const Text('Announcements',
-                    style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: TatvaColors.neutral900,
-                        letterSpacing: -0.3))),
+                child: Row(children: [
+                  const Expanded(child: Text('Announcements',
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: TatvaColors.neutral900,
+                          letterSpacing: -0.3))),
+                  if (announcements.length > 3)
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => AnnouncementsListScreen(
+                              api: api, currentUid: uid, currentRole: 'Parent', grade: grade))),
+                      child: const Text('See All',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: TatvaColors.info)),
+                    ),
+                ])),
             const SizedBox(height: 12),
-            ...announcements.asMap().entries.map((e) => Padding(
+            ...announcements.take(3).toList().asMap().entries.map((e) => Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: AnnouncementCard(
                     announcement: e.value,
@@ -309,58 +331,29 @@ class ParentHomeTab extends StatelessWidget {
               const SizedBox(height: 24),
               Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: const Text('Recent Activity',
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: TatvaColors.neutral900,
-                          letterSpacing: -0.3))),
+                  child: Row(children: [
+                    const Expanded(child: Text('Recent Activity',
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: TatvaColors.neutral900,
+                            letterSpacing: -0.3))),
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => ActivityListScreen(
+                              api: api, targetUid: childUid, title: 'Activity'))),
+                      child: const Text('See All',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: TatvaColors.info)),
+                    ),
+                  ])),
               const SizedBox(height: 12),
               ...activityFeed.take(5).toList().asMap().entries.map((entry) {
                 final evt = entry.value;
                 final timeAgo = evt.createdAt != null
-                    ? formatTimeAgo(evt.createdAt!)
+                    ? activity_helpers.formatTimeAgo(evt.createdAt!)
                     : '';
-                IconData evtIcon;
-                Color evtColor;
-                switch (evt.type) {
-                  case ActivityType.behaviorPoint:
-                    evtIcon = Icons.star_rounded;
-                    evtColor = TatvaColors.purple;
-                    break;
-                  case ActivityType.attendance:
-                    evtIcon = Icons.calendar_today_rounded;
-                    evtColor = TatvaColors.info;
-                    break;
-                  case ActivityType.homeworkAssigned:
-                    evtIcon = Icons.assignment_outlined;
-                    evtColor = TatvaColors.accent;
-                    break;
-                  case ActivityType.homeworkSubmitted:
-                    evtIcon = Icons.assignment_turned_in_outlined;
-                    evtColor = TatvaColors.success;
-                    break;
-                  case ActivityType.gradeEntered:
-                    evtIcon = Icons.grading_rounded;
-                    evtColor = TatvaColors.info;
-                    break;
-                  case ActivityType.announcement:
-                    evtIcon = Icons.campaign_outlined;
-                    evtColor = TatvaColors.error;
-                    break;
-                  case ActivityType.storyPost:
-                    evtIcon = Icons.auto_stories_outlined;
-                    evtColor = TatvaColors.purple;
-                    break;
-                  case ActivityType.voteCreated:
-                    evtIcon = Icons.how_to_vote_outlined;
-                    evtColor = TatvaColors.accent;
-                    break;
-                  case ActivityType.studentEnrolled:
-                    evtIcon = Icons.person_add_outlined;
-                    evtColor = TatvaColors.success;
-                    break;
-                }
+                final evtIcon = activity_helpers.activityIcon(evt.type);
+                final evtColor = activity_helpers.activityColor(evt.type);
                 return Container(
                   margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
                   padding: const EdgeInsets.all(14),
@@ -423,97 +416,18 @@ class ParentHomeTab extends StatelessWidget {
     final parentOfLabel = childNames.length <= 1
         ? 'Parent of ${childNames.isNotEmpty ? childNames.first : ''}'
         : 'Parent of ${childNames.join(' & ')}';
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      child: WaveCard(
-        gradientColors: const [
-          Color(0xFF6A1B9A),
-          Color(0xFF8E24AA),
-          Color(0xFFAB47BC)
-        ],
-        boxShadow: [
-          BoxShadow(
-              color: TatvaColors.purple.withOpacity(0.35),
-              blurRadius: 24,
-              offset: const Offset(0, 10))
-        ],
-        child: Stack(children: [
-          Positioned(
-              top: -20,
-              right: 60,
-              child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.04)))),
-          Positioned(
-              top: 10,
-              right: -20,
-              child: Container(
-                  width: 140,
-                  height: 140,
-                  decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.04)))),
-          Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Expanded(
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                            Row(children: [
-                              Text(Greeting.emoji,
-                                  style: const TextStyle(fontSize: 16)),
-                              const SizedBox(width: 6),
-                              Text(Greeting.text,
-                                  style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.white.withOpacity(0.7)))
-                            ]),
-                            const SizedBox(height: 6),
-                            TypewriterText(
-                                text: user?.name ?? '',
-                                delayMs: 400,
-                                style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    letterSpacing: -0.5,
-                                    height: 1.1)),
-                            const SizedBox(height: 4),
-                            Text(parentOfLabel,
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.white.withOpacity(0.6))),
-                          ])),
-                      HeroAvatar(
-                          heroTag: 'parent_avatar',
-                          initial: user?.initial ?? '?',
-                          radius: 26,
-                          bgColor: Colors.white.withOpacity(0.15),
-                          textColor: Colors.white,
-                          borderColor: Colors.white.withOpacity(0.3)),
-                    ]),
-                    const SizedBox(height: 16),
-                    Row(children: [
-                      _miniStat('${avg.toStringAsFixed(0)}%', 'Avg Grade',
-                          TatvaColors.accent),
-                      const SizedBox(width: 20),
-                      _miniStat('${grades.length}', 'Tests', Colors.white),
-                      const SizedBox(width: 20),
-                      _miniStat(
-                          '${grades.map((g) => g.subject).toSet().length}',
-                          'Subjects',
-                          Colors.white),
-                    ]),
-                  ])),
-        ]),
-      ),
+    return GreetingCard(
+      gradientColors: const [Color(0xFF6A1B9A), Color(0xFF8E24AA), Color(0xFFAB47BC)],
+      heroTag: 'parent_avatar',
+      userName: user?.name ?? '',
+      subtitle: parentOfLabel,
+      bottomWidget: Row(children: [
+        _miniStat('${avg.toStringAsFixed(0)}%', 'Avg Grade', TatvaColors.accent),
+        const SizedBox(width: 20),
+        _miniStat('${grades.length}', 'Tests', Colors.white),
+        const SizedBox(width: 20),
+        _miniStat('${grades.map((g) => g.subject).toSet().length}', 'Subjects', Colors.white),
+      ]),
     );
   }
 
@@ -527,32 +441,4 @@ class ParentHomeTab extends StatelessWidget {
                 fontSize: 10, color: Colors.white.withOpacity(0.5))),
       ]);
 
-  Widget _qaBtn(
-          String label, IconData icon, Color color, VoidCallback onTap) =>
-      Expanded(
-          child: GestureDetector(
-              onTap: onTap,
-              child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-                  decoration: BoxDecoration(
-                      color: TatvaColors.bgCard,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.grey.shade100)),
-                  child: Column(children: [
-                    Container(
-                        padding: const EdgeInsets.all(9),
-                        decoration: BoxDecoration(
-                            color: color.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(10)),
-                        child: Icon(icon, color: color, size: 18)),
-                    const SizedBox(height: 7),
-                    Text(label,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            fontSize: 10,
-                            color: TatvaColors.neutral600,
-                            fontWeight: FontWeight.w600,
-                            height: 1.3)),
-                  ]))));
 }

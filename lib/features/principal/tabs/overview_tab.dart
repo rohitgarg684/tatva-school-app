@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 import '../../../models/activity_event.dart';
+import '../../../models/announcement_model.dart';
 import '../../../models/user_model.dart';
+import '../../../services/api_service.dart';
 import '../../../shared/animations/animations.dart';
+import '../../../shared/screens/announcements_list_screen.dart';
 import '../../../shared/theme/colors.dart';
 import '../../../shared/utils/greeting.dart';
+import '../../../shared/widgets/announcement_card.dart';
+import '../../../shared/widgets/greeting_card.dart';
+import '../../../shared/widgets/stat_card.dart';
+import '../../parent/parent_helpers.dart';
 import '../widgets/line_chart_painter.dart';
 
 class OverviewTab extends StatelessWidget {
@@ -13,6 +20,10 @@ class OverviewTab extends StatelessWidget {
   final int classCount;
   final Map<String, double> subjectAverages;
   final List<ActivityEvent> activityFeed;
+  final List<AnnouncementModel> announcements;
+  final ApiService api;
+  final String uid;
+  final void Function(AnnouncementModel) onToggleAnnouncementLike;
   final Animation<double> greetingFade;
   final Animation<Offset> greetingSlide;
   final Animation<double> greetingScale;
@@ -29,6 +40,10 @@ class OverviewTab extends StatelessWidget {
     required this.classCount,
     required this.subjectAverages,
     required this.activityFeed,
+    this.announcements = const [],
+    required this.api,
+    required this.uid,
+    required this.onToggleAnnouncementLike,
     required this.greetingFade,
     required this.greetingSlide,
     required this.greetingScale,
@@ -67,23 +82,22 @@ class OverviewTab extends StatelessWidget {
                 Expanded(
                     child: FlipCard(
                         delayMs: 0,
-                        child: _statCard('$teacherCount', 'Teachers',
-                            Icons.people_outline, TatvaColors.primary))),
+                        child: StatCard(value: '$teacherCount', label: 'Teachers',
+                            icon: Icons.people_outline, color: TatvaColors.primary))),
                 SizedBox(width: 10),
                 Expanded(
                     child: FlipCard(
                         delayMs: 100,
-                        child: _statCard('$studentCount', 'Students',
-                            Icons.school_outlined, TatvaColors.info))),
+                        child: StatCard(value: '$studentCount', label: 'Students',
+                            icon: Icons.school_outlined, color: TatvaColors.info))),
                 SizedBox(width: 10),
                 Expanded(
                     child: FlipCard(
                         delayMs: 200,
-                        child: _statCard(
-                            '${schoolAvg.toStringAsFixed(1)}%',
-                            'Avg',
-                            Icons.bar_chart_rounded,
-                            TatvaColors.success))),
+                        child: StatCard(value: '${schoolAvg.toStringAsFixed(1)}%',
+                            label: 'Avg',
+                            icon: Icons.bar_chart_rounded,
+                            color: TatvaColors.success))),
               ]),
             ),
             SizedBox(height: 10),
@@ -95,26 +109,24 @@ class OverviewTab extends StatelessWidget {
                         delayMs: 300,
                         child: GestureDetector(
                             onTap: () => onSwitchTab(1),
-                            child: _statCard(
-                                '${activityFeed.length}',
-                                'Activity',
-                                Icons.timeline_rounded,
-                                TatvaColors.accent)))),
+                            child: StatCard(value: '${activityFeed.length}',
+                                label: 'Activity',
+                                icon: Icons.timeline_rounded,
+                                color: TatvaColors.accent)))),
                 SizedBox(width: 10),
                 Expanded(
                     child: FlipCard(
                         delayMs: 400,
-                        child: _statCard('$classCount', 'Classes',
-                            Icons.class_outlined, TatvaColors.purple))),
+                        child: StatCard(value: '$classCount', label: 'Classes',
+                            icon: Icons.class_outlined, color: TatvaColors.purple))),
                 SizedBox(width: 10),
                 Expanded(
                     child: FlipCard(
                         delayMs: 500,
-                        child: _statCard(
-                            '—',
-                            'Tasks',
-                            Icons.assignment_outlined,
-                            TatvaColors.error))),
+                        child: StatCard(value: '—',
+                            label: 'Tasks',
+                            icon: Icons.assignment_outlined,
+                            color: TatvaColors.error))),
               ]),
             ),
             SizedBox(height: 28),
@@ -288,6 +300,39 @@ class OverviewTab extends StatelessWidget {
                 ),
               ),
             ),
+            if (announcements.isNotEmpty) ...[
+              SizedBox(height: 28),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Row(children: [
+                  Expanded(child: Text('Announcements',
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: TatvaColors.neutral900,
+                          letterSpacing: -0.3))),
+                  if (announcements.length > 3)
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => AnnouncementsListScreen(
+                              api: api, currentUid: uid, currentRole: 'Principal'))),
+                      child: Text('See All',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: TatvaColors.info)),
+                    ),
+                ]),
+              ),
+              SizedBox(height: 12),
+              ...announcements.take(3).toList().asMap().entries.map((e) => Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    child: AnnouncementCard(
+                      announcement: e.value,
+                      currentUid: uid,
+                      currentRole: 'Principal',
+                      isFirst: e.key == 0,
+                      onLike: () => onToggleAnnouncementLike(e.value),
+                    ),
+                  )),
+            ],
             SizedBox(height: 24),
           ],
         ),
@@ -296,111 +341,22 @@ class OverviewTab extends StatelessWidget {
   }
 
   Widget _buildGreetingCard() {
-    return Container(
-      margin: EdgeInsets.fromLTRB(20, 16, 20, 0),
-      child: WaveCard(
-        gradientColors: [
-          Color(0xFF4A148C),
-          Color(0xFF7B1FA2),
-          Color(0xFF9C27B0)
-        ],
-        boxShadow: [
-          BoxShadow(
-              color: TatvaColors.purple.withOpacity(0.35),
-              blurRadius: 24,
-              offset: Offset(0, 10)),
-          BoxShadow(
-              color: TatvaColors.purple.withOpacity(0.15),
-              blurRadius: 48,
-              offset: Offset(0, 20)),
-        ],
-        child: Stack(
-          children: [
-            Positioned(
-                top: -20,
-                right: 60,
-                child: Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.04)))),
-            Positioned(
-                top: 10,
-                right: -20,
-                child: Container(
-                    width: 140,
-                    height: 140,
-                    decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.04)))),
-            Padding(
-              padding: EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
-                    Expanded(
-                      child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
-                          children: [
-                            Row(children: [
-                              Text(Greeting.emoji,
-                                  style: TextStyle(fontSize: 16)),
-                              SizedBox(width: 6),
-                              Text(Greeting.text,
-                                  style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.white
-                                          .withOpacity(0.7),
-                                      fontWeight: FontWeight.w500)),
-                            ]),
-                            SizedBox(height: 6),
-                            TypewriterText(
-                                text: user?.name ?? '',
-                                delayMs: 400,
-                                style: TextStyle(
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    letterSpacing: -0.5,
-                                    height: 1.1)),
-                            SizedBox(height: 6),
-                            Text('Tatva Academy · Principal',
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.white
-                                        .withOpacity(0.6))),
-                          ]),
-                    ),
-                    HeroAvatar(
-                        heroTag: 'principal_avatar',
-                        initial: user?.initial ?? 'P',
-                        radius: 26,
-                        bgColor: Colors.white.withOpacity(0.15),
-                        textColor: Colors.white,
-                        borderColor:
-                            Colors.white.withOpacity(0.3)),
-                  ]),
-                  SizedBox(height: 20),
-                  Container(
-                      height: 1,
-                      color: Colors.white.withOpacity(0.1)),
-                  SizedBox(height: 16),
-                  Row(children: [
-                    _greetingStatItem('$teacherCount', 'Teachers'),
-                    _greetingDivider(),
-                    _greetingStatItem('$studentCount', 'Students'),
-                    _greetingDivider(),
-                    _greetingStatItem('$classCount', 'Classes'),
-                  ]),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+    return GreetingCard(
+      gradientColors: const [Color(0xFF4A148C), Color(0xFF7B1FA2), Color(0xFF9C27B0)],
+      heroTag: 'principal_avatar',
+      userName: user?.name ?? '',
+      subtitle: 'Tatva Academy · Principal',
+      bottomWidget: Column(children: [
+        Container(height: 1, color: Colors.white.withOpacity(0.1)),
+        const SizedBox(height: 16),
+        Row(children: [
+          _greetingStatItem('$teacherCount', 'Teachers'),
+          _greetingDivider(),
+          _greetingStatItem('$studentCount', 'Students'),
+          _greetingDivider(),
+          _greetingStatItem('$classCount', 'Classes'),
+        ]),
+      ]),
     );
   }
 
@@ -423,36 +379,4 @@ class OverviewTab extends StatelessWidget {
   Widget _greetingDivider() => Container(
       width: 1, height: 28, color: Colors.white.withOpacity(0.1));
 
-  Widget _statCard(
-          String value, String label, IconData icon, Color color) =>
-      Container(
-        padding: EdgeInsets.all(14),
-        decoration: BoxDecoration(
-            color: TatvaColors.bgCard,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade100)),
-        child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                  padding: EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                      color: color.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8)),
-                  child: Icon(icon, color: color, size: 16)),
-              SizedBox(height: 10),
-              Text(value,
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: TatvaColors.neutral900,
-                      letterSpacing: -0.5)),
-              SizedBox(height: 2),
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 10,
-                      color: TatvaColors.neutral400,
-                      fontWeight: FontWeight.w500)),
-            ]),
-      );
 }

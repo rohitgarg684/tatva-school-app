@@ -2,7 +2,7 @@ import { Router } from "express";
 import * as admin from "firebase-admin";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { db, getDoc, serializeDocs, serializeDoc } from "../lib/firestore-helpers";
-import { cacheDeletePrefix } from "../lib/cache";
+import { invalidateDashboards } from "../lib/cache-invalidation";
 import { asyncHandler } from "../lib/async-handler";
 import { deleteDocument } from "../lib/crud-helpers";
 import { Collections } from "../lib/collections";
@@ -148,7 +148,7 @@ router.post(
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    cacheDeletePrefix("teacher_dash_");
+    invalidateDashboards("schedules_");
     res.json({ id: ref.id, created: true });
   })
 );
@@ -201,8 +201,7 @@ router.post(
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    cacheDeletePrefix("teacher_dash_");
-    cacheDeletePrefix("student_dash_");
+    invalidateDashboards("schedules_");
     res.json({ id: docId, cancelled: true });
   })
 );

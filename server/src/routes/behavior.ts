@@ -2,10 +2,11 @@ import { Router } from "express";
 import * as admin from "firebase-admin";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { db } from "../lib/firestore-helpers";
-import { cacheDeletePrefix } from "../lib/cache";
+import { invalidateDashboards } from "../lib/cache-invalidation";
 import { asyncHandler } from "../lib/async-handler";
 import { deleteDocument } from "../lib/crud-helpers";
 import { Collections } from "../lib/collections";
+import { logActivity } from "../lib/activity-logger";
 
 const router = Router();
 router.use(requireAuth);
@@ -38,8 +39,18 @@ router.post(
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    cacheDeletePrefix("student_dash_");
-    cacheDeletePrefix("teacher_dash_");
+    logActivity({
+      type: "behaviorPoint",
+      actorUid: uid,
+      actorName: awardedByName,
+      actorRole: req.role || "Teacher",
+      targetUid: studentUid,
+      classId,
+      title: `${(points || 1) > 0 ? '+' : ''}${points || 1} ${categoryId}`,
+      metadata: { categoryId, points: points || 1, note: note || "" },
+    });
+
+    invalidateDashboards("behavior_");
     res.json({ id: ref.id, awarded: true });
   })
 );

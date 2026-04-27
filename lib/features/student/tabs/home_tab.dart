@@ -4,6 +4,7 @@ import '../../../shared/theme/colors.dart';
 import '../../../shared/utils/greeting.dart';
 import '../../../shared/widgets/attendance_detail_sheet.dart';
 import '../../../shared/widgets/announcement_card.dart';
+import '../../../shared/widgets/greeting_card.dart';
 import '../../../models/user_model.dart';
 import '../../../models/class_model.dart';
 import '../../../models/grade_model.dart';
@@ -14,6 +15,10 @@ import '../../../models/behavior_category.dart';
 import '../../../models/attendance_record.dart';
 import '../../../models/attendance_status.dart';
 import '../../../models/activity_event.dart';
+import '../../../services/api_service.dart';
+import '../../../shared/screens/announcements_list_screen.dart';
+import '../../../shared/screens/activity_list_screen.dart';
+import '../../../shared/utils/activity_helpers.dart' as activity_helpers;
 import '../../parent/parent_helpers.dart';
 
 class StudentHomeTab extends StatelessWidget {
@@ -34,6 +39,8 @@ class StudentHomeTab extends StatelessWidget {
   final String uid;
   final VoidCallback onSwitchToHomework;
   final Future<void> Function() onRefresh;
+  final ApiService api;
+  final String? grade;
   final void Function(AnnouncementModel) onToggleAnnouncementLike;
 
   const StudentHomeTab({
@@ -55,6 +62,8 @@ class StudentHomeTab extends StatelessWidget {
     required this.onSwitchToHomework,
     required this.onRefresh,
     required this.uid,
+    required this.api,
+    this.grade,
     required this.onToggleAnnouncementLike,
   });
 
@@ -138,16 +147,26 @@ class StudentHomeTab extends StatelessWidget {
           const SizedBox(height: 24),
           Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: const Text('Announcements',
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: TatvaColors.neutral900,
-                      letterSpacing: -0.3))),
+              child: Row(children: [
+                const Expanded(child: Text('Announcements',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: TatvaColors.neutral900,
+                        letterSpacing: -0.3))),
+                if (announcements.length > 3)
+                  GestureDetector(
+                    onTap: () => Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => AnnouncementsListScreen(
+                            api: api, currentUid: uid, currentRole: 'Student', grade: grade))),
+                    child: const Text('See All',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: TatvaColors.info)),
+                  ),
+              ])),
           const SizedBox(height: 12),
-          _buildAnnouncements(),
+          _buildAnnouncements(context),
           const SizedBox(height: 28),
-          _buildRecentActivity(),
+          _buildRecentActivity(context),
           const SizedBox(height: 28),
           _buildVoteResults(),
           const SizedBox(height: 24),
@@ -388,28 +407,29 @@ class StudentHomeTab extends StatelessWidget {
         ]),
       ));
 
-  Widget _buildAnnouncements() {
+  Widget _buildAnnouncements(BuildContext context) {
+    final capped = announcements.take(3).toList();
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemCount: announcements.length,
-      itemBuilder: (context, index) {
+      itemCount: capped.length,
+      itemBuilder: (_, index) {
         return StaggeredItem(
           index: index,
           child: AnnouncementCard(
-            announcement: announcements[index],
+            announcement: capped[index],
             currentUid: uid,
             currentRole: 'Student',
             isFirst: index == 0,
-            onLike: () => onToggleAnnouncementLike(announcements[index]),
+            onLike: () => onToggleAnnouncementLike(capped[index]),
           ),
         );
       },
     );
   }
 
-  Widget _buildRecentActivity() {
+  Widget _buildRecentActivity(BuildContext context) {
     if (activityFeed.isEmpty) return const SizedBox.shrink();
     final events = activityFeed.length > 5
         ? activityFeed.sublist(0, 5)
@@ -417,12 +437,21 @@ class StudentHomeTab extends StatelessWidget {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: const Text('Recent Activity',
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: TatvaColors.neutral900,
-                  letterSpacing: -0.3))),
+          child: Row(children: [
+            const Expanded(child: Text('Recent Activity',
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: TatvaColors.neutral900,
+                    letterSpacing: -0.3))),
+            GestureDetector(
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => ActivityListScreen(
+                      api: api, targetUid: uid, title: 'Activity'))),
+              child: const Text('See All',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: TatvaColors.info)),
+            ),
+          ])),
       const SizedBox(height: 12),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -436,9 +465,9 @@ class StudentHomeTab extends StatelessWidget {
             children: events.asMap().entries.map((entry) {
               final idx = entry.key;
               final event = entry.value;
-              final icon = _activityIcon(event.type.name);
+              final icon = activity_helpers.activityIcon(event.type);
               final timeAgo = event.createdAt != null
-                  ? formatTimeAgo(event.createdAt!)
+                  ? activity_helpers.formatTimeAgo(event.createdAt!)
                   : '';
               return Column(children: [
                 if (idx > 0)
@@ -480,25 +509,6 @@ class StudentHomeTab extends StatelessWidget {
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     final l = dt.toLocal();
     return '${months[l.month - 1]} ${l.day}';
-  }
-
-  IconData _activityIcon(String type) {
-    switch (type) {
-      case 'behavior':
-        return Icons.star;
-      case 'attendance':
-        return Icons.check_circle;
-      case 'homework':
-        return Icons.assignment;
-      case 'grades':
-        return Icons.grade;
-      case 'announcements':
-        return Icons.campaign;
-      case 'story':
-        return Icons.photo_camera;
-      default:
-        return Icons.circle;
-    }
   }
 
   Widget _buildVoteResults() {
@@ -597,106 +607,21 @@ class StudentHomeTab extends StatelessWidget {
   }
 
   Widget _buildGreetingCard() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      child: WaveCard(
-        gradientColors: const [
-          Color(0xFF1565C0),
-          Color(0xFF1E88E5),
-          Color(0xFF42A5F5)
-        ],
-        boxShadow: [
-          BoxShadow(
-              color: TatvaColors.info.withOpacity(0.35),
-              blurRadius: 24,
-              offset: const Offset(0, 10)),
-          BoxShadow(
-              color: TatvaColors.info.withOpacity(0.15),
-              blurRadius: 48,
-              offset: const Offset(0, 20)),
-        ],
-        child: Stack(children: [
-          Positioned(
-              top: -20,
-              right: 60,
-              child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.04)))),
-          Positioned(
-              top: 10,
-              right: -20,
-              child: Container(
-                  width: 140,
-                  height: 140,
-                  decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.04)))),
-          Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Expanded(
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                            Row(children: [
-                              Text(Greeting.emoji,
-                                  style: const TextStyle(fontSize: 16)),
-                              const SizedBox(width: 6),
-                              Text(Greeting.text,
-                                  style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.white.withOpacity(0.7),
-                                      fontWeight: FontWeight.w500)),
-                            ]),
-                            const SizedBox(height: 6),
-                            TypewriterText(
-                                text: user?.name ?? '',
-                                delayMs: 400,
-                                style: const TextStyle(
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    letterSpacing: -0.5,
-                                    height: 1.1)),
-                            const SizedBox(height: 6),
-                            Text('${primaryClass?.name ?? ''} · ${primaryClass?.subject ?? ''}',
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.white.withOpacity(0.6))),
-                          ])),
-                      HeroAvatar(
-                          heroTag: 'student_avatar',
-                          initial: user?.initial ?? '?',
-                          radius: 26,
-                          bgColor: Colors.white.withOpacity(0.15),
-                          textColor: Colors.white,
-                          borderColor: Colors.white.withOpacity(0.3)),
-                    ]),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(12)),
-                      child: Row(children: [
-                        Icon(Icons.lightbulb_outline_rounded,
-                            color: TatvaColors.accent, size: 16),
-                        const SizedBox(width: 8),
-                        Text(motivationalText,
-                            style: const TextStyle(
-                                fontSize: 13,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w500)),
-                      ]),
-                    ),
-                  ])),
+    return GreetingCard(
+      gradientColors: const [Color(0xFF1565C0), Color(0xFF1E88E5), Color(0xFF42A5F5)],
+      heroTag: 'student_avatar',
+      userName: user?.name ?? '',
+      subtitle: '${primaryClass?.name ?? ''} · ${primaryClass?.subject ?? ''}',
+      bottomWidget: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(12)),
+        child: Row(children: [
+          Icon(Icons.lightbulb_outline_rounded, color: TatvaColors.accent, size: 16),
+          const SizedBox(width: 8),
+          Text(motivationalText,
+              style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w500)),
         ]),
       ),
     );

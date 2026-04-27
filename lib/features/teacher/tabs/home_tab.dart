@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import '../../../shared/animations/animations.dart';
 import '../../../shared/theme/colors.dart';
 import '../../../shared/widgets/announcement_card.dart';
+import '../../../shared/widgets/greeting_card.dart';
+import '../../../shared/widgets/stat_card.dart';
+import '../../../shared/widgets/quick_action_button.dart';
+import '../../../shared/utils/activity_helpers.dart' as activity_helpers;
 import '../../parent/parent_helpers.dart';
 import '../../../shared/utils/greeting.dart';
 import '../../../models/user_model.dart';
@@ -9,6 +13,9 @@ import '../../../models/class_model.dart';
 import '../../../models/announcement_model.dart';
 import '../../../models/homework_model.dart';
 import '../../../models/activity_event.dart';
+import '../../../services/api_service.dart';
+import '../../../shared/screens/announcements_list_screen.dart';
+import '../../../shared/screens/activity_list_screen.dart';
 
 class TeacherHomeTab extends StatelessWidget {
   final UserModel? user;
@@ -27,6 +34,8 @@ class TeacherHomeTab extends StatelessWidget {
   final VoidCallback onNewAnnouncement;
   final void Function(AnnouncementModel) onToggleAnnouncementLike;
   final void Function(AnnouncementModel) onEditAnnouncement;
+  final ApiService api;
+  final String? firstClassId;
   final void Function(AnnouncementModel) onDeleteAnnouncement;
 
   const TeacherHomeTab({
@@ -48,6 +57,8 @@ class TeacherHomeTab extends StatelessWidget {
     required this.onToggleAnnouncementLike,
     required this.onEditAnnouncement,
     required this.onDeleteAnnouncement,
+    required this.api,
+    this.firstClassId,
   });
 
   @override
@@ -71,14 +82,14 @@ class TeacherHomeTab extends StatelessWidget {
           Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(children: [
-                _statCard('${classes.length}', 'Classes',
-                    Icons.class_outlined, TatvaColors.primary),
+                Expanded(child: StatCard(value: '${classes.length}', label: 'Classes',
+                    icon: Icons.class_outlined, color: TatvaColors.primary)),
                 const SizedBox(width: 10),
-                _statCard('$totalStudents', 'Students',
-                    Icons.people_outline, TatvaColors.info),
+                Expanded(child: StatCard(value: '$totalStudents', label: 'Students',
+                    icon: Icons.people_outline, color: TatvaColors.info)),
                 const SizedBox(width: 10),
-                _statCard('$activeHw', 'Homework',
-                    Icons.assignment_outlined, TatvaColors.accent),
+                Expanded(child: StatCard(value: '$activeHw', label: 'Homework',
+                    icon: Icons.assignment_outlined, color: TatvaColors.accent)),
               ])),
           const SizedBox(height: 24),
           Padding(
@@ -92,17 +103,17 @@ class TeacherHomeTab extends StatelessWidget {
           Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(children: [
-                _qaBtn('Enter\nGrades', Icons.edit_note_outlined,
-                    TatvaColors.accent, () => onSwitchTab(5)),
+                Expanded(child: QuickActionButton(label: 'Enter\nGrades', icon: Icons.edit_note_outlined,
+                    color: TatvaColors.accent, onTap: () => onSwitchTab(5))),
                 const SizedBox(width: 8),
-                _qaBtn('Post\nHomework', Icons.assignment_outlined,
-                    TatvaColors.primary, () => onSwitchTab(6)),
+                Expanded(child: QuickActionButton(label: 'Post\nHomework', icon: Icons.assignment_outlined,
+                    color: TatvaColors.primary, onTap: () => onSwitchTab(6))),
                 const SizedBox(width: 8),
-                _qaBtn('Behavior', Icons.emoji_events_outlined,
-                    TatvaColors.info, () => onSwitchTab(2)),
+                Expanded(child: QuickActionButton(label: 'Behavior', icon: Icons.emoji_events_outlined,
+                    color: TatvaColors.info, onTap: () => onSwitchTab(2))),
                 const SizedBox(width: 8),
-                _qaBtn('Messages', Icons.chat_outlined, TatvaColors.purple,
-                    () => onSwitchTab(8)),
+                Expanded(child: QuickActionButton(label: 'Messages', icon: Icons.chat_outlined, color: TatvaColors.purple,
+                    onTap: () => onSwitchTab(8))),
               ])),
           const SizedBox(height: 24),
           Padding(
@@ -115,6 +126,17 @@ class TeacherHomeTab extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                         color: TatvaColors.neutral900)),
               ),
+              if (announcements.length > 3)
+                Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: GestureDetector(
+                    onTap: () => Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => AnnouncementsListScreen(
+                            api: api, currentUid: uid, currentRole: 'Teacher'))),
+                    child: const Text('See All',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: TatvaColors.info)),
+                  ),
+                ),
               GestureDetector(
                 onTap: onNewAnnouncement,
                 child: Container(
@@ -160,24 +182,26 @@ class TeacherHomeTab extends StatelessWidget {
             const SizedBox(height: 28),
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: const Text('Recent Activity',
-                    style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: TatvaColors.neutral900))),
+                child: Row(children: [
+                  const Expanded(child: Text('Recent Activity',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: TatvaColors.neutral900))),
+                  GestureDetector(
+                    onTap: () => Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => ActivityListScreen(
+                            api: api, classId: firstClassId, title: 'Activity'))),
+                    child: const Text('See All',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: TatvaColors.info)),
+                  ),
+                ])),
             const SizedBox(height: 12),
             ...activityFeed.take(5).map((event) {
-              final icon = switch (event.type.name) {
-                'behaviorPoint' => Icons.star,
-                'attendance' => Icons.check_circle,
-                'homeworkAssigned' => Icons.assignment,
-                'gradeEntered' => Icons.grade,
-                'announcement' => Icons.campaign,
-                'storyPost' => Icons.photo_camera,
-                _ => Icons.circle,
-              };
-              final ago =
-                  event.createdAt != null ? formatTimeAgo(event.createdAt!) : '';
+              final icon = activity_helpers.activityIcon(event.type);
+              final ago = event.createdAt != null
+                  ? activity_helpers.formatTimeAgo(event.createdAt!)
+                  : '';
               return Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
@@ -225,101 +249,21 @@ class TeacherHomeTab extends StatelessWidget {
   }
 
   Widget _buildGreetingCard() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      child: WaveCard(
-        gradientColors: const [
-          Color(0xFF1E5C3A),
-          Color(0xFF2E6B4F),
-          Color(0xFF3D8B6B)
-        ],
-        boxShadow: [
-          BoxShadow(
-              color: TatvaColors.primary.withOpacity(0.35),
-              blurRadius: 24,
-              offset: const Offset(0, 10))
-        ],
-        child: Stack(children: [
-          Positioned(
-              top: -20,
-              right: 60,
-              child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.04)))),
-          Positioned(
-              top: 10,
-              right: -20,
-              child: Container(
-                  width: 140,
-                  height: 140,
-                  decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.04)))),
-          Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Expanded(
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                            Row(children: [
-                              Text(Greeting.emoji,
-                                  style: const TextStyle(fontSize: 16)),
-                              const SizedBox(width: 6),
-                              Text(Greeting.text,
-                                  style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.white.withOpacity(0.7),
-                                      fontWeight: FontWeight.w500))
-                            ]),
-                            const SizedBox(height: 6),
-                            TypewriterText(
-                                text: user?.name ?? '',
-                                delayMs: 400,
-                                style: const TextStyle(
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    letterSpacing: -0.5,
-                                    height: 1.1)),
-                            const SizedBox(height: 4),
-                            Text('Tatva Academy · Teacher',
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.white.withOpacity(0.6))),
-                          ])),
-                      HeroAvatar(
-                          heroTag: 'teacher_avatar',
-                          initial: user?.initial ?? '?',
-                          radius: 26,
-                          bgColor: Colors.white.withOpacity(0.15),
-                          textColor: Colors.white,
-                          borderColor: Colors.white.withOpacity(0.3)),
-                    ]),
-                    const SizedBox(height: 16),
-                    Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
-                        decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(12)),
-                        child: Row(children: [
-                          Icon(Icons.lightbulb_outline_rounded,
-                              color: TatvaColors.accent, size: 16),
-                          const SizedBox(width: 8),
-                          const Text('Inspiring minds every day! ✨',
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w500))
-                        ])),
-                  ])),
+    return GreetingCard(
+      gradientColors: const [Color(0xFF1E5C3A), Color(0xFF2E6B4F), Color(0xFF3D8B6B)],
+      heroTag: 'teacher_avatar',
+      userName: user?.name ?? '',
+      subtitle: 'Tatva Academy · Teacher',
+      bottomWidget: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(12)),
+        child: Row(children: [
+          Icon(Icons.lightbulb_outline_rounded, color: TatvaColors.accent, size: 16),
+          const SizedBox(width: 8),
+          const Text('Inspiring minds every day! ✨',
+              style: TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w500)),
         ]),
       ),
     );
@@ -447,66 +391,5 @@ class TeacherHomeTab extends StatelessWidget {
           ]),
         ));
   }
-
-  Widget _statCard(
-          String value, String label, IconData icon, Color color) =>
-      Expanded(
-          child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-            color: TatvaColors.bgCard,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade100)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8)),
-              child: Icon(icon, color: color, size: 16)),
-          const SizedBox(height: 10),
-          Text(value,
-              style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: TatvaColors.neutral900,
-                  letterSpacing: -0.5)),
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 11,
-                  color: TatvaColors.neutral400,
-                  fontWeight: FontWeight.w500)),
-        ]),
-      ));
-
-  Widget _qaBtn(
-          String label, IconData icon, Color color, VoidCallback onTap) =>
-      Expanded(
-          child: GestureDetector(
-              onTap: onTap,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
-                decoration: BoxDecoration(
-                    color: TatvaColors.bgCard,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.grey.shade100)),
-                child: Column(children: [
-                  Container(
-                      padding: const EdgeInsets.all(9),
-                      decoration: BoxDecoration(
-                          color: color.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(10)),
-                      child: Icon(icon, color: color, size: 18)),
-                  const SizedBox(height: 7),
-                  Text(label,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                          fontSize: 10,
-                          color: TatvaColors.neutral600,
-                          fontWeight: FontWeight.w600,
-                          height: 1.3)),
-                ]),
-              )));
 
 }

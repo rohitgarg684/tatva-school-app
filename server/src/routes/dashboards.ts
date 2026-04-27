@@ -10,6 +10,19 @@ import {
 } from "../lib/firestore-helpers";
 import { cacheGet, cacheSet, SHARED_TTL, USER_TTL } from "../lib/cache";
 import { asyncHandler } from "../lib/async-handler";
+import {
+  filterAnnouncementsByGrade,
+  computeBehaviorScore,
+  computeSubjectAverages,
+  type AnnouncementDoc,
+  type BehaviorPointDoc,
+  type GradeDoc,
+  type ClassDoc,
+  type StudentDoc,
+  type AttendanceDoc,
+  type ContentDoc,
+  type ActivityDoc,
+} from "../lib/dashboard-helpers";
 import { Collections } from "../lib/collections";
 import { Config } from "../lib/config";
 
@@ -56,39 +69,6 @@ async function safe<T>(promise: Promise<T>, fallback: T): Promise<T> {
   }
 }
 
-function filterAnnouncementsByGrade(announcements: any[], userGrades: string[]): any[] {
-  return announcements.filter((a: any) => {
-    if ((a.audience || "").toLowerCase() === "everyone") return true;
-    if (Array.isArray(a.grades) && a.grades.length > 0) {
-      return a.grades.some((g: string) => userGrades.includes(g));
-    }
-    return true;
-  });
-}
-
-function computeBehaviorScore(points: any[]): number {
-  let score = 0;
-  for (const p of points) {
-    score += (p.points as number) || 0;
-  }
-  return score;
-}
-
-function computeSubjectAverages(grades: any[]): Record<string, number> {
-  const sums: Record<string, { total: number; count: number }> = {};
-  for (const g of grades) {
-    const subj = g.subject || "Unknown";
-    const pct = (g.total ?? 0) > 0 ? ((g.score || 0) / (g.total ?? 1)) * 100 : 0;
-    if (!sums[subj]) sums[subj] = { total: 0, count: 0 };
-    sums[subj].total += pct;
-    sums[subj].count += 1;
-  }
-  const result: Record<string, number> = {};
-  for (const [subj, { total, count }] of Object.entries(sums)) {
-    result[subj] = count > 0 ? Math.round((total / count) * 10) / 10 : 0;
-  }
-  return result;
-}
 
 // ─── Student Dashboard ──────────────────────────────────────────────────────
 
@@ -148,6 +128,15 @@ router.get(
     const userGrades = userGrade ? [userGrade] : [];
     const filteredAnnouncements = filterAnnouncementsByGrade(announcements as any[], userGrades);
 
+    const filteredContent = (contentItems as ContentDoc[]).filter((c) => {
+      const hasGrade = c.grade && c.grade.length > 0;
+      const hasStudents = Array.isArray(c.studentUids) && c.studentUids.length > 0;
+      if (!hasGrade && !hasStudents) return true;
+      if (hasStudents && c.studentUids.includes(uid)) return true;
+      if (hasGrade && userGrade && c.grade === userGrade) return true;
+      return false;
+    });
+
     const result = {
       user: serializeDoc(user),
       primaryClass: serializeDoc(primaryClass),
@@ -159,7 +148,7 @@ router.get(
       behaviorScore: computeBehaviorScore(behaviorPoints),
       attendance: serializeDocs(attendance),
       activityFeed: serializeDocs(activityFeed),
-      contentItems: serializeDocs(contentItems),
+      contentItems: serializeDocs(filteredContent),
     };
 
     cacheSet(cacheKey, result, USER_TTL);
@@ -191,14 +180,14 @@ router.get(
     const classIds: string[] = user.classIds || [];
     const classes = classIds.length > 0 ? await getDocs(Collections.CLASSES, classIds) : [];
 
-    let studentsInFirstClass: any[] = [];
-    let parentsInFirstClass: any[] = [];
-    let gradesInFirstClass: any[] = [];
-    let classBehavior: any[] = [];
-    let todayAttendance: any[] = [];
-    let activityFeed: any[] = [];
-    let allTeacherGrades: any[] = [];
-    let testTitles: any[] = [];
+    let studentsInFirstClass: StudentDoc[] = [];
+    let parentsInFirstClass: StudentDoc[] = [];
+    let gradesInFirstClass: GradeDoc[] = [];
+    let classBehavior: BehaviorPointDoc[] = [];
+    let todayAttendance: AttendanceDoc[] = [];
+    let activityFeed: ActivityDoc[] = [];
+    let allTeacherGrades: GradeDoc[] = [];
+    let testTitles: { id: string; [key: string]: unknown }[] = [];
 
     if (classes.length > 0) {
       const first = classes[0] as any;
@@ -220,7 +209,7 @@ router.get(
       todayAttendance = att;
       activityFeed = activity;
 
-      const allClassIds = classes.map((c: any) => c.id);
+      const allClassIds = (classes as ClassDoc[]).map((c) => c.id);
       const gradeArrays = await Promise.all(
         allClassIds.map((cid: string) =>
           safe(queryDocs(Collections.GRADES, [{ field: "classId", op: "==", value: cid }], { field: "createdAt" }), [])
@@ -239,7 +228,7 @@ router.get(
       console.warn("Non-fatal: test_titles query failed:", (err as Error)?.message);
     }
 
-    const [announcements, homework, allStudents] = await Promise.all([
+    const [announcements, homework, allStudents, teacherContent] = await Promise.all([
       safe(fetchShared("announcements_all", () =>
         queryDocs(Collections.ANNOUNCEMENTS, [], { field: "createdAt", direction: "desc" }, Config.ANNOUNCEMENTS_LIMIT)
       ), []),
@@ -247,9 +236,10 @@ router.get(
       safe(fetchShared("all_students", () =>
         queryDocs(Collections.USERS, [{ field: "role", op: "==", value: "Student" }], { field: "name" })
       ), []),
+      safe(queryDocs(Collections.CONTENT, [{ field: "createdBy", op: "==", value: uid }], { field: "createdAt", direction: "desc" }), []),
     ]);
 
-    const teacherGrades = classes.map((c: any) => c.grade).filter(Boolean);
+    const teacherGrades = (classes as ClassDoc[]).map((c) => c.grade).filter(Boolean) as string[];
     const filteredAnnouncements = filterAnnouncementsByGrade(announcements as any[], teacherGrades);
 
     const result = {
@@ -266,6 +256,7 @@ router.get(
       todayAttendance: serializeDocs(todayAttendance),
       activityFeed: serializeDocs(activityFeed),
       allStudents: serializeDocs(allStudents),
+      contentItems: serializeDocs(teacherContent),
     };
 
     cacheSet(cacheKey, result, USER_TTL);
@@ -296,17 +287,17 @@ router.get(
 
     const children: Array<{ childName: string; classId: string }> = user.children || [];
     const classIdSet = new Set<string>();
-    const childrenData: any[] = [];
+    const childrenData: { childUid: string; info: unknown; childClass: unknown; grades: GradeDoc[]; behavior: BehaviorPointDoc[]; attendance: AttendanceDoc[] }[] = [];
 
     const classIdsFromChildren = children.map((c) => c.classId).filter(Boolean);
     const childClasses = classIdsFromChildren.length > 0
       ? await getDocs(Collections.CLASSES, classIdsFromChildren)
       : [];
-    const classMap = new Map(childClasses.map((c: any) => [c.id, c]));
+    const classMap = new Map((childClasses as ClassDoc[]).map((c) => [c.id, c]));
 
     // Batch: collect all child names, find matching student UIDs in one pass
     const childNames = children.map((c) => c.childName).filter(Boolean);
-    let allStudents: any[] = [];
+    let allStudents: StudentDoc[] = [];
     if (childNames.length > 0) {
       const nameChunks: string[][] = [];
       for (let i = 0; i < childNames.length; i += Config.FIRESTORE_IN_LIMIT) {
@@ -322,7 +313,7 @@ router.get(
       );
       allStudents = studentChunks.flat();
     }
-    const studentNameMap = new Map(allStudents.map((s: any) => [s.name, s.id]));
+    const studentNameMap = new Map(allStudents.map((s) => [s.name, s.id]));
 
     // Batch: collect all child UIDs, query grades/behavior/attendance in bulk
     const childUids: string[] = [];
@@ -344,9 +335,9 @@ router.get(
       const childUid = studentNameMap.get(childInfo.childName) || "";
 
       if (childUid) {
-        const grades = (allGrades as any[]).filter((g: any) => g.studentUid === childUid);
-        const behavior = (allBehavior as any[]).filter((b: any) => b.studentUid === childUid);
-        const attendance = (allAttendance as any[]).filter((a: any) => a.studentUid === childUid);
+        const grades = (allGrades as GradeDoc[]).filter((g) => g.studentUid === childUid);
+        const behavior = (allBehavior as BehaviorPointDoc[]).filter((b) => b.studentUid === childUid);
+        const attendance = (allAttendance as AttendanceDoc[]).filter((a) => a.studentUid === childUid);
 
         childrenData.push({
           info: childInfo,
@@ -373,7 +364,7 @@ router.get(
     const classIdList = Array.from(classIdSet);
     const firstChildUid = childrenData.length > 0 ? childrenData[0].childUid : "";
 
-    const childGrades = childClasses.map((c: any) => c.grade).filter(Boolean);
+    const childGrades = (childClasses as ClassDoc[]).map((c) => c.grade).filter(Boolean) as string[];
 
     const [announcements, votes, activity, content] = await Promise.all([
       safe(fetchShared("announcements_all", () =>
@@ -392,13 +383,22 @@ router.get(
 
     const filteredAnnouncements = filterAnnouncementsByGrade(announcements as any[], childGrades);
 
+    const filteredContent = (content as ContentDoc[]).filter((c) => {
+      const hasGrade = c.grade && c.grade.length > 0;
+      const hasStudents = Array.isArray(c.studentUids) && c.studentUids.length > 0;
+      if (!hasGrade && !hasStudents) return true;
+      if (hasStudents && childUids.some((u: string) => c.studentUids.includes(u))) return true;
+      if (hasGrade && childGrades.includes(c.grade)) return true;
+      return false;
+    });
+
     const result = {
       user: serializeDoc(user),
       childrenData,
       announcements: serializeDocs(filteredAnnouncements.slice(0, Config.PRINCIPAL_ACTIVITY_LIMIT)),
       activeVotes: serializeDocs(votes),
       activityFeed: serializeDocs(activity as any[]),
-      contentItems: serializeDocs(content),
+      contentItems: serializeDocs(filteredContent),
     };
 
     cacheSet(cacheKey, result, USER_TTL);
@@ -469,6 +469,36 @@ router.get(
 
     cacheSet(cacheKey, result, USER_TTL);
     res.json(result);
+  })
+);
+
+router.get(
+  "/activities/paginated",
+  asyncHandler(async (req, res) => {
+    const targetUid = req.query.targetUid as string | undefined;
+    const classId = req.query.classId as string | undefined;
+    const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+    const after = req.query.after as string | undefined;
+
+    let query: FirebaseFirestore.Query = db
+      .collection(Collections.ACTIVITIES)
+      .orderBy("createdAt", "desc");
+
+    if (targetUid) {
+      query = query.where("targetUid", "==", targetUid);
+    } else if (classId) {
+      query = query.where("classId", "==", classId);
+    }
+
+    if (after) {
+      query = query.where("createdAt", "<", new Date(after));
+    }
+
+    const snap = await query.limit(limit + 1).get();
+    const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const hasMore = docs.length > limit;
+    const items = serializeDocs(docs.slice(0, limit));
+    res.json({ items, hasMore });
   })
 );
 

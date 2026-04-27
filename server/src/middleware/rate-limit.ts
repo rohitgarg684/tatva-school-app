@@ -10,9 +10,9 @@ export const uploadLimiter = rateLimit({
   message: { error: "Too many uploads. Try again in a minute." },
 });
 
-export const dashboardLimiter = rateLimit({
+const standardLimiterInstance = rateLimit({
   windowMs: 60 * 1000,
-  max: 60,
+  max: 200,
   keyGenerator: (req: any) => req.uid || "anonymous",
   standardHeaders: true,
   legacyHeaders: false,
@@ -20,12 +20,5 @@ export const dashboardLimiter = rateLimit({
   message: { error: "Too many requests. Try again in a minute." },
 });
 
-export const actionLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 60,
-  keyGenerator: (req: any) => req.uid || "anonymous",
-  standardHeaders: true,
-  legacyHeaders: false,
-  validate: { xForwardedForHeader: false, ip: false },
-  message: { error: "Too many requests. Try again in a minute." },
-});
+export const dashboardLimiter = standardLimiterInstance;
+export const actionLimiter = standardLimiterInstance;

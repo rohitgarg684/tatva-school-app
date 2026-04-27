@@ -2,10 +2,11 @@ import { Router } from "express";
 import * as admin from "firebase-admin";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { db, getDoc, serializeDocs } from "../lib/firestore-helpers";
-import { cacheDeletePrefix } from "../lib/cache";
+import { invalidateDashboards } from "../lib/cache-invalidation";
 import { asyncHandler } from "../lib/async-handler";
 import { deleteDocument } from "../lib/crud-helpers";
 import { Collections } from "../lib/collections";
+import { logActivity } from "../lib/activity-logger";
 
 const router = Router();
 router.use(requireAuth);
@@ -37,8 +38,18 @@ router.post(
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    cacheDeletePrefix("teacher_dash_");
-    cacheDeletePrefix("student_dash_");
+    logActivity({
+      type: "homeworkAssigned",
+      actorUid: uid,
+      actorName: userDoc?.name || "",
+      actorRole: req.role || "Teacher",
+      classId,
+      title: `Homework: ${title}`,
+      body: subject ? `${subject}${dueDate ? ` — due ${dueDate}` : ''}` : "",
+      metadata: { subject, dueDate },
+    });
+
+    invalidateDashboards("homework_");
     res.json({ id: ref.id, created: true });
   })
 );
@@ -81,8 +92,19 @@ router.post(
       submittedBy: FieldValue.arrayUnion(uid),
     });
 
-    cacheDeletePrefix("student_dash_");
-    cacheDeletePrefix("teacher_dash_");
+    const hwDoc = await getDoc(Collections.HOMEWORK, homeworkId);
+    const studentDoc = await getDoc(Collections.USERS, uid);
+    logActivity({
+      type: "homeworkSubmitted",
+      actorUid: uid,
+      actorName: studentDoc?.name || "",
+      actorRole: "Student",
+      targetUid: uid,
+      classId: hwDoc?.classId || "",
+      title: `Submitted: ${hwDoc?.title || "Homework"}`,
+    });
+
+    invalidateDashboards("homework_");
     res.json({ homeworkId, submitted: true });
   })
 );

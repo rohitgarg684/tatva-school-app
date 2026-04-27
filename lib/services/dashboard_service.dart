@@ -57,6 +57,7 @@ class TeacherDashboardData {
   final List<AttendanceRecord> todayAttendance;
   final List<ActivityEvent> activityFeed;
   final List<UserModel> allStudents;
+  final List<ContentItem> contentItems;
 
   const TeacherDashboardData({
     required this.user,
@@ -72,6 +73,7 @@ class TeacherDashboardData {
     this.todayAttendance = const [],
     this.activityFeed = const [],
     this.allStudents = const [],
+    this.contentItems = const [],
   });
 }
 
@@ -270,6 +272,7 @@ class DashboardService {
           _parseList(json['todayAttendance'], AttendanceRecord.fromJson),
       activityFeed: _parseList(json['activityFeed'], ActivityEvent.fromJson),
       allStudents: _parseList(json['allStudents'], UserModel.fromJson),
+      contentItems: _parseList(json['contentItems'], ContentItem.fromJson),
     );
 
     _cachedTeacherData = data;

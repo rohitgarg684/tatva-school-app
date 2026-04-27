@@ -70,6 +70,9 @@ class ContentItem {
   final int viewCount;
   final List<String> completedBy;
   final DateTime? createdAt;
+  final String createdBy;
+  final String grade;
+  final List<String> studentUids;
 
   const ContentItem({
     this.id = '',
@@ -83,9 +86,15 @@ class ContentItem {
     this.viewCount = 0,
     this.completedBy = const [],
     this.createdAt,
+    this.createdBy = '',
+    this.grade = '',
+    this.studentUids = const [],
   });
 
   bool isCompletedBy(String uid) => completedBy.contains(uid);
+
+  /// True when this content targets everyone (no grade / student filter).
+  bool get isGlobal => grade.isEmpty && studentUids.isEmpty;
 
   ContentItem copyWith({
     String? id,
@@ -99,6 +108,9 @@ class ContentItem {
     int? viewCount,
     List<String>? completedBy,
     DateTime? createdAt,
+    String? createdBy,
+    String? grade,
+    List<String>? studentUids,
   }) {
     return ContentItem(
       id: id ?? this.id,
@@ -112,6 +124,9 @@ class ContentItem {
       viewCount: viewCount ?? this.viewCount,
       completedBy: completedBy ?? this.completedBy,
       createdAt: createdAt ?? this.createdAt,
+      createdBy: createdBy ?? this.createdBy,
+      grade: grade ?? this.grade,
+      studentUids: studentUids ?? this.studentUids,
     );
   }
 
@@ -130,6 +145,9 @@ class ContentItem {
       createdAt: data['createdAt'] != null
           ? DateTime.tryParse(data['createdAt'] as String)
           : null,
+      createdBy: data['createdBy'] as String? ?? '',
+      grade: data['grade'] as String? ?? '',
+      studentUids: List<String>.from(data['studentUids'] ?? []),
     );
   }
 
@@ -145,6 +163,9 @@ class ContentItem {
       'viewCount': viewCount,
       'completedBy': completedBy,
       'createdAt': (createdAt ?? DateTime.now()).toIso8601String(),
+      'createdBy': createdBy,
+      'grade': grade,
+      'studentUids': studentUids,
     };
   }
 }

@@ -1,24 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../shared/animations/animations.dart';
 import '../../shared/theme/colors.dart';
 import '../../shared/widgets/tatva_snackbar.dart';
 import '../../shared/widgets/bottom_nav_bar.dart';
-import '../../shared/widgets/logout_sheet.dart';
-import '../../core/router/app_router.dart';
+import '../../shared/mixins/dashboard_mixin.dart';
 import '../../services/dashboard_service.dart';
 import '../../services/api_service.dart';
 import '../../repositories/auth_repository.dart';
-import '../../models/user_model.dart';
 import '../../models/class_model.dart';
-import '../../models/grade_model.dart';
 import '../../models/announcement_model.dart';
+import '../../shared/utils/announcement_helpers.dart';
 import '../../models/attachment.dart';
 import '../../models/audience.dart';
 import '../../models/homework_model.dart';
 import '../../models/behavior_point.dart';
 import '../../models/attendance_record.dart';
-import '../../models/activity_event.dart';
+import '../../models/content_item.dart';
 import '../principal/widgets/new_announcement_sheet.dart';
 import '../../shared/widgets/announcement_card.dart';
 import 'tabs/home_tab.dart';
@@ -28,6 +25,7 @@ import 'tabs/attendance_tab.dart';
 import 'tabs/schedule_tab.dart';
 import 'tabs/grades_tab.dart';
 import 'tabs/homework_tab.dart';
+import 'tabs/learn_tab.dart';
 import 'tabs/messages_tab.dart';
 import 'tabs/profile_tab.dart';
 
@@ -39,7 +37,7 @@ class TeacherDashboard extends StatefulWidget {
 }
 
 class _TeacherDashboardState extends State<TeacherDashboard>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, DashboardMixin {
   static const List<TabItem> _tabs = [
     TabItem(icon: Icons.dashboard_outlined, activeIcon: Icons.dashboard_rounded, label: 'Home'),
     TabItem(icon: Icons.class_outlined, activeIcon: Icons.class_rounded, label: 'Classes'),
@@ -48,12 +46,10 @@ class _TeacherDashboardState extends State<TeacherDashboard>
     TabItem(icon: Icons.calendar_view_week_outlined, activeIcon: Icons.calendar_view_week_rounded, label: 'Schedule'),
     TabItem(icon: Icons.grade_outlined, activeIcon: Icons.grade_rounded, label: 'Grades'),
     TabItem(icon: Icons.assignment_outlined, activeIcon: Icons.assignment_rounded, label: 'Homework'),
+    TabItem(icon: Icons.auto_stories_outlined, activeIcon: Icons.auto_stories_rounded, label: 'Learn'),
     TabItem(icon: Icons.chat_outlined, activeIcon: Icons.chat_rounded, label: 'Messages'),
     TabItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Profile'),
   ];
-
-  int _currentTab = 0;
-  bool isLoading = true;
 
   final _dashSvc = DashboardService();
   final _api = ApiService();
@@ -64,57 +60,18 @@ class _TeacherDashboardState extends State<TeacherDashboard>
   List<AnnouncementModel> _announcements = [];
   List<BehaviorPoint> _classBehavior = [];
   List<AttendanceRecord> _todayAttendance = [];
-
-  // ── ANIMATIONS
-  late AnimationController _shimmerController;
-  late AnimationController _greetingController;
-  late AnimationController _cardsController;
-  late AnimationController _tabController;
-  late Animation<double> _shimmerAnim;
-  late Animation<double> _greetingFade;
-  late Animation<Offset> _greetingSlide;
-  late Animation<double> _greetingScale;
-  late Animation<double> _tabFade;
+  List<ContentItem> _contentItems = [];
 
   @override
   void initState() {
     super.initState();
-    _shimmerController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1200))
-      ..repeat();
-    _shimmerAnim = Tween<double>(begin: -1, end: 2).animate(_shimmerController);
-
-    _greetingController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1000));
-    _greetingFade = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
-        parent: _greetingController,
-        curve: const Interval(0.0, 0.6, curve: Curves.easeOut)));
-    _greetingSlide =
-        Tween<Offset>(begin: const Offset(0, 0.15), end: Offset.zero).animate(
-            CurvedAnimation(
-                parent: _greetingController,
-                curve: const Interval(0.0, 0.7, curve: Curves.easeOutCubic)));
-    _greetingScale = Tween<double>(begin: 0.96, end: 1.0).animate(
-        CurvedAnimation(
-            parent: _greetingController,
-            curve: const Interval(0.0, 0.7, curve: Curves.easeOut)));
-
-    _cardsController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 900));
-    _tabController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 350));
-    _tabFade = Tween<double>(begin: 0, end: 1).animate(
-        CurvedAnimation(parent: _tabController, curve: Curves.easeOut));
-
+    initDashboardAnimations();
     _loadUser();
   }
 
   @override
   void dispose() {
-    _shimmerController.dispose();
-    _greetingController.dispose();
-    _cardsController.dispose();
-    _tabController.dispose();
+    disposeDashboardAnimations();
     super.dispose();
   }
 
@@ -128,95 +85,18 @@ class _TeacherDashboardState extends State<TeacherDashboard>
       _announcements = List.of(data.announcements);
       _classBehavior = List.of(data.classBehavior);
       _todayAttendance = List.of(data.todayAttendance);
+      _contentItems = List.of(data.contentItems);
     } catch (e) {
       debugPrint('TeacherDashboard._loadData error: $e');
     }
-    if (!mounted) return;
-    setState(() => isLoading = false);
-    _greetingController.forward();
-    _tabController.forward();
+    onDataLoaded();
   }
 
-  void _switchTab(int index) {
-    if (index == _currentTab) return;
-    HapticFeedback.selectionClick();
-    _tabController.reset();
-    setState(() => _currentTab = index);
-    _tabController.forward();
-  }
-
-  void _logout() {
-    LogoutSheet.show(context, onConfirm: () async {
-      await AuthRepository().signOut();
-      if (context.mounted) {
-        AppRouter.toWelcomeAndClearStack(context);
-      }
-    });
-  }
-
-  // ─── BUILD ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark));
-    return Scaffold(
-      backgroundColor: TatvaColors.bgLight,
-      body: isLoading ? _buildShimmer() : _buildBody(),
-      bottomNavigationBar: isLoading ? null : _buildBottomNav(),
-    );
-  }
-
-  Widget _buildShimmer() {
-    return SafeArea(
-        child: Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(children: [
-        _shimmerBox(double.infinity, 200, radius: 24),
-        const SizedBox(height: 20),
-        Row(children: [
-          Expanded(child: _shimmerBox(double.infinity, 88)),
-          const SizedBox(width: 10),
-          Expanded(child: _shimmerBox(double.infinity, 88)),
-          const SizedBox(width: 10),
-          Expanded(child: _shimmerBox(double.infinity, 88))
-        ]),
-        const SizedBox(height: 20),
-        _shimmerBox(double.infinity, 100),
-        const SizedBox(height: 10),
-        _shimmerBox(double.infinity, 100),
-      ]),
-    ));
-  }
-
-  Widget _shimmerBox(double width, double height, {double radius = 12}) =>
-      AnimatedBuilder(
-        animation: _shimmerAnim,
-        builder: (_, __) => Container(
-          width: width,
-          height: height,
-          decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(radius),
-              gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: const [
-                    Color(0xFFE8F0E8),
-                    Color(0xFFF5FAF5),
-                    Color(0xFFE8F0E8)
-                  ],
-                  stops: [
-                    (_shimmerAnim.value - 1).clamp(0.0, 1.0),
-                    _shimmerAnim.value.clamp(0.0, 1.0),
-                    (_shimmerAnim.value + 1).clamp(0.0, 1.0)
-                  ])),
-        ),
-      );
-
-  Widget _buildBody() => SafeArea(
-      child: FadeTransition(
-          opacity: _tabFade,
-          child: IndexedStack(index: _currentTab, children: [
+    return buildDashboardScaffold(
+      tabs: _tabs,
+      bodyBuilder: () => IndexedStack(index: currentTab, children: [
             TeacherHomeTab(
               user: _data?.user,
               classes: _data?.classes ?? [],
@@ -224,17 +104,19 @@ class _TeacherDashboardState extends State<TeacherDashboard>
               announcements: _announcements,
               uid: _uid,
               activityFeed: _data?.activityFeed ?? [],
-              greetingFade: _greetingFade,
-              greetingSlide: _greetingSlide,
-              greetingScale: _greetingScale,
+              greetingFade: greetingFade,
+              greetingSlide: greetingSlide,
+              greetingScale: greetingScale,
               onRefresh: _loadUser,
-              onSwitchTab: _switchTab,
+              onSwitchTab: switchTab,
               onViewClassStudents: (cls) => _showClassStudents(cls),
               onDeleteClass: (cls) => _confirmDeleteClass(cls),
               onNewAnnouncement: _showNewAnnouncement,
               onToggleAnnouncementLike: _toggleAnnouncementLike,
               onEditAnnouncement: _editAnnouncement,
               onDeleteAnnouncement: _deleteAnnouncement,
+              api: _api,
+              firstClassId: (_data?.classes ?? []).isNotEmpty ? _data!.classes.first.id : null,
             ),
             TeacherClassesTab(
               classes: _data?.classes ?? [],
@@ -283,17 +165,28 @@ class _TeacherDashboardState extends State<TeacherDashboard>
               onHomeworkDeleted: (id) =>
                   setState(() => _homework.removeWhere((h) => h.id == id)),
             ),
+            TeacherLearnTab(
+              contentItems: _contentItems,
+              classes: _data?.classes ?? [],
+              allStudents: _data?.allStudents ?? [],
+              uid: _uid,
+              onContentAdded: (ci) =>
+                  setState(() => _contentItems.insert(0, ci)),
+              onContentDeleted: (id) =>
+                  setState(() => _contentItems.removeWhere((c) => c.id == id)),
+              onContentUpdated: (ci) => setState(() {
+                final idx = _contentItems.indexWhere((c) => c.id == ci.id);
+                if (idx >= 0) _contentItems[idx] = ci;
+              }),
+            ),
             TeacherMessagesTab(parents: _data?.parentsInFirstClass ?? []),
             TeacherProfileTab(
               user: _data?.user,
               classCount: _data?.classes.length ?? 0,
-              onLogout: _logout,
+              onLogout: logout,
             ),
-          ])));
-
-  Widget _buildBottomNav() {
-    return TatvaBottomNavBar(
-        items: _tabs, currentIndex: _currentTab, onTap: _switchTab);
+          ]),
+    );
   }
 
   List<String> get _availableGrades {
@@ -320,16 +213,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
   }
 
   void _toggleAnnouncementLike(AnnouncementModel ann) {
-    if (ann.id.isEmpty) return;
-    setState(() {
-      final idx = _announcements.indexWhere((a) => a.id == ann.id);
-      if (idx < 0) return;
-      final current = _announcements[idx];
-      final liked = current.likedBy.contains(_uid);
-      final newLikedBy = List<String>.from(current.likedBy);
-      liked ? newLikedBy.remove(_uid) : newLikedBy.add(_uid);
-      _announcements[idx] = current.copyWith(likedBy: newLikedBy);
-    });
+    setState(() => _announcements = toggleAnnouncementLike(_announcements, ann.id, _uid));
     _api.toggleAnnouncementLike(ann.id);
   }
 
