@@ -1208,8 +1208,6 @@ fontSize: 14, color: TatvaColors.neutral900),
                         TatvaColors.accent, eventType, (v) => setModal(() => eventType = v)),
                     _eventTypeChip('ptm', 'PTM', Icons.people_outline,
                         TatvaColors.purple, eventType, (v) => setModal(() => eventType = v)),
-                    _eventTypeChip('holiday', 'Holiday', Icons.wb_sunny_outlined,
-                        TatvaColors.error, eventType, (v) => setModal(() => eventType = v)),
                     _eventTypeChip('override', 'Override', Icons.swap_horiz_rounded,
                         TatvaColors.info, eventType, (v) => setModal(() => eventType = v)),
                   ]),
@@ -2299,17 +2297,25 @@ fontSize: 13, color: Colors.grey.shade400),
           if (name.isEmpty) return;
           setSheet(() => saving = true);
           try {
+            final desc = descCtrl.text.trim();
             if (existing != null) {
               await _api.updateHoliday(existing.id,
                   name: name, startDate: fmtDate(startDate), endDate: fmtDate(endDate),
-                  type: selectedType, description: descCtrl.text.trim());
+                  type: selectedType, description: desc);
             } else {
               await _api.createHoliday(
                   name: name, startDate: fmtDate(startDate), endDate: fmtDate(endDate),
-                  type: selectedType, description: descCtrl.text.trim());
+                  type: selectedType, description: desc);
+              for (var d = startDate; !d.isAfter(endDate); d = d.add(const Duration(days: 1))) {
+                await _api.createScheduleEvent(
+                  title: name, date: fmtDate(d), type: 'holiday',
+                  description: desc, cancelsRegularSchedule: true,
+                );
+              }
             }
             if (ctx.mounted) Navigator.pop(ctx);
             _holidaysLoaded = false;
+            _calLoaded = false;
             _loadHolidays();
             if (mounted) TatvaSnackbar.success(context, existing != null ? 'Holiday updated' : 'Holiday added');
           } catch (e) {
