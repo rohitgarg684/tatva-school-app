@@ -177,8 +177,8 @@ async function seedAnnouncements() {
 async function seedVotes() {
   console.log("Seeding votes...");
   const votes = [
-    { question: "Should we have school on Saturday for extra classes?", type: "school_decision", createdBy: "principal_anjali", createdByName: "Dr. Anjali Nair", createdByRole: "Principal", votes: { school: 45, no_school: 120, undecided: 15 }, voters: ["parent_suresh", "parent_kavitha", "parent_deepak"], active: true },
-    { question: "Should the annual day theme be 'Space Exploration' or 'Heritage of India'?", type: "school_decision", createdBy: "principal_anjali", createdByName: "Dr. Anjali Nair", createdByRole: "Principal", votes: { school: 90, no_school: 65, undecided: 25 }, voters: ["parent_suresh", "parent_nisha"], active: true },
+    { question: "Should we have school on Saturday for extra classes?", type: "school_decision", options: ["school", "no_school", "undecided"], createdBy: "principal_anjali", createdByName: "Dr. Anjali Nair", createdByRole: "Principal", votes: { school: 45, no_school: 120, undecided: 15 }, voters: ["parent_suresh", "parent_kavitha", "parent_deepak"], active: true, votingDeadline: new Date(Date.now() + 7 * 86400000).toISOString(), resultsVisibleUntil: new Date(Date.now() + 14 * 86400000).toISOString() },
+    { question: "Should the annual day theme be 'Space Exploration' or 'Heritage of India'?", type: "school_decision", options: ["school", "no_school", "undecided"], createdBy: "principal_anjali", createdByName: "Dr. Anjali Nair", createdByRole: "Principal", votes: { school: 90, no_school: 65, undecided: 25 }, voters: ["parent_suresh", "parent_nisha"], active: true, votingDeadline: new Date(Date.now() + 7 * 86400000).toISOString(), resultsVisibleUntil: new Date(Date.now() + 14 * 86400000).toISOString() },
   ];
 
   const batch = db.batch();

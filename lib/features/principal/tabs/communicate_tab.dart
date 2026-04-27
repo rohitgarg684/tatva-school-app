@@ -356,7 +356,8 @@ class CommunicateTab extends StatelessWidget {
           )
         else
           ...voteModels.map((vote) {
-            final total = vote.votes.total;
+            final total = vote.totalVotes;
+            final isOpen = vote.isVotingOpen;
             return Container(
               margin: EdgeInsets.only(bottom: 12),
               padding: EdgeInsets.all(16),
@@ -379,12 +380,27 @@ class CommunicateTab extends StatelessWidget {
                                   .withOpacity(0.08),
                               borderRadius:
                                   BorderRadius.circular(6)),
-                          child: Text(vote.type,
+                          child: Text(vote.type.replaceAll('_', ' '),
                               style: TextStyle(
                                   fontSize: 10,
                                   color: TatvaColors.purple,
                                   fontWeight:
                                       FontWeight.w700))),
+                      SizedBox(width: 8),
+                      Container(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                              color: isOpen
+                                  ? TatvaColors.success.withOpacity(0.08)
+                                  : TatvaColors.neutral400.withOpacity(0.08),
+                              borderRadius:
+                                  BorderRadius.circular(6)),
+                          child: Text(isOpen ? 'Open' : 'Closed',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: isOpen ? TatvaColors.success : TatvaColors.neutral400,
+                                  fontWeight: FontWeight.w700))),
                       Spacer(),
                       Icon(Icons.people_outline,
                           color: TatvaColors.neutral400,
@@ -395,49 +411,43 @@ class CommunicateTab extends StatelessWidget {
                               fontSize: 11,
                               color:
                                   TatvaColors.neutral400)),
-                      SizedBox(width: 10),
-                      GestureDetector(
-                        onTap: () async {
-                          await api.closeVote(vote.id);
-                          onVoteClosed(vote);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context)
-                                .showSnackBar(SnackBar(
-                                    content: Text(
-                                        'Vote closed',
-                                        style:
-                                            TextStyle()),
-                                    backgroundColor:
-                                        TatvaColors
-                                            .neutral600,
-                                    behavior:
-                                        SnackBarBehavior
-                                            .floating,
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius
-                                                .circular(
-                                                    10))));
-                          }
-                        },
-                        child: Container(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3),
-                            decoration: BoxDecoration(
-                                color: TatvaColors.error
-                                    .withOpacity(0.08),
-                                borderRadius:
-                                    BorderRadius.circular(
-                                        6)),
-                            child: Text('Close',
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    color:
-                                        TatvaColors.error,
-                                    fontWeight:
-                                        FontWeight.w700))),
-                      ),
+                      if (isOpen) ...[
+                        SizedBox(width: 10),
+                        GestureDetector(
+                          onTap: () async {
+                            await api.closeVote(vote.id);
+                            onVoteClosed(vote);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(SnackBar(
+                                      content: Text(
+                                          'Vote closed',
+                                          style: TextStyle()),
+                                      backgroundColor:
+                                          TatvaColors.neutral600,
+                                      behavior:
+                                          SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(10))));
+                            }
+                          },
+                          child: Container(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3),
+                              decoration: BoxDecoration(
+                                  color: TatvaColors.error
+                                      .withOpacity(0.08),
+                                  borderRadius:
+                                      BorderRadius.circular(6)),
+                              child: Text('Close',
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      color: TatvaColors.error,
+                                      fontWeight: FontWeight.w700))),
+                        ),
+                      ],
                     ]),
                     SizedBox(height: 10),
                     Text(vote.question,
@@ -448,23 +458,29 @@ class CommunicateTab extends StatelessWidget {
                             height: 1.3)),
                     if (total > 0) ...[
                       SizedBox(height: 12),
-                      _voteResultBar('School',
-                          vote.votes.school, total, TatvaColors.success),
-                      SizedBox(height: 5),
-                      _voteResultBar('No School',
-                          vote.votes.noSchool, total, TatvaColors.error),
-                      SizedBox(height: 5),
-                      _voteResultBar(
-                          'Undecided',
-                          vote.votes.undecided,
-                          total,
-                          TatvaColors.accent),
+                      ...vote.options.map((opt) {
+                        final count = vote.votes[opt] ?? 0;
+                        return Padding(
+                          padding: EdgeInsets.only(bottom: 5),
+                          child: _voteResultBar(
+                              opt.replaceAll('_', ' '), count, total, _optionColor(opt)),
+                        );
+                      }),
                     ],
                   ]),
             );
           }),
       ],
     );
+  }
+
+  Color _optionColor(String opt) {
+    switch (opt) {
+      case 'school': return TatvaColors.success;
+      case 'no_school': return TatvaColors.error;
+      case 'undecided': return TatvaColors.accent;
+      default: return TatvaColors.info;
+    }
   }
 
   Widget _voteResultBar(

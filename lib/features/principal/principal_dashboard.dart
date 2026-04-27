@@ -311,8 +311,10 @@ class _PrincipalDashboardState extends State<PrincipalDashboard>
               api: _api,
               onNewAnnouncement: _showNewAnnouncement,
               onCreateVote: _showCreateVote,
-              onVoteClosed: (vote) =>
-                  setState(() => _voteModels.removeWhere((v) => v.id == vote.id)),
+              onVoteClosed: (vote) => setState(() {
+                final idx = _voteModels.indexWhere((v) => v.id == vote.id);
+                if (idx >= 0) _voteModels[idx] = _voteModels[idx].copyWith(active: false);
+              }),
             ),
             ProfileTab(
               user: _data?.user,

@@ -530,9 +530,30 @@ class StudentHomeworkTab extends StatelessWidget {
               Row(children: [
                 Icon(Icons.person_outline, size: 12, color: TatvaColors.neutral400),
                 const SizedBox(width: 4),
-                Text(hw.teacherName,
+                Expanded(child: Text(hw.teacherName,
                     style: const TextStyle(
-                        fontSize: 11, color: TatvaColors.neutral400)),
+                        fontSize: 11, color: TatvaColors.neutral400))),
+                GestureDetector(
+                  onTap: () => HomeworkCommentsSheet.show(
+                    context,
+                    homeworkId: hw.id,
+                    studentUid: uid,
+                    studentName: 'My Questions',
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                        color: TatvaColors.info.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: TatvaColors.info.withOpacity(0.15))),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.chat_bubble_outline_rounded, size: 12, color: TatvaColors.info),
+                      const SizedBox(width: 4),
+                      Text('Ask / Comment',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: TatvaColors.info)),
+                    ]),
+                  ),
+                ),
               ]),
               if (mySubmissions.containsKey(hw.id)) ...[
                 const SizedBox(height: 8),

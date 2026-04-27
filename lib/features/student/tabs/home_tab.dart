@@ -512,7 +512,8 @@ class StudentHomeTab extends StatelessWidget {
   }
 
   Widget _buildVoteResults() {
-    if (activeVotes.isEmpty) {
+    final visibleVotes = activeVotes.where((v) => v.areResultsVisible).toList();
+    if (visibleVotes.isEmpty) {
       return const SizedBox.shrink();
     }
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -531,9 +532,9 @@ class StudentHomeTab extends StatelessWidget {
               style: TextStyle(
                   fontSize: 12, color: TatvaColors.neutral400))),
       const SizedBox(height: 12),
-      ...List.generate(activeVotes.length, (i) {
-        final v = activeVotes[i];
-        final total = v.votes.total;
+      ...List.generate(visibleVotes.length, (i) {
+        final v = visibleVotes[i];
+        final total = v.totalVotes;
         return Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
           child: Container(
@@ -551,7 +552,7 @@ class StudentHomeTab extends StatelessWidget {
                     decoration: BoxDecoration(
                         color: TatvaColors.info.withOpacity(0.08),
                         borderRadius: BorderRadius.circular(8)),
-                    child: Text(v.type,
+                    child: Text(v.type.replaceAll('_', ' '),
                         style: const TextStyle(
                             fontSize: 11,
                             color: TatvaColors.info,
@@ -572,13 +573,14 @@ class StudentHomeTab extends StatelessWidget {
                       color: TatvaColors.neutral900,
                       height: 1.4)),
               const SizedBox(height: 12),
-              _simpleVoteBar('🏫 School', v.votes.school, total, TatvaColors.success),
-              const SizedBox(height: 6),
-              _simpleVoteBar(
-                  '🏠 No School', v.votes.noSchool, total, TatvaColors.error),
-              const SizedBox(height: 6),
-              _simpleVoteBar(
-                  '🤷 Undecided', v.votes.undecided, total, TatvaColors.accent),
+              ...v.options.map((opt) {
+                final count = v.votes[opt] ?? 0;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: _simpleVoteBar(
+                      _optionLabel(opt), count, total, _optionColor(opt)),
+                );
+              }),
             ]),
           ),
         );
@@ -604,6 +606,24 @@ class StudentHomeTab extends StatelessWidget {
               color: color,
               fontWeight: FontWeight.bold)),
     ]);
+  }
+
+  String _optionLabel(String opt) {
+    switch (opt) {
+      case 'school': return '🏫 School';
+      case 'no_school': return '🏠 No School';
+      case 'undecided': return '🤷 Undecided';
+      default: return opt.replaceAll('_', ' ');
+    }
+  }
+
+  Color _optionColor(String opt) {
+    switch (opt) {
+      case 'school': return TatvaColors.success;
+      case 'no_school': return TatvaColors.error;
+      case 'undecided': return TatvaColors.accent;
+      default: return TatvaColors.info;
+    }
   }
 
   Widget _buildGreetingCard() {

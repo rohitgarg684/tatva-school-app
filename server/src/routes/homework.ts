@@ -128,7 +128,17 @@ router.post(
     const subId = `${homeworkId}_${studentUid}`;
     const subRef = db.collection(Collections.HOMEWORK_SUBMISSIONS).doc(subId);
     const subSnap = await subRef.get();
-    if (!subSnap.exists) return res.status(404).json({ error: "Submission not found" });
+    if (!subSnap.exists) {
+      await subRef.set({
+        homeworkId,
+        studentUid,
+        files: [],
+        note: "",
+        status: "pending",
+        commentCount: 0,
+        submittedAt: FieldValue.serverTimestamp(),
+      });
+    }
 
     const userDoc = await getDoc(Collections.USERS, uid);
     const ref = await db.collection(Collections.HOMEWORK_COMMENTS).add({

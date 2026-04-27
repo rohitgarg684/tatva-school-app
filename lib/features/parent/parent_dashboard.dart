@@ -82,23 +82,12 @@ class _ParentDashboardState extends State<ParentDashboard>
     if (_activeVotes[index].hasVoted(_uid)) return;
     final voteId = _activeVotes[index].id;
     final old = _activeVotes[index];
-    final oldVotes = old.votes;
+    final updatedVotes = Map<String, int>.from(old.votes);
+    updatedVotes[option] = (updatedVotes[option] ?? 0) + 1;
     setState(() {
-      _activeVotes[index] = VoteModel(
-        id: old.id,
-        question: old.question,
-        type: old.type,
-        createdBy: old.createdBy,
-        createdByName: old.createdByName,
-        createdByRole: old.createdByRole,
-        votes: VoteCount(
-          school: oldVotes.school + (option == 'school' ? 1 : 0),
-          noSchool: oldVotes.noSchool + (option == 'no_school' ? 1 : 0),
-          undecided: oldVotes.undecided + (option == 'undecided' ? 1 : 0),
-        ),
+      _activeVotes[index] = old.copyWith(
+        votes: updatedVotes,
         voters: [...old.voters, _uid],
-        active: old.active,
-        createdAt: old.createdAt,
       );
     });
     _api.castVote(voteId, option);

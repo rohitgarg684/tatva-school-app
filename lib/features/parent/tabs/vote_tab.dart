@@ -17,6 +17,7 @@ class ParentVoteTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visibleVotes = activeVotes.where((v) => v.areResultsVisible).toList();
     return SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -34,7 +35,7 @@ class ParentVoteTab extends StatelessWidget {
                   style: TextStyle(
                       fontSize: 13, color: TatvaColors.neutral400))),
           const SizedBox(height: 24),
-          if (activeVotes.isEmpty)
+          if (visibleVotes.isEmpty)
             FadeSlideIn(
                 delayMs: 80,
                 child: Container(
@@ -54,16 +55,18 @@ class ParentVoteTab extends StatelessWidget {
                   ])),
                 ))
           else
-            ...activeVotes.asMap().entries.map((entry) {
+            ...visibleVotes.asMap().entries.map((entry) {
               final i = entry.key;
               final voteData = entry.value;
-              final total = voteData.votes.total;
+              final total = voteData.totalVotes;
               final hasVoted = voteData.hasVoted(uid);
+              final canVote = voteData.isVotingOpen && !hasVoted;
+              final originalIdx = activeVotes.indexOf(voteData);
               return FadeSlideIn(
                   delayMs: 80 + i * 60,
                   child: Container(
                     margin: EdgeInsets.only(
-                        bottom: i < activeVotes.length - 1 ? 16 : 0),
+                        bottom: i < visibleVotes.length - 1 ? 16 : 0),
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                         color: TatvaColors.bgCard,
@@ -83,12 +86,25 @@ class ParentVoteTab extends StatelessWidget {
                                         TatvaColors.info.withOpacity(0.08),
                                     borderRadius:
                                         BorderRadius.circular(8)),
-                                child: Text(voteData.type,
+                                child: Text(voteData.type.replaceAll('_', ' '),
                                     style: const TextStyle(
                                         fontSize: 11,
                                         color: TatvaColors.info,
                                         fontWeight: FontWeight.w700))),
                             const Spacer(),
+                            if (!voteData.isVotingOpen)
+                              Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 3),
+                                  margin: const EdgeInsets.only(right: 8),
+                                  decoration: BoxDecoration(
+                                      color: TatvaColors.neutral400.withOpacity(0.08),
+                                      borderRadius: BorderRadius.circular(6)),
+                                  child: const Text('Voting Closed',
+                                      style: TextStyle(
+                                          fontSize: 10,
+                                          color: TatvaColors.neutral400,
+                                          fontWeight: FontWeight.w700))),
                             Text('$total votes',
                                 style: const TextStyle(
                                     fontSize: 12,
@@ -102,90 +118,54 @@ class ParentVoteTab extends StatelessWidget {
                                   color: TatvaColors.neutral900,
                                   height: 1.4)),
                           const SizedBox(height: 20),
-                          if (!hasVoted)
-                            ...['school', 'no_school', 'undecided']
-                                .map((opt) => Padding(
-                                    padding:
-                                        const EdgeInsets.only(bottom: 10),
-                                    child: GestureDetector(
-                                        onTap: () => onCastVote(i, opt),
-                                        child: Container(
-                                          padding:
-                                              const EdgeInsets.symmetric(
-                                                  vertical: 14,
-                                                  horizontal: 16),
-                                          decoration: BoxDecoration(
-                                              color: TatvaColors.info
-                                                  .withOpacity(0.06),
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                      12),
-                                              border: Border.all(
-                                                  color: TatvaColors.info
-                                                      .withOpacity(0.2))),
-                                          child: Row(children: [
-                                            Icon(
-                                                opt == 'school'
-                                                    ? Icons.school_outlined
-                                                    : opt == 'no_school'
-                                                        ? Icons
-                                                            .home_outlined
-                                                        : Icons
-                                                            .help_outline_rounded,
-                                                color: TatvaColors.info,
-                                                size: 18),
-                                            const SizedBox(width: 12),
-                                            Text(
-                                                opt == 'school'
-                                                    ? '🏫 School as usual'
-                                                    : opt == 'no_school'
-                                                        ? '🏠 No school tomorrow'
-                                                        : '🤷 Undecided',
-                                                style: const TextStyle(
-                                                    fontSize: 14,
-                                                    fontWeight:
-                                                        FontWeight.w600,
-                                                    color: TatvaColors
-                                                        .neutral900)),
-                                          ]),
-                                        ))))
+                          if (canVote)
+                            ...voteData.options.map((opt) => Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: GestureDetector(
+                                    onTap: () => onCastVote(originalIdx, opt),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 14, horizontal: 16),
+                                      decoration: BoxDecoration(
+                                          color: TatvaColors.info.withOpacity(0.06),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(
+                                              color: TatvaColors.info.withOpacity(0.2))),
+                                      child: Row(children: [
+                                        Icon(_optionIcon(opt),
+                                            color: TatvaColors.info, size: 18),
+                                        const SizedBox(width: 12),
+                                        Text(_optionLabel(opt),
+                                            style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color: TatvaColors.neutral900)),
+                                      ]),
+                                    ))))
                           else
-                            ...{
-                              '🏫 School': voteData.votes.school,
-                              '🏠 No School': voteData.votes.noSchool,
-                              '🤷 Undecided': voteData.votes.undecided,
-                            }.entries.map((e) {
-                              final pct =
-                                  total > 0 ? e.value / total : 0.0;
-                              final c = e.key.contains('School') &&
-                                      !e.key.contains('No')
-                                  ? TatvaColors.success
-                                  : e.key.contains('No')
-                                      ? TatvaColors.error
-                                      : TatvaColors.accent;
+                            ...voteData.options.map((opt) {
+                              final count = voteData.votes[opt] ?? 0;
+                              final pct = total > 0 ? count / total : 0.0;
                               return Padding(
-                                  padding:
-                                      const EdgeInsets.only(bottom: 10),
+                                  padding: const EdgeInsets.only(bottom: 10),
                                   child: Row(children: [
                                     SizedBox(
                                         width: 110,
-                                        child: Text(e.key,
+                                        child: Text(_optionLabel(opt),
                                             style: const TextStyle(
                                                 fontSize: 12,
-                                                color: TatvaColors
-                                                    .neutral400))),
+                                                color: TatvaColors.neutral400))),
                                     Expanded(
                                         child: AnimatedProgressBar(
                                             value: pct,
-                                            color: c,
+                                            color: _optionColor(opt),
                                             height: 6,
                                             delayMs: 0)),
                                     const SizedBox(width: 8),
-                                    Text(
-                                        '${(pct * 100).toStringAsFixed(0)}%',
+                                    Text('${(pct * 100).toStringAsFixed(0)}%',
                                         style: TextStyle(
                                             fontSize: 12,
-                                            color: c,
+                                            color: _optionColor(opt),
                                             fontWeight: FontWeight.bold)),
                                   ]));
                             }),
@@ -195,18 +175,15 @@ class ParentVoteTab extends StatelessWidget {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 8),
                               decoration: BoxDecoration(
-                                  color: TatvaColors.success
-                                      .withOpacity(0.08),
+                                  color: TatvaColors.success.withOpacity(0.08),
                                   borderRadius: BorderRadius.circular(8)),
                               child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(Icons.check_circle_outline,
-                                        color: TatvaColors.success,
-                                        size: 14),
+                                        color: TatvaColors.success, size: 14),
                                     const SizedBox(width: 6),
-                                    const Text(
-                                        'Your vote has been submitted',
+                                    const Text('Your vote has been submitted',
                                         style: TextStyle(
                                             fontSize: 12,
                                             color: TatvaColors.success))
@@ -216,5 +193,44 @@ class ParentVoteTab extends StatelessWidget {
                   ));
             }),
         ]));
+  }
+
+  IconData _optionIcon(String opt) {
+    switch (opt) {
+      case 'school':
+        return Icons.school_outlined;
+      case 'no_school':
+        return Icons.home_outlined;
+      case 'undecided':
+        return Icons.help_outline_rounded;
+      default:
+        return Icons.radio_button_unchecked;
+    }
+  }
+
+  String _optionLabel(String opt) {
+    switch (opt) {
+      case 'school':
+        return 'School as usual';
+      case 'no_school':
+        return 'No school tomorrow';
+      case 'undecided':
+        return 'Undecided';
+      default:
+        return opt.replaceAll('_', ' ');
+    }
+  }
+
+  Color _optionColor(String opt) {
+    switch (opt) {
+      case 'school':
+        return TatvaColors.success;
+      case 'no_school':
+        return TatvaColors.error;
+      case 'undecided':
+        return TatvaColors.accent;
+      default:
+        return TatvaColors.info;
+    }
   }
 }

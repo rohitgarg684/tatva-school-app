@@ -59,6 +59,9 @@ class HeroAvatar extends StatelessWidget {
             backgroundColor: bgColor,
             backgroundImage:
                 photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+            onBackgroundImageError: photoUrl.isNotEmpty
+                ? (_, __) {}
+                : null,
             child: photoUrl.isNotEmpty
                 ? null
                 : Text(
@@ -103,6 +106,9 @@ class _AvatarZoomScreen extends StatelessWidget {
               backgroundColor: bgColor,
               backgroundImage:
                   photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+              onBackgroundImageError: photoUrl.isNotEmpty
+                  ? (_, __) {}
+                  : null,
               child: photoUrl.isNotEmpty
                   ? null
                   : Text(

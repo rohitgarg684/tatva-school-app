@@ -113,8 +113,8 @@ router.get(
       safe(classIds.length > 0
         ? queryDocs(Collections.HOMEWORK, [{ field: "classId", op: "in", value: inLimit }], { field: "createdAt", direction: "desc" })
         : Promise.resolve([]), []),
-      safe(fetchShared("votes_active", () =>
-        queryDocs(Collections.VOTES, [{ field: "active", op: "==", value: true }], { field: "createdAt", direction: "desc" })
+      safe(fetchShared("votes_visible", () =>
+        queryDocs(Collections.VOTES, [{ field: "resultsVisibleUntil", op: ">=", value: new Date().toISOString() }], { field: "resultsVisibleUntil" })
       ), []),
       safe(queryDocs(Collections.BEHAVIOR_POINTS, [{ field: "studentUid", op: "==", value: uid }], { field: "createdAt", direction: "desc" }), []),
       safe(queryDocs(Collections.ATTENDANCE, [{ field: "studentUid", op: "==", value: uid }], { field: "date", direction: "desc" }), []),
@@ -229,7 +229,7 @@ router.get(
       console.warn("Non-fatal: test_titles query failed:", (err as Error)?.message);
     }
 
-    const [announcements, homework, allStudents, teacherContent] = await Promise.all([
+    const [announcements, homework, allStudents, teacherContent, votes] = await Promise.all([
       safe(fetchShared("announcements_all", () =>
         queryDocs(Collections.ANNOUNCEMENTS, [], { field: "createdAt", direction: "desc" }, Config.ANNOUNCEMENTS_LIMIT)
       ), []),
@@ -238,6 +238,9 @@ router.get(
         queryDocs(Collections.USERS, [{ field: "role", op: "==", value: "Student" }], { field: "name" })
       ), []),
       safe(queryDocs(Collections.CONTENT, [{ field: "createdBy", op: "==", value: uid }], { field: "createdAt", direction: "desc" }), []),
+      safe(fetchShared("votes_visible", () =>
+        queryDocs(Collections.VOTES, [{ field: "resultsVisibleUntil", op: ">=", value: new Date().toISOString() }], { field: "resultsVisibleUntil" })
+      ), []),
     ]);
 
     const teacherGrades = (classes as ClassDoc[]).map((c) => c.grade).filter(Boolean) as string[];
@@ -258,6 +261,7 @@ router.get(
       activityFeed: serializeDocs(activityFeed),
       allStudents: serializeDocs(allStudents),
       contentItems: serializeDocs(teacherContent),
+      activeVotes: serializeDocs(votes),
     };
 
     cacheSet(cacheKey, result, USER_TTL);
@@ -371,8 +375,8 @@ router.get(
       safe(fetchShared("announcements_all", () =>
         queryDocs(Collections.ANNOUNCEMENTS, [], { field: "createdAt", direction: "desc" }, Config.ANNOUNCEMENTS_LIMIT)
       ), []),
-      safe(fetchShared("votes_active", () =>
-        queryDocs(Collections.VOTES, [{ field: "active", op: "==", value: true }], { field: "createdAt", direction: "desc" })
+      safe(fetchShared("votes_visible", () =>
+        queryDocs(Collections.VOTES, [{ field: "resultsVisibleUntil", op: ">=", value: new Date().toISOString() }], { field: "resultsVisibleUntil" })
       ), []),
       safe(firstChildUid
         ? queryDocs(Collections.ACTIVITIES, [{ field: "targetUid", op: "==", value: firstChildUid }], { field: "createdAt", direction: "desc" }, Config.ACTIVITY_FEED_LIMIT)
@@ -441,8 +445,8 @@ router.get(
       fetchShared("announcements_all", () =>
         queryDocs(Collections.ANNOUNCEMENTS, [], { field: "createdAt", direction: "desc" }, Config.ANNOUNCEMENTS_LIMIT)
       ),
-      fetchShared("votes_active", () =>
-        queryDocs(Collections.VOTES, [{ field: "active", op: "==", value: true }], { field: "createdAt", direction: "desc" })
+      fetchShared("votes_visible", () =>
+        queryDocs(Collections.VOTES, [{ field: "resultsVisibleUntil", op: ">=", value: new Date().toISOString() }], { field: "resultsVisibleUntil" })
       ),
       queryDocs(Collections.ACTIVITIES, [], { field: "createdAt", direction: "desc" }, Config.PRINCIPAL_ACTIVITY_LIMIT),
     ]);

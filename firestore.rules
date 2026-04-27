@@ -77,9 +77,9 @@ service cloud.firestore {
     // All vote mutations go through server Admin SDK
     match /votes/{voteId} {
       allow read: if isSignedIn();
-      allow create: if isPrincipal();
+      allow create: if isTeacherOrPrincipal();
       allow update: if false;
-      allow delete: if isPrincipal();
+      allow delete: if isTeacherOrPrincipal();
     }
 
     // ── Homework ─────────────────────────────────────────────────────

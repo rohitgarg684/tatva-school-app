@@ -186,6 +186,28 @@ class ApiService {
   Future<Map<String, dynamic>> closeVote(String voteId) =>
       _post('/vote/$voteId/close', {});
 
+  Future<Map<String, dynamic>> updateVote(
+    String voteId, {
+    String? question,
+    String? type,
+    List<String>? options,
+    String? votingDeadline,
+    String? resultsVisibleUntil,
+  }) =>
+      _put('/vote/$voteId', {
+        if (question != null) 'question': question,
+        if (type != null) 'type': type,
+        if (options != null) 'options': options,
+        if (votingDeadline != null) 'votingDeadline': votingDeadline,
+        if (resultsVisibleUntil != null) 'resultsVisibleUntil': resultsVisibleUntil,
+      });
+
+  Future<Map<String, dynamic>> deleteVote(String voteId) =>
+      _delete('/vote/$voteId');
+
+  Future<Map<String, dynamic>> getVoteHistory({int limit = 20, String? after}) =>
+      _get('/votes/history?limit=$limit${after != null ? '&after=$after' : ''}');
+
   Future<Map<String, dynamic>> markAttendanceBatch(
           List<Map<String, dynamic>> records) =>
       _post('/attendance', {'records': records});
@@ -505,8 +527,20 @@ class ApiService {
       '${classId != null ? '&classId=$classId' : ''}'
       '${after != null ? '&after=$after' : ''}');
 
-  Future<Map<String, dynamic>> createVote({required String question}) =>
-      _post('/vote', {'question': question});
+  Future<Map<String, dynamic>> createVote({
+    required String question,
+    String type = 'school_decision',
+    List<String>? options,
+    required String votingDeadline,
+    required String resultsVisibleUntil,
+  }) =>
+      _post('/vote', {
+        'question': question,
+        'type': type,
+        if (options != null) 'options': options,
+        'votingDeadline': votingDeadline,
+        'resultsVisibleUntil': resultsVisibleUntil,
+      });
 
   Future<Map<String, dynamic>> enterGrade({
     required String studentUid,

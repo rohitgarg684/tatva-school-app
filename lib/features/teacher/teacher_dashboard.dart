@@ -16,6 +16,7 @@ import '../../models/homework_model.dart';
 import '../../models/behavior_point.dart';
 import '../../models/attendance_record.dart';
 import '../../models/content_item.dart';
+import '../../models/vote_model.dart';
 import '../principal/widgets/new_announcement_sheet.dart';
 import '../../shared/widgets/announcement_card.dart';
 import 'tabs/home_tab.dart';
@@ -26,6 +27,7 @@ import 'tabs/schedule_tab.dart';
 import 'tabs/grades_tab.dart';
 import 'tabs/homework_tab.dart';
 import 'tabs/learn_tab.dart';
+import 'tabs/votes_tab.dart';
 import 'tabs/messages_tab.dart';
 import 'tabs/profile_tab.dart';
 
@@ -47,6 +49,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
     TabItem(icon: Icons.grade_outlined, activeIcon: Icons.grade_rounded, label: 'Grades'),
     TabItem(icon: Icons.assignment_outlined, activeIcon: Icons.assignment_rounded, label: 'Homework'),
     TabItem(icon: Icons.auto_stories_outlined, activeIcon: Icons.auto_stories_rounded, label: 'Learn'),
+    TabItem(icon: Icons.how_to_vote_outlined, activeIcon: Icons.how_to_vote_rounded, label: 'Votes'),
     TabItem(icon: Icons.chat_outlined, activeIcon: Icons.chat_rounded, label: 'Messages'),
     TabItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Profile'),
   ];
@@ -61,6 +64,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
   List<BehaviorPoint> _classBehavior = [];
   List<AttendanceRecord> _todayAttendance = [];
   List<ContentItem> _contentItems = [];
+  List<VoteModel> _voteModels = [];
 
   @override
   void initState() {
@@ -86,6 +90,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
       _classBehavior = List.of(data.classBehavior);
       _todayAttendance = List.of(data.todayAttendance);
       _contentItems = List.of(data.contentItems);
+      _voteModels = List.of(data.activeVotes);
     } catch (e) {
       debugPrint('TeacherDashboard._loadData error: $e');
     }
@@ -177,6 +182,21 @@ class _TeacherDashboardState extends State<TeacherDashboard>
               onContentUpdated: (ci) => setState(() {
                 final idx = _contentItems.indexWhere((c) => c.id == ci.id);
                 if (idx >= 0) _contentItems[idx] = ci;
+              }),
+            ),
+            TeacherVotesTab(
+              votes: _voteModels,
+              uid: _uid,
+              api: _api,
+              onVoteCreated: (vote) => setState(() => _voteModels.insert(0, vote)),
+              onVoteUpdated: (vote) => setState(() {
+                final idx = _voteModels.indexWhere((v) => v.id == vote.id);
+                if (idx >= 0) _voteModels[idx] = vote;
+              }),
+              onVoteDeleted: (id) => setState(() => _voteModels.removeWhere((v) => v.id == id)),
+              onVoteClosed: (vote) => setState(() {
+                final idx = _voteModels.indexWhere((v) => v.id == vote.id);
+                if (idx >= 0) _voteModels[idx] = _voteModels[idx].copyWith(active: false);
               }),
             ),
             TeacherMessagesTab(parents: _data?.parentsInFirstClass ?? []),

@@ -91,12 +91,15 @@ export interface VoteDoc {
   id: string;
   question: string;
   type: string;
+  options: string[];
   createdBy: string;
   createdByName: string;
   createdByRole: string;
   votes: Record<string, number>;
   voters: string[];
   active: boolean;
+  votingDeadline: string;
+  resultsVisibleUntil: string;
   createdAt?: FirebaseFirestore.Timestamp | string;
 }
 

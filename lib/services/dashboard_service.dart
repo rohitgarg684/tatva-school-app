@@ -72,6 +72,7 @@ class TeacherDashboardData {
   final List<ActivityEvent> activityFeed;
   final List<UserModel> allStudents;
   final List<ContentItem> contentItems;
+  final List<VoteModel> activeVotes;
 
   const TeacherDashboardData({
     required this.user,
@@ -88,6 +89,7 @@ class TeacherDashboardData {
     this.activityFeed = const [],
     this.allStudents = const [],
     this.contentItems = const [],
+    this.activeVotes = const [],
   });
 
   TeacherDashboardData copyWithPhotoUrl(String url) => TeacherDashboardData(
@@ -105,6 +107,7 @@ class TeacherDashboardData {
         activityFeed: activityFeed,
         allStudents: allStudents,
         contentItems: contentItems,
+        activeVotes: activeVotes,
       );
 }
 
@@ -304,6 +307,7 @@ class DashboardService {
       activityFeed: _parseList(json['activityFeed'], ActivityEvent.fromJson),
       allStudents: _parseList(json['allStudents'], UserModel.fromJson),
       contentItems: _parseList(json['contentItems'], ContentItem.fromJson),
+      activeVotes: _parseList(json['activeVotes'], VoteModel.fromJson),
     );
 
     _cachedTeacherData = data;
