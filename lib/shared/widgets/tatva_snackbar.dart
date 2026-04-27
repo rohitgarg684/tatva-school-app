@@ -12,4 +12,10 @@ class TatvaSnackbar {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     ));
   }
+
+  static void success(BuildContext context, String msg) =>
+      show(context, msg, color: TatvaColors.success);
+
+  static void error(BuildContext context, String msg) =>
+      show(context, msg, color: TatvaColors.error);
 }
