@@ -23,6 +23,7 @@ import contentRoutes from "./routes/content";
 import dashboardRoutes from "./routes/dashboards";
 import uploadRoutes from "./routes/upload";
 import holidayRoutes from "./routes/holidays";
+import publicRoutes from "./routes/public";
 
 const app = express();
 
@@ -33,6 +34,8 @@ app.use(cors({
 }));
 
 app.use(express.json({ limit: "1mb" }));
+
+app.use(publicRoutes);
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });

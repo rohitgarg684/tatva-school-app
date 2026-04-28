@@ -22,6 +22,20 @@
         }
       },
       {
+        "source": "/privacy-policy",
+        "run": {
+          "serviceId": "tatva-api",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/support",
+        "run": {
+          "serviceId": "tatva-api",
+          "region": "us-central1"
+        }
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
