@@ -3,10 +3,19 @@
 <plist version="1.0">
 <dict>
 	<key>method</key>
-	<string>development</string>
-	<key>compileBitcode</key>
+	<string>app-store-connect</string>
+	<key>teamID</key>
+	<string>WU28MJMG3H</string>
+	<key>uploadBitcode</key>
 	<false/>
+	<key>uploadSymbols</key>
+	<true/>
 	<key>signingStyle</key>
 	<string>manual</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>com.tatvaschool.app</key>
+		<string>Tatva Academy App Store</string>
+	</dict>
 </dict>
 </plist>
