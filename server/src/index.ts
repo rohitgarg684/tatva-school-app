@@ -27,6 +27,8 @@ import publicRoutes from "./routes/public";
 
 const app = express();
 
+app.use(publicRoutes);
+
 app.use(helmet());
 
 app.use(cors({
@@ -34,8 +36,6 @@ app.use(cors({
 }));
 
 app.use(express.json({ limit: "1mb" }));
-
-app.use(publicRoutes);
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
