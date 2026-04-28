@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../student/student_dashboard.dart';
 import '../teacher/teacher_dashboard.dart';
 import '../parent/parent_dashboard.dart';
 import '../principal/principal_dashboard.dart';
@@ -108,9 +107,6 @@ class WelcomeScreen extends StatelessWidget {
                   style: TextStyle(
 fontSize: 14, color: textMut)),
               const SizedBox(height: 36),
-              _roleCard(context, '🎓', 'Student', 'Arjun Mehta · Grade 8-A',
-                  const Color(0xFF1E88E5), const StudentDashboard()),
-              const SizedBox(height: 12),
               _roleCard(
                   context,
                   '🧑‍🏫',

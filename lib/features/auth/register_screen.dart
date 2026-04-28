@@ -20,17 +20,12 @@ class _RegisterScreenState extends State<RegisterScreen>
   final _classCodeController = TextEditingController();
   final _childNameController = TextEditingController();
 
-  String _selectedRole = 'Student';
+  String _selectedRole = 'Parent';
   bool _loading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
 
   final List<Map<String, dynamic>> _roles = [
-    {
-      'label': 'Student',
-      'icon': Icons.school_outlined,
-      'desc': 'I am a student'
-    },
     {
       'label': 'Parent',
       'icon': Icons.family_restroom_outlined,
@@ -101,10 +96,8 @@ class _RegisterScreenState extends State<RegisterScreen>
         return accent;
       case 'Principal':
         return Color(0xFF8E24AA);
-      case 'Parent':
-        return success;
       default:
-        return Color(0xFF1E88E5);
+        return success;
     }
   }
 
@@ -123,8 +116,7 @@ class _RegisterScreenState extends State<RegisterScreen>
       setState(() => _errorMessage = 'Password must be at least 6 characters.');
       return;
     }
-    if ((_selectedRole == 'Student' || _selectedRole == 'Parent') &&
-        classCode.isEmpty) {
+    if (_selectedRole == 'Parent' && classCode.isEmpty) {
       setState(() =>
           _errorMessage = 'Please enter a class code to join your class.');
       return;
@@ -398,26 +390,20 @@ fontSize: 14, color: textDark),
                     ),
                   ),
 
-                  // Class code field (Student or Parent)
-                  if (_selectedRole == 'Student' ||
-                      _selectedRole == 'Parent') ...[
+                  if (_selectedRole == 'Parent') ...[
                     SizedBox(height: 14),
-                    if (_selectedRole == 'Parent') ...[
-                      _inputLabel("Child's Name"),
-                      SizedBox(height: 8),
-                      _textField(
-                        controller: _childNameController,
-                        hint: "Enter your child's full name",
-                        icon: Icons.child_care_outlined,
-                      ),
-                      SizedBox(height: 14),
-                    ],
+                    _inputLabel("Child's Name"),
+                    SizedBox(height: 8),
+                    _textField(
+                      controller: _childNameController,
+                      hint: "Enter your child's full name",
+                      icon: Icons.child_care_outlined,
+                    ),
+                    SizedBox(height: 14),
                     _inputLabel('Class Code'),
                     SizedBox(height: 4),
                     Text(
-                        _selectedRole == 'Student'
-                            ? 'Get this from your teacher'
-                            : "Get this from your child's teacher",
+                        "Get this from your child's teacher",
                         style: TextStyle(
                             fontSize: 12,
                             color: textLight)),
@@ -610,10 +596,8 @@ fontSize: 14, color: textDark),
         return accent;
       case 'Principal':
         return Color(0xFF8E24AA);
-      case 'Parent':
-        return success;
       default:
-        return Color(0xFF1E88E5);
+        return success;
     }
   }
 

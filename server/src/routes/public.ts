@@ -1,4 +1,5 @@
 import { Router } from "express";
+import express from "express";
 
 const router = Router();
 
@@ -64,7 +65,7 @@ router.get("/privacy-policy", (_req, res) => {
     <h2>1. Information We Collect</h2>
     <p>We may collect the following types of information:</p>
     <ul>
-      <li><strong>Account Information:</strong> Name, email address, phone number, and role (e.g., teacher, parent, student) provided during registration.</li>
+      <li><strong>Account Information:</strong> Name, email address, phone number, and role (e.g., teacher, parent, principal) provided during registration.</li>
       <li><strong>Profile Information:</strong> Profile photos, class assignments, and preferences you set within the app.</li>
       <li><strong>Academic Data:</strong> Attendance records, grades, homework submissions, schedules, and behavioral notes managed through the app.</li>
       <li><strong>Communications:</strong> Messages sent through the app's messaging system.</li>
@@ -201,7 +202,7 @@ router.get("/support", (_req, res) => {
       btn.textContent = 'Sending...';
 
       try {
-        const res = await fetch('/api/support', {
+        const res = await fetch('/support', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -226,7 +227,7 @@ router.get("/support", (_req, res) => {
   res.send(PAGE_SHELL("Support", body));
 });
 
-router.post("/support", async (req, res) => {
+router.post("/support", express.json(), async (req, res) => {
   const { name, email, subject, message } = req.body;
   if (!name || !email || !subject || !message) {
     res.status(400).json({ error: "All fields are required" });

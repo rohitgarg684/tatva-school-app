@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../student/student_dashboard.dart';
 import '../teacher/teacher_dashboard.dart';
 import '../parent/parent_dashboard.dart';
 import '../principal/principal_dashboard.dart';
@@ -100,6 +99,16 @@ class _LoginScreenState extends State<LoginScreen>
 
       if (result == null) throw UserNotFoundException();
 
+      if (result.role == UserRole.student) {
+        await _authService.signOut();
+        if (!mounted) return;
+        setState(() {
+          generalError = 'Student accounts cannot log in. Please use a parent account.';
+          isLoading = false;
+        });
+        return;
+      }
+
       HapticFeedback.mediumImpact();
       setState(() => _showConfetti = true);
       await Future.delayed(Duration(milliseconds: 900));
@@ -117,7 +126,7 @@ class _LoginScreenState extends State<LoginScreen>
             dashboard = PrincipalDashboard();
             break;
           default:
-            dashboard = StudentDashboard();
+            dashboard = ParentDashboard();
         }
         Navigator.pushReplacement(
             context, TatvaPageRoute.slideUp(dashboard));

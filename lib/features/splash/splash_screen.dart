@@ -109,8 +109,12 @@ class _SplashScreenState extends State<SplashScreen>
         final roleStr = tokenResult.claims?['role'] as String?;
         if (roleStr != null && mounted) {
           final role = UserRole.fromString(roleStr);
-          AppRouter.toDashboardAndClearStack(context, role);
-          return;
+          if (role == UserRole.student) {
+            await FirebaseAuth.instance.signOut();
+          } else {
+            AppRouter.toDashboardAndClearStack(context, role);
+            return;
+          }
         }
       } catch (_) {}
     }
