@@ -10,7 +10,8 @@ import '../../features/parent/parent_helpers.dart';
 import '../../services/api_service.dart';
 import '../theme/colors.dart';
 import '../animations/animations.dart';
-import 'web_embed.dart';
+import 'web_embed_stub.dart'
+    if (dart.library.html) 'web_embed.dart';
 
 class AnnouncementCard extends StatelessWidget {
   final AnnouncementModel announcement;
