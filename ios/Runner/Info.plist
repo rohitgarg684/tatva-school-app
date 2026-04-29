@@ -43,6 +43,12 @@
 	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Tatva Academy needs access to your photo library to attach files to homework submissions and announcements.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<true/>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

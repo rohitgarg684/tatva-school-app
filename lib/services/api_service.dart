@@ -391,6 +391,9 @@ class ApiService {
         'role': role,
       });
 
+  Future<Map<String, dynamic>> registerFcmToken(String token) =>
+      _post('/user/fcm-token', {'token': token});
+
   Future<Map<String, dynamic>> createClass({
     required String name,
     required String subject,

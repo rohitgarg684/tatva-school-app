@@ -39,6 +39,19 @@ router.post(
   })
 );
 
+router.post(
+  "/user/fcm-token",
+  asyncHandler(async (req, res) => {
+    const uid = req.uid!;
+    const { token } = req.body;
+    if (!token || typeof token !== "string")
+      return res.status(400).json({ error: "token required" });
+
+    await db.collection(Collections.USERS).doc(uid).update({ fcmToken: token });
+    res.json({ updated: true });
+  })
+);
+
 router.get(
   "/report/weekly",
   asyncHandler(async (req, res) => {

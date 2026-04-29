@@ -7,6 +7,7 @@ import { asyncHandler } from "../lib/async-handler";
 import { Collections } from "../lib/collections";
 import { Config } from "../lib/config";
 import { logActivity } from "../lib/activity-logger";
+import { notify } from "../lib/notifications/notifier";
 
 const router = Router();
 router.use(requireAuth);
@@ -17,21 +18,25 @@ router.post(
   "/announcement",
   requireRole("Teacher", "Principal"),
   asyncHandler(async (req, res) => {
-    const { title, body: bodyText, audience, grades, attachments } = req.body;
+    const { title, body: bodyText, grades, attachments } = req.body;
     if (!title || !bodyText)
       return res.status(400).json({ error: "title, body required" });
 
     const uid = req.uid!;
     const userDoc = await getDoc(Collections.USERS, uid);
 
+    const normalizedGrades: string[] = Array.isArray(grades) ? grades : [];
+    const audience = normalizedGrades.length > 0 ? "Grades" : "Everyone";
+    const authorName = userDoc?.name || "";
+
     const ref = await db.collection(Collections.ANNOUNCEMENTS).add({
       title,
       body: bodyText,
-      audience: Array.isArray(grades) && grades.length > 0 ? "Grades" : "Everyone",
-      grades: Array.isArray(grades) ? grades : [],
+      audience,
+      grades: normalizedGrades,
       classIds: [],
       createdBy: uid,
-      createdByName: userDoc?.name || "",
+      createdByName: authorName,
       createdByRole: req.role || "",
       likedBy: [],
       commentCount: 0,
@@ -42,10 +47,22 @@ router.post(
     logActivity({
       type: "announcement",
       actorUid: uid,
-      actorName: userDoc?.name || "",
+      actorName: authorName,
       actorRole: req.role || "",
       title: `Announcement: ${title}`,
       body: bodyText,
+    });
+
+    notify({
+      event: "announcement",
+      ctx: {
+        title,
+        authorName,
+        audience,
+        grades: normalizedGrades,
+        senderUid: uid,
+        announcementId: ref.id,
+      },
     });
 
     invalidateDashboards("announcements_");

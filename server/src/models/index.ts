@@ -24,6 +24,8 @@ export interface ClassDoc {
   id: string;
   name: string;
   subject: string;
+  grade: string;
+  section: string;
   classCode: string;
   teacherUid: string;
   teacherName: string;
@@ -80,10 +82,14 @@ export interface AnnouncementDoc {
   title: string;
   body: string;
   audience: string;
+  grades: string[];
   classIds: string[];
   createdBy: string;
   createdByName: string;
   createdByRole: string;
+  likedBy: string[];
+  commentCount: number;
+  attachments: { url: string; name: string; type: string }[];
   createdAt?: FirebaseFirestore.Timestamp | string;
 }
 

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../teacher/teacher_dashboard.dart';
@@ -7,6 +8,7 @@ import '../../shared/animations/animations.dart';
 import '../../services/auth_service.dart';
 import '../../models/user_role.dart';
 import '../../core/router/app_router.dart';
+import '../../repositories/auth_repository.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -22,12 +24,15 @@ class _LoginScreenState extends State<LoginScreen>
   final emailFocus = FocusNode();
   final passwordFocus = FocusNode();
 
-  bool isLoading = false;
+  bool _emailLoading = false;
+  bool _socialLoading = false;
   bool obscurePassword = true;
   bool _showConfetti = false;
   String emailError = '';
   String passwordError = '';
   String generalError = '';
+
+  bool get _busy => _emailLoading || _socialLoading;
 
   static const Color bg1 = Color(0xFF1B3A2D);
   static const Color bg2 = Color(0xFF2D4A1E);
@@ -37,9 +42,14 @@ class _LoginScreenState extends State<LoginScreen>
   static const Color textMuted = Color(0xFF8FAF8F);
   static const Color fieldBg = Color(0xFF1E3828);
 
+  static const _studentBlockedMsg =
+      'Student accounts cannot log in. Please use a parent account.';
+
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
+
+  final _authService = AuthService();
 
   @override
   void initState() {
@@ -63,6 +73,63 @@ class _LoginScreenState extends State<LoginScreen>
     super.dispose();
   }
 
+  // ── Helpers ──────────────────────────────────────────────────────────
+
+  bool get _showAppleButton =>
+      kIsWeb ||
+      defaultTargetPlatform == TargetPlatform.iOS ||
+      defaultTargetPlatform == TargetPlatform.macOS;
+
+  void _setError(String msg) {
+    if (mounted) setState(() => generalError = msg);
+  }
+
+  String _friendlyError(Object e) {
+    final msg = e.toString();
+    if (msg.contains('user-not-found') ||
+        msg.contains('wrong-password') ||
+        msg.contains('invalid-credential')) {
+      return 'Incorrect email or password. Please try again.';
+    }
+    if (msg.contains('too-many-requests')) {
+      return 'Too many attempts. Please wait and try again.';
+    }
+    if (msg.contains('network')) {
+      return 'No internet connection. Please check and retry.';
+    }
+    return 'Something went wrong. Please try again.';
+  }
+
+  /// Blocks student roles with sign-out. Returns `true` if blocked.
+  Future<bool> _blockStudentRole(UserRole role) async {
+    if (role != UserRole.student) return false;
+    await _authService.signOut();
+    _setError(_studentBlockedMsg);
+    return true;
+  }
+
+  void _navigateToDashboard(UserRole role) {
+    HapticFeedback.mediumImpact();
+    setState(() => _showConfetti = true);
+    Future.delayed(Duration(milliseconds: 900), () {
+      if (!mounted) return;
+      final Widget dashboard;
+      switch (role) {
+        case UserRole.teacher:
+          dashboard = TeacherDashboard();
+        case UserRole.parent:
+          dashboard = ParentDashboard();
+        case UserRole.principal:
+          dashboard = PrincipalDashboard();
+        default:
+          dashboard = ParentDashboard();
+      }
+      Navigator.pushReplacement(context, TatvaPageRoute.slideUp(dashboard));
+    });
+  }
+
+  // ── Email login ──────────────────────────────────────────────────────
+
   bool _validate() {
     bool valid = true;
     setState(() {
@@ -84,12 +151,10 @@ class _LoginScreenState extends State<LoginScreen>
     return valid;
   }
 
-  final _authService = AuthService();
-
-  Future<void> login() async {
+  Future<void> _login() async {
     if (!_validate()) return;
     HapticFeedback.lightImpact();
-    setState(() => isLoading = true);
+    setState(() => _emailLoading = true);
 
     try {
       final result = await _authService.signIn(
@@ -97,70 +162,62 @@ class _LoginScreenState extends State<LoginScreen>
         password: passwordController.text,
       );
 
-      if (result == null) throw UserNotFoundException();
+      if (await _blockStudentRole(result.role)) return;
 
-      if (result.role == UserRole.student) {
-        await _authService.signOut();
+      _navigateToDashboard(result.role);
+    } on UnverifiedEmailException {
+      _setError('Please verify your email first. Check your inbox.');
+    } on UserNotFoundException {
+      _setError('User profile not found. Please register first.');
+    } catch (e) {
+      _setError(_friendlyError(e));
+      HapticFeedback.vibrate();
+    }
+    if (mounted) setState(() => _emailLoading = false);
+  }
+
+  // ── Social login ─────────────────────────────────────────────────────
+
+  Future<void> _handleSocialSignIn(
+    Future<SocialSignInResult> Function() signIn,
+  ) async {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _socialLoading = true;
+      generalError = '';
+    });
+
+    try {
+      final result = await signIn();
+
+      if (result.isNewUser || result.role == null) {
         if (!mounted) return;
-        setState(() {
-          generalError = 'Student accounts cannot log in. Please use a parent account.';
-          isLoading = false;
-        });
+        final pickedRole = await _showRolePicker();
+        if (pickedRole == null) {
+          await _authService.signOut();
+          if (mounted) setState(() => _socialLoading = false);
+          return;
+        }
+        if (await _blockStudentRole(pickedRole)) return;
+
+        final profile =
+            await _authService.completeSocialProfile(role: pickedRole);
+        _navigateToDashboard(profile.role);
         return;
       }
 
-      HapticFeedback.mediumImpact();
-      setState(() => _showConfetti = true);
-      await Future.delayed(Duration(milliseconds: 900));
+      if (await _blockStudentRole(result.role!)) return;
 
-      if (mounted) {
-        final Widget dashboard;
-        switch (result.role) {
-          case UserRole.teacher:
-            dashboard = TeacherDashboard();
-            break;
-          case UserRole.parent:
-            dashboard = ParentDashboard();
-            break;
-          case UserRole.principal:
-            dashboard = PrincipalDashboard();
-            break;
-          default:
-            dashboard = ParentDashboard();
-        }
-        Navigator.pushReplacement(
-            context, TatvaPageRoute.slideUp(dashboard));
-      }
-    } on UnverifiedEmailException {
-      if (!mounted) return;
-      setState(() {
-        generalError = 'Please verify your email first. Check your inbox.';
-      });
-    } on UserNotFoundException {
-      if (!mounted) return;
-      setState(() {
-        generalError = 'User profile not found. Please register first.';
-      });
+      _navigateToDashboard(result.role!);
+    } on SignInCancelledException {
+      // User cancelled — no-op
     } catch (e) {
-      String msg = e.toString();
-      if (!mounted) return;
-      setState(() {
-        if (msg.contains('user-not-found') ||
-            msg.contains('wrong-password') ||
-            msg.contains('invalid-credential')) {
-          generalError = 'Incorrect email or password. Please try again.';
-        } else if (msg.contains('too-many-requests')) {
-          generalError = 'Too many attempts. Please wait and try again.';
-        } else if (msg.contains('network')) {
-          generalError = 'No internet connection. Please check and retry.';
-        } else {
-          generalError = 'Something went wrong. Please try again.';
-        }
-      });
-      HapticFeedback.vibrate();
+      _setError(_friendlyError(e));
     }
-    if (mounted) setState(() => isLoading = false);
+    if (mounted) setState(() => _socialLoading = false);
   }
+
+  // ── Forgot password ──────────────────────────────────────────────────
 
   Future<void> _forgotPassword() async {
     if (emailController.text.trim().isEmpty) {
@@ -231,6 +288,75 @@ class _LoginScreenState extends State<LoginScreen>
           () => emailError = 'Could not send reset email. Check the address.');
     }
   }
+
+  // ── Role picker ──────────────────────────────────────────────────────
+
+  Future<UserRole?> _showRolePicker() {
+    UserRole selected = UserRole.parent;
+    return showModalBottomSheet<UserRole>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isDismissible: true,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Container(
+          decoration: BoxDecoration(
+            color: Color(0xFF243D2F),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: EdgeInsets.fromLTRB(28, 16, 28, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              SizedBox(height: 20),
+              Text('Choose your role',
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: textWhite)),
+              SizedBox(height: 6),
+              Text('How will you use Tatva Academy?',
+                  style: TextStyle(fontSize: 13, color: textMuted)),
+              SizedBox(height: 20),
+              for (final role in [UserRole.parent, UserRole.teacher, UserRole.principal])
+                _RolePickerTile(
+                  role: role,
+                  selected: selected == role,
+                  onTap: () => setSheetState(() => selected = role),
+                ),
+              SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, selected),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accent,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    padding: EdgeInsets.symmetric(vertical: 14),
+                    elevation: 0,
+                  ),
+                  child: Text('Continue',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, color: Colors.white)),
+                ),
+              ),
+              SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Build ────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -307,7 +433,7 @@ class _LoginScreenState extends State<LoginScreen>
                         focusNode: passwordFocus,
                         obscureText: obscurePassword,
                         textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => login(),
+                        onSubmitted: (_) => _login(),
                         style: TextStyle(
                             fontSize: 14,
                             color: textWhite),
@@ -368,9 +494,9 @@ class _LoginScreenState extends State<LoginScreen>
                           ),
                         ),
                       _PressableButton(
-                        onPressed: isLoading ? null : login,
+                        onPressed: _busy ? null : _login,
                         color: accent,
-                        child: isLoading
+                        child: _emailLoading
                             ? SizedBox(
                                 height: 20,
                                 width: 20,
@@ -382,7 +508,63 @@ class _LoginScreenState extends State<LoginScreen>
                                     fontWeight: FontWeight.bold,
                                     color: Colors.white)),
                       ),
-                      SizedBox(height: 32),
+                      SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(child: Divider(color: Colors.white12)),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 16),
+                            child: Text('or continue with',
+                                style: TextStyle(
+                                    fontSize: 12, color: textMuted)),
+                          ),
+                          Expanded(child: Divider(color: Colors.white12)),
+                        ],
+                      ),
+                      SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _SocialButton(
+                              onPressed: _busy
+                                  ? null
+                                  : () => _handleSocialSignIn(
+                                      _authService.signInWithGoogle),
+                              icon: const _GoogleIcon(),
+                              label: 'Google',
+                              backgroundColor: fieldBg,
+                            ),
+                          ),
+                          if (_showAppleButton) ...[
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: _SocialButton(
+                                onPressed: _busy
+                                    ? null
+                                    : () => _handleSocialSignIn(
+                                        _authService.signInWithApple),
+                                icon: Icon(Icons.apple,
+                                    color: textWhite, size: 22),
+                                label: 'Apple',
+                                backgroundColor: fieldBg,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (_socialLoading)
+                        Padding(
+                          padding: EdgeInsets.only(top: 16),
+                          child: Center(
+                            child: SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                  color: accent, strokeWidth: 2),
+                            ),
+                          ),
+                        ),
+                      SizedBox(height: 24),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -466,7 +648,209 @@ class _LoginScreenState extends State<LoginScreen>
               width: 1.5)),
     );
   }
+}
 
+// ── Extracted widgets ────────────────────────────────────────────────────
+
+class _RolePickerTile extends StatelessWidget {
+  final UserRole role;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _RolePickerTile({
+    required this.role,
+    required this.selected,
+    required this.onTap,
+  });
+
+  static const _icons = {
+    UserRole.parent: Icons.family_restroom,
+    UserRole.teacher: Icons.school,
+    UserRole.principal: Icons.admin_panel_settings,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 10),
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: Duration(milliseconds: 150),
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: selected
+                ? _LoginScreenState.accent.withOpacity(0.15)
+                : _LoginScreenState.fieldBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? _LoginScreenState.accent : Colors.white12,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                _icons[role] ?? Icons.person,
+                color: selected
+                    ? _LoginScreenState.accent
+                    : _LoginScreenState.textMuted,
+                size: 22,
+              ),
+              SizedBox(width: 12),
+              Text(role.label,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: selected
+                        ? _LoginScreenState.textWhite
+                        : _LoginScreenState.textMuted,
+                  )),
+              Spacer(),
+              if (selected)
+                Icon(Icons.check_circle,
+                    color: _LoginScreenState.accent, size: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GoogleIcon extends StatelessWidget {
+  const _GoogleIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 20,
+      height: 20,
+      child: CustomPaint(painter: _GoogleLogoPainter()),
+    );
+  }
+}
+
+class _GoogleLogoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double w = size.width;
+    final double h = size.height;
+    final paint = Paint()..style = PaintingStyle.fill;
+
+    paint.color = const Color(0xFF4285F4);
+    canvas.drawPath(
+      Path()
+        ..moveTo(w * 0.96, h * 0.42)
+        ..lineTo(w * 0.50, h * 0.42)
+        ..lineTo(w * 0.50, h * 0.58)
+        ..lineTo(w * 0.77, h * 0.58)
+        ..cubicTo(w * 0.73, h * 0.72, w * 0.62, h * 0.80, w * 0.50, h * 0.80)
+        ..cubicTo(w * 0.33, h * 0.80, w * 0.20, h * 0.67, w * 0.20, h * 0.50)
+        ..cubicTo(w * 0.20, h * 0.33, w * 0.33, h * 0.20, w * 0.50, h * 0.20)
+        ..cubicTo(w * 0.58, h * 0.20, w * 0.65, h * 0.23, w * 0.71, h * 0.29)
+        ..lineTo(w * 0.82, h * 0.18)
+        ..cubicTo(w * 0.74, h * 0.10, w * 0.63, h * 0.05, w * 0.50, h * 0.05)
+        ..cubicTo(w * 0.25, h * 0.05, w * 0.05, h * 0.25, w * 0.05, h * 0.50)
+        ..cubicTo(w * 0.05, h * 0.75, w * 0.25, h * 0.95, w * 0.50, h * 0.95)
+        ..cubicTo(w * 0.75, h * 0.95, w * 0.98, h * 0.75, w * 0.96, h * 0.42)
+        ..close(),
+      paint,
+    );
+
+    paint.color = const Color(0xFF34A853);
+    canvas.drawPath(
+      Path()
+        ..moveTo(w * 0.05, h * 0.50)
+        ..cubicTo(w * 0.05, h * 0.75, w * 0.25, h * 0.95, w * 0.50, h * 0.95)
+        ..cubicTo(w * 0.62, h * 0.95, w * 0.73, h * 0.90, w * 0.80, h * 0.82)
+        ..lineTo(w * 0.65, h * 0.72)
+        ..cubicTo(w * 0.61, h * 0.77, w * 0.56, h * 0.80, w * 0.50, h * 0.80)
+        ..cubicTo(w * 0.38, h * 0.80, w * 0.28, h * 0.72, w * 0.23, h * 0.60)
+        ..lineTo(w * 0.07, h * 0.72)
+        ..cubicTo(w * 0.05, h * 0.65, w * 0.05, h * 0.58, w * 0.05, h * 0.50)
+        ..close(),
+      paint,
+    );
+
+    paint.color = const Color(0xFFFBBC05);
+    canvas.drawPath(
+      Path()
+        ..moveTo(w * 0.23, h * 0.60)
+        ..cubicTo(w * 0.21, h * 0.55, w * 0.20, h * 0.53, w * 0.20, h * 0.50)
+        ..cubicTo(w * 0.20, h * 0.47, w * 0.21, h * 0.45, w * 0.23, h * 0.40)
+        ..lineTo(w * 0.07, h * 0.28)
+        ..cubicTo(w * 0.05, h * 0.35, w * 0.05, h * 0.42, w * 0.05, h * 0.50)
+        ..cubicTo(w * 0.05, h * 0.58, w * 0.05, h * 0.65, w * 0.07, h * 0.72)
+        ..lineTo(w * 0.23, h * 0.60)
+        ..close(),
+      paint,
+    );
+
+    paint.color = const Color(0xFFEA4335);
+    canvas.drawPath(
+      Path()
+        ..moveTo(w * 0.50, h * 0.20)
+        ..cubicTo(w * 0.58, h * 0.20, w * 0.65, h * 0.23, w * 0.71, h * 0.29)
+        ..lineTo(w * 0.82, h * 0.18)
+        ..cubicTo(w * 0.74, h * 0.10, w * 0.63, h * 0.05, w * 0.50, h * 0.05)
+        ..cubicTo(w * 0.35, h * 0.05, w * 0.22, h * 0.12, w * 0.12, h * 0.24)
+        ..lineTo(w * 0.07, h * 0.28)
+        ..lineTo(w * 0.23, h * 0.40)
+        ..cubicTo(w * 0.28, h * 0.28, w * 0.38, h * 0.20, w * 0.50, h * 0.20)
+        ..close(),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _SocialButton extends StatelessWidget {
+  final VoidCallback? onPressed;
+  final Widget icon;
+  final String label;
+  final Color backgroundColor;
+
+  const _SocialButton({
+    required this.onPressed,
+    required this.icon,
+    required this.label,
+    required this.backgroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: backgroundColor,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          height: 48,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white12),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              icon,
+              SizedBox(width: 8),
+              Text(label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: _LoginScreenState.textWhite,
+                  )),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _PressableButton extends StatefulWidget {

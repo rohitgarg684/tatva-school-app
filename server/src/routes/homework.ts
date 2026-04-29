@@ -7,6 +7,7 @@ import { asyncHandler } from "../lib/async-handler";
 import { deleteDocument } from "../lib/crud-helpers";
 import { Collections } from "../lib/collections";
 import { logActivity } from "../lib/activity-logger";
+import { notify } from "../lib/notifications/notifier";
 
 const router = Router();
 router.use(requireAuth);
@@ -47,6 +48,17 @@ router.post(
       title: `Homework: ${title}`,
       body: subject ? `${subject}${dueDate ? ` — due ${dueDate}` : ''}` : "",
       metadata: { subject, dueDate },
+    });
+
+    notify({
+      event: "homeworkAssigned",
+      ctx: {
+        homeworkId: ref.id,
+        classId,
+        title,
+        teacherName: userDoc?.name || "",
+        teacherUid: uid,
+      },
     });
 
     invalidateDashboards("homework_");
@@ -114,7 +126,8 @@ router.post(
 router.post(
   "/homework/:homeworkId/submissions/:studentUid/comments",
   asyncHandler(async (req, res) => {
-    const { homeworkId, studentUid } = req.params;
+    const homeworkId = req.params.homeworkId as string;
+    const studentUid = req.params.studentUid as string;
     const uid = req.uid!;
     const role = req.role!;
     const { text } = req.body;
@@ -141,16 +154,31 @@ router.post(
     }
 
     const userDoc = await getDoc(Collections.USERS, uid);
+    const authorName = userDoc?.name || "";
     const ref = await db.collection(Collections.HOMEWORK_COMMENTS).add({
       submissionId: subId,
       authorUid: uid,
-      authorName: userDoc?.name || "",
+      authorName,
       authorRole: role,
       text,
       createdAt: FieldValue.serverTimestamp(),
     });
 
     await subRef.update({ commentCount: FieldValue.increment(1) });
+
+    const hwDoc = await getDoc(Collections.HOMEWORK, homeworkId);
+    notify({
+      event: "homeworkComment",
+      ctx: {
+        homeworkId,
+        studentUid,
+        authorUid: uid,
+        authorName,
+        teacherUid: hwDoc?.teacherUid || "",
+        homeworkTitle: hwDoc?.title || "Homework",
+      },
+    });
+
     res.json({ id: ref.id, created: true });
   })
 );
@@ -189,7 +217,8 @@ router.patch(
   "/homework/:homeworkId/submissions/:studentUid/status",
   requireRole("Teacher", "Principal"),
   asyncHandler(async (req, res) => {
-    const { homeworkId, studentUid } = req.params;
+    const homeworkId = req.params.homeworkId as string;
+    const studentUid = req.params.studentUid as string;
     const { status } = req.body;
     if (!["accepted", "returned"].includes(status))
       return res.status(400).json({ error: "status must be 'accepted' or 'returned'" });
@@ -201,6 +230,19 @@ router.patch(
     if (!snap.exists) return res.status(404).json({ error: "Submission not found" });
 
     await subRef.update({ status });
+
+    const hwDoc = await getDoc(Collections.HOMEWORK, homeworkId);
+    notify({
+      event: "homeworkStatusChanged",
+      ctx: {
+        homeworkId,
+        studentUid,
+        classId: hwDoc?.classId || "",
+        title: hwDoc?.title || "Homework",
+        status,
+      },
+    });
+
     invalidateDashboards("homework_");
     res.json({ updated: true, status });
   })

@@ -1,6 +1,12 @@
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../models/social_sign_in_result.dart';
 import '../models/user_role.dart';
 import '../repositories/auth_repository.dart';
 import 'api_service.dart';
+import 'notification_service.dart';
+
+export '../models/social_sign_in_result.dart';
 
 class AuthService {
   final AuthRepository _authRepo;
@@ -12,7 +18,7 @@ class AuthService {
   })  : _authRepo = authRepo ?? AuthRepository(),
         _api = api ?? ApiService();
 
-  Future<({String uid, UserRole role})?> signIn({
+  Future<({String uid, UserRole role})> signIn({
     required String email,
     required String password,
   }) async {
@@ -26,16 +32,39 @@ class AuthService {
       throw UnverifiedEmailException();
     }
 
-    try {
-      await _api.syncClaims();
-    } catch (_) {}
+    final role = await _syncAndResolveRole(cred.user!);
+    if (role == null) throw UserNotFoundException();
 
-    final tokenResult = await cred.user!.getIdTokenResult(true);
-    final roleStr = tokenResult.claims?['role'] as String?;
-    if (roleStr == null) throw UserNotFoundException();
-
-    final role = UserRole.fromString(roleStr);
+    NotificationService.instance.requestPermissionAndRegister();
     return (uid: cred.user!.uid, role: role);
+  }
+
+  Future<SocialSignInResult> signInWithGoogle() async {
+    final cred = await _authRepo.signInWithGoogle();
+    return _handleSocialCredential(cred);
+  }
+
+  Future<SocialSignInResult> signInWithApple() async {
+    final cred = await _authRepo.signInWithApple();
+    return _handleSocialCredential(cred);
+  }
+
+  Future<({String uid, UserRole role})> completeSocialProfile({
+    required UserRole role,
+  }) async {
+    final user = _authRepo.currentUser;
+    if (user == null) throw UserNotFoundException();
+
+    await _api.createUser(
+      uid: user.uid,
+      name: user.displayName ?? user.email?.split('@').first ?? 'User',
+      email: user.email ?? '',
+      role: role.label,
+    );
+
+    await _syncAndResolveRole(user);
+    NotificationService.instance.requestPermissionAndRegister();
+    return (uid: user.uid, role: role);
   }
 
   Future<String?> register({
@@ -77,6 +106,42 @@ class AuthService {
 
   Future<void> sendPasswordReset({required String email}) {
     return _authRepo.sendPasswordReset(email: email);
+  }
+
+  // ── Private ──────────────────────────────────────────────────────────
+
+  Future<SocialSignInResult> _handleSocialCredential(
+    UserCredential cred,
+  ) async {
+    final user = cred.user!;
+    final role = await _syncAndResolveRole(user);
+
+    if (role != null) {
+      NotificationService.instance.requestPermissionAndRegister();
+      return SocialSignInResult(
+        uid: user.uid,
+        role: role,
+        isNewUser: false,
+      );
+    }
+
+    return SocialSignInResult(
+      uid: user.uid,
+      role: null,
+      isNewUser: true,
+      displayName: user.displayName,
+      email: user.email,
+    );
+  }
+
+  Future<UserRole?> _syncAndResolveRole(User user) async {
+    try {
+      await _api.syncClaims();
+    } catch (_) {}
+
+    final tokenResult = await user.getIdTokenResult(true);
+    final roleStr = tokenResult.claims?['role'] as String?;
+    return roleStr != null ? UserRole.fromString(roleStr) : null;
   }
 }
 
