@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException;
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -210,7 +211,10 @@ class _LoginScreenState extends State<LoginScreen>
 
       _navigateToDashboard(result.role!);
     } on SignInCancelledException {
-      // User cancelled — no-op
+      // User cancelled native flow — no-op
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'popup-closed-by-user' || e.code == 'cancelled') return;
+      _setError(_friendlyError(e));
     } catch (e) {
       _setError(_friendlyError(e));
     }

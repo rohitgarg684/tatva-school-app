@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
@@ -33,6 +34,8 @@ class AuthRepository {
   }
 
   Future<UserCredential> signInWithGoogle() async {
+    if (kIsWeb) return _auth.signInWithPopup(GoogleAuthProvider());
+
     final googleUser = await GoogleSignIn().signIn();
     if (googleUser == null) throw SignInCancelledException();
 
@@ -45,6 +48,13 @@ class AuthRepository {
   }
 
   Future<UserCredential> signInWithApple() async {
+    if (kIsWeb) {
+      final provider = OAuthProvider('apple.com')
+        ..addScope('email')
+        ..addScope('name');
+      return _auth.signInWithPopup(provider);
+    }
+
     final rawNonce = _generateNonce();
     final nonce = _sha256ofString(rawNonce);
 
@@ -77,7 +87,14 @@ class AuthRepository {
     return userCredential;
   }
 
-  Future<void> signOut() => _auth.signOut();
+  Future<void> signOut() async {
+    if (!kIsWeb) {
+      try {
+        await GoogleSignIn().signOut();
+      } catch (_) {}
+    }
+    return _auth.signOut();
+  }
 
   Future<void> sendEmailVerification() async {
     await currentUser?.sendEmailVerification();
