@@ -72,7 +72,7 @@ class ParentProfileTab extends StatelessWidget {
                           fontSize: 12,
                           color: TatvaColors.purple,
                           fontWeight: FontWeight.w700)))),
-          if (childrenData.length > 1) ...[
+          if (childrenData.map((c) => c.info.childName).toSet().length > 1) ...[
             const SizedBox(height: 24),
             FadeSlideIn(
                 delayMs: 125,
@@ -253,6 +253,16 @@ class ParentProfileTab extends StatelessWidget {
   ];
 
   Widget _childPicker() {
+    final seen = <String>{};
+    final uniqueChildren = <({int firstIndex, String name})>[];
+    for (var i = 0; i < childrenData.length; i++) {
+      final name = childrenData[i].info.childName;
+      if (seen.add(name)) {
+        uniqueChildren.add((firstIndex: i, name: name));
+      }
+    }
+    final activeChildName = childrenData[selectedChildIndex].info.childName;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -267,13 +277,14 @@ class ParentProfileTab extends StatelessWidget {
         Wrap(
           spacing: 12,
           runSpacing: 12,
-          children: List.generate(childrenData.length, (i) {
-            final isActive = i == selectedChildIndex;
-            final name = childrenData[i].info.childName;
+          children: List.generate(uniqueChildren.length, (i) {
+            final uc = uniqueChildren[i];
+            final isActive = uc.name == activeChildName;
+            final name = uc.name;
             final color = _avatarColors[i % _avatarColors.length];
             final initials = _initials(name);
             return BouncyTap(
-              onTap: () => onChildSelected(i),
+              onTap: () => onChildSelected(uc.firstIndex),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 250),
                 padding:

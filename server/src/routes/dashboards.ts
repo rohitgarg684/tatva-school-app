@@ -286,12 +286,11 @@ router.get(
     if (role !== "Parent" && role !== "Principal")
       return res.status(403).json({ error: "Forbidden: insufficient role" });
 
-    const cacheKey = `parent_dash_${uid}`;
-    const cached = cacheGet<any>(cacheKey);
-    if (cached) return res.json(cached);
-
     let user = await getDoc(Collections.USERS, uid);
     if (!user) return res.status(404).json({ error: "User not found" });
+
+    const cacheKey = `parent_dash_${uid}`;
+    let didDedup = false;
 
     // Lazy auto-link: pick up students whose parentEmail matches this parent
     if (user.email) {
@@ -324,7 +323,6 @@ router.get(
           }
         }
 
-        // Deduplicate existing + incoming by (childName, classId)
         const seen = new Set<string>();
         const deduped: typeof existingChildren = [];
         for (const c of existingChildren) {
@@ -336,6 +334,7 @@ router.get(
         const hadDuplicates = deduped.length < existingChildren.length;
 
         if (newEntries.length > 0 || hadDuplicates) {
+          didDedup = true;
           const merged = [...deduped, ...newEntries];
           const allClassIds = [...new Set([
             ...(user.classIds || []) as string[],
@@ -353,6 +352,11 @@ router.get(
           user = await getDoc(Collections.USERS, uid);
         }
       }
+    }
+
+    if (!didDedup) {
+      const cached = cacheGet<any>(cacheKey);
+      if (cached) return res.json(cached);
     }
 
     const children: Array<{ childName: string; classId: string }> = user!.children || [];

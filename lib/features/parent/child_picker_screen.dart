@@ -55,7 +55,10 @@ class _ChildPickerScreenState extends State<ChildPickerScreen>
           await _dashSvc.loadParentDashboard(overrideUid: uid, forceRefresh: true);
       if (!mounted) return;
 
-      if (data.childrenData.length <= 1) {
+      final uniqueNames = data.childrenData
+          .map((c) => c.info.childName)
+          .toSet();
+      if (uniqueNames.length <= 1) {
         _goToDashboard(0);
         return;
       }
@@ -91,6 +94,20 @@ class _ChildPickerScreenState extends State<ChildPickerScreen>
     final children = _data!.childrenData;
     final userName = _data!.user.name;
 
+    // Group by unique child name, keeping the first index for each
+    final seen = <String>{};
+    final uniqueChildren = <({int firstIndex, String name, String className})>[];
+    for (var i = 0; i < children.length; i++) {
+      final name = children[i].info.childName;
+      if (seen.add(name)) {
+        uniqueChildren.add((
+          firstIndex: i,
+          name: name,
+          className: children[i].info.className,
+        ));
+      }
+    }
+
     return Scaffold(
       backgroundColor: TatvaColors.bgLight,
       body: SafeArea(
@@ -114,17 +131,17 @@ class _ChildPickerScreenState extends State<ChildPickerScreen>
                     alignment: WrapAlignment.center,
                     spacing: 24,
                     runSpacing: 32,
-                    children: List.generate(children.length, (i) {
-                      final child = children[i];
+                    children: List.generate(uniqueChildren.length, (i) {
+                      final uc = uniqueChildren[i];
                       final color = _avatarColors[i % _avatarColors.length];
-                      final initials = _initials(child.info.childName);
+                      final initials = _initials(uc.name);
                       return _ProfileTile(
-                        name: child.info.childName,
-                        className: child.info.className,
+                        name: uc.name,
+                        className: uc.className,
                         color: color,
                         initials: initials,
                         delay: i * 100,
-                        onTap: () => _goToDashboard(i),
+                        onTap: () => _goToDashboard(uc.firstIndex),
                       );
                     }),
                   ),
