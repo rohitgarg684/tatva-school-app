@@ -4,7 +4,7 @@ import * as admin from "firebase-admin";
 import multer from "multer";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { isValidImage, isValidDocument } from "../lib/file-validation";
-import { db, serializeDocs } from "../lib/firestore-helpers";
+import { db, getDoc, serializeDocs } from "../lib/firestore-helpers";
 import { invalidateDashboards } from "../lib/cache-invalidation";
 import { asyncHandler } from "../lib/async-handler";
 import { Collections } from "../lib/collections";
@@ -251,12 +251,24 @@ router.post(
 
 router.post(
   "/homework/:id/submit-files",
-  requireRole("Student"),
+  requireRole("Student", "Parent"),
   docUpload.array("files", Config.MAX_UPLOAD_FILES),
   async (req: Request, res: Response) => {
     try {
       const homeworkId = sanitizeId(req.params.id as string);
-      const uid = req.uid!;
+      let studentUid = req.uid!;
+
+      if (req.role === "Parent") {
+        const targetUid = req.body?.studentUid as string;
+        if (!targetUid) return res.status(403).json({ error: "studentUid required for parent submissions" });
+        const parentDoc = await getDoc(Collections.USERS, req.uid!);
+        const childNames: string[] = ((parentDoc?.children || []) as Array<{ childName: string }>).map((c) => c.childName);
+        const studentDoc = await getDoc(Collections.USERS, targetUid);
+        if (!studentDoc || !childNames.includes(studentDoc.name))
+          return res.status(403).json({ error: "You can only submit for your own child" });
+        studentUid = targetUid;
+      }
+
       const files = req.files as Express.Multer.File[];
       const note = (req.body.note as string) || "";
 
@@ -266,17 +278,17 @@ router.post(
           if (!isValidDocument(file.buffer))
             return res.status(400).json({ error: `File "${file.originalname}" has invalid content` });
 
-          const storagePath = `homework/${homeworkId}/submissions/${sanitizeId(uid)}/${generateFileName(file.mimetype)}`;
+          const storagePath = `homework/${homeworkId}/submissions/${sanitizeId(studentUid)}/${generateFileName(file.mimetype)}`;
           const url = await uploadToStorage(file.buffer, storagePath, file.mimetype);
           fileUrls.push({ url, name: file.originalname, type: classifyFileType(file.originalname) });
         }
       }
 
-      const subRef = db.collection(Collections.HOMEWORK_SUBMISSIONS).doc(`${homeworkId}_${uid}`);
+      const subRef = db.collection(Collections.HOMEWORK_SUBMISSIONS).doc(`${homeworkId}_${studentUid}`);
       await subRef.set(
         {
           homeworkId,
-          studentUid: uid,
+          studentUid,
           files: fileUrls.length > 0 ? admin.firestore.FieldValue.arrayUnion(...fileUrls) : [],
           note,
           status: "pending",
@@ -286,7 +298,7 @@ router.post(
       );
 
       await db.collection(Collections.HOMEWORK).doc(homeworkId).update({
-        submittedBy: admin.firestore.FieldValue.arrayUnion(uid),
+        submittedBy: admin.firestore.FieldValue.arrayUnion(studentUid),
       });
 
       invalidateDashboards("homework_");
@@ -356,11 +368,11 @@ router.get(
 
 router.get(
   "/homework/:id/my-submission",
-  requireRole("Student"),
+  requireRole("Student", "Parent"),
   asyncHandler(async (req, res) => {
     const homeworkId = req.params.id as string;
-    const uid = req.uid!;
-    const docRef = db.collection(Collections.HOMEWORK_SUBMISSIONS).doc(`${homeworkId}_${uid}`);
+    const studentUid = (req.query.studentUid as string) || req.uid!;
+    const docRef = db.collection(Collections.HOMEWORK_SUBMISSIONS).doc(`${homeworkId}_${studentUid}`);
     const snap = await docRef.get();
     if (!snap.exists) return res.json({ submission: null });
 
@@ -373,15 +385,27 @@ router.get(
 
 router.delete(
   "/homework/:id/submissions/files",
-  requireRole("Student"),
+  requireRole("Student", "Parent"),
   asyncHandler(async (req: Request, res: Response) => {
     const homeworkId = sanitizeId(req.params.id as string);
-    const uid = req.uid!;
+    let studentUid = req.uid!;
+
+    if (req.role === "Parent") {
+      const targetUid = req.body?.studentUid as string;
+      if (!targetUid) return res.status(403).json({ error: "studentUid required" });
+      const parentDoc = await getDoc(Collections.USERS, req.uid!);
+      const childNames: string[] = ((parentDoc?.children || []) as Array<{ childName: string }>).map((c) => c.childName);
+      const studentDoc = await getDoc(Collections.USERS, targetUid);
+      if (!studentDoc || !childNames.includes(studentDoc.name))
+        return res.status(403).json({ error: "You can only manage your own child's submissions" });
+      studentUid = targetUid;
+    }
+
     const { url } = req.body;
     if (!url || typeof url !== "string")
       return res.status(400).json({ error: "url required" });
 
-    const subRef = db.collection(Collections.HOMEWORK_SUBMISSIONS).doc(`${homeworkId}_${uid}`);
+    const subRef = db.collection(Collections.HOMEWORK_SUBMISSIONS).doc(`${homeworkId}_${studentUid}`);
     const snap = await subRef.get();
     if (!snap.exists) return res.status(404).json({ error: "Submission not found" });
 
@@ -410,7 +434,7 @@ router.delete(
     const remainingNote = updatedData.note || "";
     if (remainingFiles.length === 0 && !remainingNote) {
       await db.collection(Collections.HOMEWORK).doc(homeworkId).update({
-        submittedBy: admin.firestore.FieldValue.arrayRemove(uid),
+        submittedBy: admin.firestore.FieldValue.arrayRemove(studentUid),
       });
     }
 

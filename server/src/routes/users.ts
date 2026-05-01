@@ -6,51 +6,81 @@ import { asyncHandler } from "../lib/async-handler";
 import { Collections } from "../lib/collections";
 import { Config } from "../lib/config";
 
+type ChildEntry = {
+  childName: string; classId: string; className: string;
+  subject: string; teacherName: string; teacherUid: string; teacherEmail: string;
+};
+
+function childKey(c: ChildEntry): string {
+  return `${c.childName}::${c.classId}`;
+}
+
+function deduplicateChildren(existing: ChildEntry[], incoming: ChildEntry[]): ChildEntry[] {
+  const seen = new Set(existing.map(childKey));
+  const merged = [...existing];
+  for (const entry of incoming) {
+    const key = childKey(entry);
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(entry);
+    }
+  }
+  return merged;
+}
+
+async function buildChildEntriesFromStudents(
+  studentSnap: FirebaseFirestore.QuerySnapshot
+): Promise<{ entries: ChildEntry[]; classIds: Set<string> }> {
+  const entries: ChildEntry[] = [];
+  const classIds = new Set<string>();
+
+  for (const doc of studentSnap.docs) {
+    const s = doc.data();
+    const studentClassIds: string[] = s.classIds || [];
+    for (const cid of studentClassIds) classIds.add(cid);
+
+    const classDocs = studentClassIds.length > 0
+      ? await getDocs(Collections.CLASSES, studentClassIds) : [];
+
+    if (classDocs.length > 0) {
+      for (const cls of classDocs as any[]) {
+        entries.push({
+          childName: s.name, classId: cls.id,
+          className: cls.name || "", subject: cls.subject || "",
+          teacherName: cls.teacherName || "", teacherUid: cls.teacherUid || "",
+          teacherEmail: cls.teacherEmail || "",
+        });
+      }
+    } else {
+      entries.push({
+        childName: s.name, classId: "", className: "", subject: "",
+        teacherName: "", teacherUid: "", teacherEmail: "",
+      });
+    }
+  }
+  return { entries, classIds };
+}
+
 async function autoLinkParentByEmail(uid: string, email: string): Promise<void> {
   const studentSnap = await db.collection(Collections.STUDENTS)
     .where("parentEmail", "==", email).get();
   if (studentSnap.empty) return;
 
-  const classIdSet = new Set<string>();
-  const childEntries: Record<string, unknown>[] = [];
+  const userDoc = await getDoc(Collections.USERS, uid);
+  const existingChildren: ChildEntry[] = userDoc?.children || [];
+  const existingClassIds: string[] = userDoc?.classIds || [];
 
-  for (const doc of studentSnap.docs) {
-    const s = doc.data();
-    const studentClassIds: string[] = s.classIds || [];
-    for (const cid of studentClassIds) classIdSet.add(cid);
+  const { entries, classIds } = await buildChildEntriesFromStudents(studentSnap);
+  const merged = deduplicateChildren(existingChildren, entries);
+  if (merged.length === existingChildren.length) return;
 
-    const classDocs = studentClassIds.length > 0
-      ? await getDocs(Collections.CLASSES, studentClassIds)
-      : [];
+  const allClassIds = [...new Set([...existingClassIds, ...classIds])];
+  await db.collection(Collections.USERS).doc(uid).update({
+    children: merged,
+    classIds: allClassIds,
+  });
 
-    if (classDocs.length > 0) {
-      for (const cls of classDocs as any[]) {
-        childEntries.push({
-          childName: s.name,
-          classId: cls.id,
-          className: cls.name || "",
-          subject: cls.subject || "",
-          teacherName: cls.teacherName || "",
-          teacherUid: cls.teacherUid || "",
-          teacherEmail: cls.teacherEmail || "",
-        });
-      }
-    } else {
-      childEntries.push({ childName: s.name, classId: "", className: "", subject: "", teacherName: "", teacherUid: "", teacherEmail: "" });
-    }
-  }
-
-  if (childEntries.length === 0) return;
-
-  const updates: Record<string, unknown> = {
-    children: FieldValue.arrayUnion(...childEntries),
-  };
-  if (classIdSet.size > 0) {
-    updates.classIds = FieldValue.arrayUnion(...Array.from(classIdSet));
-  }
-  await db.collection(Collections.USERS).doc(uid).update(updates);
-
-  for (const cid of classIdSet) {
+  for (const cid of classIds) {
     await db.collection(Collections.CLASSES).doc(cid).update({
       parentUids: FieldValue.arrayUnion(uid),
     });

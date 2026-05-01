@@ -14,6 +14,22 @@ router.use(requireAuth);
 
 const FieldValue = admin.firestore.FieldValue;
 
+async function resolveStudentUid(req: any): Promise<{ studentUid: string; error?: string }> {
+  if (req.role === "Parent") {
+    const targetUid = req.body?.studentUid as string;
+    if (!targetUid) return { studentUid: "", error: "studentUid required for parent submissions" };
+    const parentDoc = await getDoc(Collections.USERS, req.uid!);
+    const children: Array<{ childName: string }> = parentDoc?.children || [];
+    const childNames = children.map((c) => c.childName);
+    const studentDoc = await getDoc(Collections.USERS, targetUid);
+    if (!studentDoc || !childNames.includes(studentDoc.name)) {
+      return { studentUid: "", error: "You can only submit for your own child" };
+    }
+    return { studentUid: targetUid };
+  }
+  return { studentUid: req.uid! };
+}
+
 router.post(
   "/homework",
   requireRole("Teacher", "Principal"),
@@ -81,19 +97,21 @@ router.delete(
 
 router.post(
   "/homework/:homeworkId/submit",
-  requireRole("Student"),
+  requireRole("Student", "Parent"),
   asyncHandler(async (req, res) => {
-    const uid = req.uid!;
+    const { studentUid, error } = await resolveStudentUid(req);
+    if (error) return res.status(403).json({ error });
+
     const homeworkId = req.params.homeworkId as string;
 
     const subRef = db
       .collection(Collections.HOMEWORK_SUBMISSIONS)
-      .doc(`${homeworkId}_${uid}`);
+      .doc(`${homeworkId}_${studentUid}`);
     const subSnap = await subRef.get();
     if (!subSnap.exists) {
       await subRef.set({
         homeworkId,
-        studentUid: uid,
+        studentUid,
         files: [],
         note: "",
         status: "pending",
@@ -103,17 +121,17 @@ router.post(
     }
 
     await db.collection(Collections.HOMEWORK).doc(homeworkId).update({
-      submittedBy: FieldValue.arrayUnion(uid),
+      submittedBy: FieldValue.arrayUnion(studentUid),
     });
 
     const hwDoc = await getDoc(Collections.HOMEWORK, homeworkId);
-    const studentDoc = await getDoc(Collections.USERS, uid);
+    const studentDoc = await getDoc(Collections.USERS, studentUid);
     logActivity({
       type: "homeworkSubmitted",
-      actorUid: uid,
+      actorUid: studentUid,
       actorName: studentDoc?.name || "",
       actorRole: "Student",
-      targetUid: uid,
+      targetUid: studentUid,
       classId: hwDoc?.classId || "",
       title: `Submitted: ${hwDoc?.title || "Homework"}`,
     });

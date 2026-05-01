@@ -19,6 +19,7 @@ import 'tabs/behavior_tab.dart';
 import 'tabs/learn_tab.dart';
 import 'tabs/vote_tab.dart';
 import 'tabs/profile_tab.dart';
+import '../student/tabs/homework_tab.dart';
 class ParentDashboard extends StatefulWidget {
   final int initialChildIndex;
   const ParentDashboard({super.key, this.initialChildIndex = 0});
@@ -32,6 +33,7 @@ class _ParentDashboardState extends State<ParentDashboard>
   static const List<TabItem> _tabs = [
     TabItem(icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: 'Home'),
     TabItem(icon: Icons.calendar_view_week_outlined, activeIcon: Icons.calendar_view_week_rounded, label: 'Schedule'),
+    TabItem(icon: Icons.assignment_outlined, activeIcon: Icons.assignment_rounded, label: 'Homework'),
     TabItem(icon: Icons.bar_chart_outlined, activeIcon: Icons.bar_chart_rounded, label: 'Progress'),
     TabItem(icon: Icons.emoji_events_outlined, activeIcon: Icons.emoji_events_rounded, label: 'Behavior'),
     TabItem(icon: Icons.lightbulb_outline, activeIcon: Icons.lightbulb_rounded, label: 'Learn'),
@@ -47,6 +49,8 @@ class _ParentDashboardState extends State<ParentDashboard>
   late int _selectedChildIndex = widget.initialChildIndex;
   List<AnnouncementModel> _announcements = [];
   List<VoteModel> _activeVotes = [];
+  Set<String> _completedIds = {};
+  Map<String, Map<String, dynamic>> _mySubmissions = {};
 
   @override
   void initState() {
@@ -72,6 +76,7 @@ class _ParentDashboardState extends State<ParentDashboard>
       if (_selectedChildIndex >= data.childrenData.length) {
         _selectedChildIndex = 0;
       }
+      _rebuildHomeworkState();
     } catch (e) {
       debugPrint('ParentDashboard._loadData error: $e');
     }
@@ -121,6 +126,33 @@ class _ParentDashboardState extends State<ParentDashboard>
   void _toggleAnnouncementLike(AnnouncementModel ann) {
     setState(() => _announcements = toggleAnnouncementLike(_announcements, ann.id, _uid));
     _api.toggleAnnouncementLike(ann.id);
+  }
+
+  void _rebuildHomeworkState() {
+    final child = _currentChild;
+    if (child == null) return;
+    _completedIds = {};
+    _mySubmissions = Map.of(child.submissions);
+    for (final hw in child.homework) {
+      if (hw.isSubmittedBy(child.childUid)) {
+        final sub = _mySubmissions[hw.id];
+        if (sub != null && sub['status'] == 'returned') continue;
+        _completedIds.add(hw.id);
+      }
+    }
+  }
+
+  void _handleMarkDone(String hwId, [Map<String, dynamic>? submission]) {
+    final childUid = _currentChild?.childUid ?? '';
+    setState(() {
+      _completedIds.add(hwId);
+      if (submission != null) _mySubmissions[hwId] = submission;
+    });
+    _api.submitHomework(hwId, studentUid: childUid);
+  }
+
+  void _handleMarkIncomplete(String hwId) {
+    setState(() => _completedIds.remove(hwId));
   }
 
   void _logout() => logout();
@@ -223,7 +255,10 @@ class _ParentDashboardState extends State<ParentDashboard>
             onTap: () {
               if (i == _selectedChildIndex) return;
               HapticFeedback.selectionClick();
-              setState(() => _selectedChildIndex = i);
+              setState(() {
+                _selectedChildIndex = i;
+                _rebuildHomeworkState();
+              });
             },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 250),
@@ -276,6 +311,17 @@ class _ParentDashboardState extends State<ParentDashboard>
               selectedChildIndex: _selectedChildIndex,
               api: _api,
             ),
+            StudentHomeworkTab(
+              homework: _currentChild?.homework ?? [],
+              completedIds: _completedIds,
+              mySubmissions: _mySubmissions,
+              uid: _uid,
+              api: _api,
+              studentUid: _currentChild?.childUid,
+              onMarkDone: _handleMarkDone,
+              onMarkIncomplete: _handleMarkIncomplete,
+              onRefresh: _loadData,
+            ),
             ParentProgressTab(currentChild: _currentChild),
             ParentBehaviorTab(currentChild: _currentChild),
             ParentLearnTab(
@@ -296,7 +342,10 @@ class _ParentDashboardState extends State<ParentDashboard>
               onLogout: _logout,
               childrenData: _data?.childrenData ?? [],
               selectedChildIndex: _selectedChildIndex,
-              onChildSelected: (i) => setState(() => _selectedChildIndex = i),
+              onChildSelected: (i) => setState(() {
+                _selectedChildIndex = i;
+                _rebuildHomeworkState();
+              }),
             ),
           ]),
     );

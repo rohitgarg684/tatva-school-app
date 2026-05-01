@@ -18,6 +18,7 @@ class StudentHomeworkTab extends StatelessWidget {
   final void Function(String hwId, [Map<String, dynamic>? submission]) onMarkDone;
   final void Function(String hwId) onMarkIncomplete;
   final VoidCallback? onRefresh;
+  final String? studentUid;
 
   const StudentHomeworkTab({
     super.key,
@@ -29,6 +30,7 @@ class StudentHomeworkTab extends StatelessWidget {
     required this.onMarkDone,
     required this.onMarkIncomplete,
     this.onRefresh,
+    this.studentUid,
   });
 
   @override
@@ -307,7 +309,7 @@ class StudentHomeworkTab extends StatelessWidget {
                   onTap: () async {
                     HapticFeedback.lightImpact();
                     try {
-                      await api.deleteSubmissionFile(hw.id, fUrl);
+                      await api.deleteSubmissionFile(hw.id, fUrl, studentUid: studentUid);
                       if (context.mounted) {
                         TatvaSnackbar.show(context, 'File removed');
                         onRefresh?.call();
@@ -333,6 +335,7 @@ class StudentHomeworkTab extends StatelessWidget {
                 hw: hw,
                 color: TatvaColors.accent,
                 api: api,
+                studentUid: studentUid,
                 onSubmitted: (submission) {
                   onMarkDone(hw.id, submission);
                   onRefresh?.call();
@@ -571,6 +574,7 @@ class StudentHomeworkTab extends StatelessWidget {
                         hw: hw,
                         color: color,
                         api: api,
+                        studentUid: studentUid,
                         onSubmitted: (submission) => onMarkDone(hw.id, submission),
                       ),
                       child: Container(

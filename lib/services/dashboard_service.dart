@@ -120,6 +120,8 @@ class ChildDashboardData {
   final List<BehaviorPoint> behaviorPoints;
   final int behaviorScore;
   final List<AttendanceRecord> attendance;
+  final List<HomeworkModel> homework;
+  final Map<String, Map<String, dynamic>> submissions;
 
   const ChildDashboardData({
     required this.info,
@@ -129,6 +131,8 @@ class ChildDashboardData {
     this.behaviorPoints = const [],
     this.behaviorScore = 0,
     this.attendance = const [],
+    this.homework = const [],
+    this.submissions = const {},
   });
 }
 
@@ -336,6 +340,14 @@ class DashboardService {
     final childrenData = childrenRaw.map((raw) {
       final m = Map<String, dynamic>.from(raw as Map);
       final infoMap = Map<String, dynamic>.from(m['info'] as Map? ?? {});
+      final submissionsRaw = m['submissions'] as List<dynamic>? ?? [];
+      final submissionsMap = <String, Map<String, dynamic>>{};
+      for (final s in submissionsRaw) {
+        final sm = Map<String, dynamic>.from(s as Map);
+        final hwId = sm['homeworkId'] as String? ?? '';
+        if (hwId.isNotEmpty) submissionsMap[hwId] = sm;
+      }
+
       return ChildDashboardData(
         info: ChildInfo.fromJson(infoMap),
         childUid: m['childUid'] as String? ?? '',
@@ -344,6 +356,8 @@ class DashboardService {
         behaviorPoints: _parseList(m['behaviorPoints'], BehaviorPoint.fromJson),
         behaviorScore: (m['behaviorScore'] as num?)?.toInt() ?? 0,
         attendance: _parseList(m['attendance'], AttendanceRecord.fromJson),
+        homework: _parseList(m['homework'], HomeworkModel.fromJson),
+        submissions: submissionsMap,
       );
     }).toList();
 

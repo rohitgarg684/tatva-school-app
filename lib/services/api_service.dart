@@ -136,8 +136,10 @@ class ApiService {
 
   // ─── Actions ──────────────────────────────────────────────────────────
 
-  Future<Map<String, dynamic>> submitHomework(String homeworkId) =>
-      _post('/homework/$homeworkId/submit', {});
+  Future<Map<String, dynamic>> submitHomework(String homeworkId, {String? studentUid}) =>
+      _post('/homework/$homeworkId/submit', {
+        if (studentUid != null) 'studentUid': studentUid,
+      });
 
   Future<Map<String, dynamic>> markContentCompleted(String contentId) =>
       _post('/content/$contentId/complete', {});
@@ -312,13 +314,14 @@ class ApiService {
   Future<Map<String, dynamic>> submitHomeworkFiles(
       String homeworkId,
       List<MapEntry<String, Uint8List>> files,
-      {String note = ''}) async {
+      {String note = '', String? studentUid}) async {
     try {
       final token = await _getToken();
       final uri = Uri.parse('$_baseUrl/homework/$homeworkId/submit-files');
       final request = http.MultipartRequest('POST', uri)
         ..headers['Authorization'] = 'Bearer $token'
         ..fields['note'] = note;
+      if (studentUid != null) request.fields['studentUid'] = studentUid;
       for (final entry in files) {
         final mime = _mimeFromFilename(entry.key);
         request.files.add(
@@ -344,8 +347,9 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>?> getMyHomeworkSubmission(
-      String homeworkId) async {
-    final data = await _get('/homework/$homeworkId/my-submission');
+      String homeworkId, {String? studentUid}) async {
+    final query = studentUid != null ? '?studentUid=$studentUid' : '';
+    final data = await _get('/homework/$homeworkId/my-submission$query');
     return data['submission'] as Map<String, dynamic>?;
   }
 
@@ -364,8 +368,11 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> deleteSubmissionFile(
-      String homeworkId, String url) =>
-      _delete('/homework/$homeworkId/submissions/files', body: {'url': url});
+      String homeworkId, String url, {String? studentUid}) =>
+      _delete('/homework/$homeworkId/submissions/files', body: {
+        'url': url,
+        if (studentUid != null) 'studentUid': studentUid,
+      });
 
   // ─── CRUD ─────────────────────────────────────────────────────────────
 

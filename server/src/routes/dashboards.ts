@@ -298,24 +298,21 @@ router.get(
       const studentSnap = await db.collection(Collections.STUDENTS)
         .where("parentEmail", "==", user.email).get();
       if (!studentSnap.empty) {
-        const existingNames = new Set(
-          ((user.children || []) as Array<{ childName: string }>).map((c) => c.childName)
-        );
-        const newChildren: Record<string, unknown>[] = [];
+        const existingChildren: Array<{ childName: string; classId: string }> = user.children || [];
+
+        const incoming: Array<{ childName: string; classId: string; className: string; subject: string; teacherName: string; teacherUid: string; teacherEmail: string }> = [];
         const newClassIds = new Set<string>();
 
         for (const doc of studentSnap.docs) {
           const s = doc.data();
-          if (existingNames.has(s.name)) continue;
           const studentClassIds: string[] = s.classIds || [];
           const classDocs = studentClassIds.length > 0
-            ? await getDocs(Collections.CLASSES, studentClassIds)
-            : [];
+            ? await getDocs(Collections.CLASSES, studentClassIds) : [];
           for (const cid of studentClassIds) newClassIds.add(cid);
 
           if (classDocs.length > 0) {
             for (const cls of classDocs as any[]) {
-              newChildren.push({
+              incoming.push({
                 childName: s.name, classId: cls.id,
                 className: cls.name || "", subject: cls.subject || "",
                 teacherName: cls.teacherName || "", teacherUid: cls.teacherUid || "",
@@ -323,18 +320,31 @@ router.get(
               });
             }
           } else {
-            newChildren.push({ childName: s.name, classId: "", className: "", subject: "", teacherName: "", teacherUid: "", teacherEmail: "" });
+            incoming.push({ childName: s.name, classId: "", className: "", subject: "", teacherName: "", teacherUid: "", teacherEmail: "" });
           }
         }
 
-        if (newChildren.length > 0) {
-          const updates: Record<string, unknown> = {
-            children: FieldValue.arrayUnion(...newChildren),
-          };
-          if (newClassIds.size > 0) {
-            updates.classIds = FieldValue.arrayUnion(...Array.from(newClassIds));
-          }
-          await db.collection(Collections.USERS).doc(uid).update(updates);
+        // Deduplicate existing + incoming by (childName, classId)
+        const seen = new Set<string>();
+        const deduped: typeof existingChildren = [];
+        for (const c of existingChildren) {
+          const key = `${c.childName}::${c.classId}`;
+          if (!seen.has(key)) { seen.add(key); deduped.push(c); }
+        }
+        const newEntries = incoming.filter(
+          (c) => !seen.has(`${c.childName}::${c.classId}`));
+        const hadDuplicates = deduped.length < existingChildren.length;
+
+        if (newEntries.length > 0 || hadDuplicates) {
+          const merged = [...deduped, ...newEntries];
+          const allClassIds = [...new Set([
+            ...(user.classIds || []) as string[],
+            ...newClassIds,
+          ])];
+          await db.collection(Collections.USERS).doc(uid).update({
+            children: merged,
+            classIds: allClassIds,
+          });
           for (const cid of newClassIds) {
             await db.collection(Collections.CLASSES).doc(cid).update({
               parentUids: FieldValue.arrayUnion(uid),
@@ -347,7 +357,7 @@ router.get(
 
     const children: Array<{ childName: string; classId: string }> = user!.children || [];
     const classIdSet = new Set<string>();
-    const childrenData: { childUid: string; info: unknown; childClass: unknown; grades: any[]; behaviorPoints: any[]; behaviorScore: number; attendance: any[] }[] = [];
+    const childrenData: { childUid: string; info: unknown; childClass: unknown; grades: any[]; behaviorPoints: any[]; behaviorScore: number; attendance: any[]; homework: any[]; submissions: any[] }[] = [];
 
     const classIdsFromChildren = children.map((c) => c.classId).filter(Boolean);
     const childClasses = classIdsFromChildren.length > 0
@@ -382,41 +392,59 @@ router.get(
       if (uid) childUids.push(uid);
     }
 
-    const [allGrades, allBehavior, allAttendance] = childUids.length > 0
-      ? await Promise.all([
-          safe(queryDocs(Collections.GRADES, [{ field: "studentUid", op: "in", value: childUids.slice(0, Config.FIRESTORE_IN_LIMIT) }], { field: "createdAt" }), []),
-          safe(queryDocs(Collections.BEHAVIOR_POINTS, [{ field: "studentUid", op: "in", value: childUids.slice(0, Config.FIRESTORE_IN_LIMIT) }], { field: "createdAt", direction: "desc" }), []),
-          safe(queryDocs(Collections.ATTENDANCE, [{ field: "studentUid", op: "in", value: childUids.slice(0, Config.FIRESTORE_IN_LIMIT) }], { field: "date", direction: "desc" }), []),
-        ])
-      : [[], [], []];
+    const [allGrades, allBehavior, allAttendance, allHomework, allSubmissions] = await Promise.all([
+      childUids.length > 0
+        ? safe(queryDocs(Collections.GRADES, [{ field: "studentUid", op: "in", value: childUids.slice(0, Config.FIRESTORE_IN_LIMIT) }], { field: "createdAt" }), [])
+        : Promise.resolve([]),
+      childUids.length > 0
+        ? safe(queryDocs(Collections.BEHAVIOR_POINTS, [{ field: "studentUid", op: "in", value: childUids.slice(0, Config.FIRESTORE_IN_LIMIT) }], { field: "createdAt", direction: "desc" }), [])
+        : Promise.resolve([]),
+      childUids.length > 0
+        ? safe(queryDocs(Collections.ATTENDANCE, [{ field: "studentUid", op: "in", value: childUids.slice(0, Config.FIRESTORE_IN_LIMIT) }], { field: "date", direction: "desc" }), [])
+        : Promise.resolve([]),
+      classIdsFromChildren.length > 0
+        ? safe(queryDocs(Collections.HOMEWORK, [{ field: "classId", op: "in", value: classIdsFromChildren.slice(0, Config.FIRESTORE_IN_LIMIT) }], { field: "createdAt", direction: "desc" }), [])
+        : Promise.resolve([]),
+      childUids.length > 0
+        ? safe(queryDocs(Collections.HOMEWORK_SUBMISSIONS, [{ field: "studentUid", op: "in", value: childUids.slice(0, Config.FIRESTORE_IN_LIMIT) }]), [])
+        : Promise.resolve([]),
+    ]);
 
     for (const childInfo of children) {
       if (childInfo.classId) classIdSet.add(childInfo.classId);
       const childUid = studentNameMap.get(childInfo.childName) || "";
 
+      const classId = childInfo.classId;
+      const homework = (allHomework as any[]).filter((h) => h.classId === classId);
+
       if (childUid) {
         const grades = (allGrades as GradeDoc[]).filter((g) => g.studentUid === childUid);
         const behavior = (allBehavior as BehaviorPointDoc[]).filter((b) => b.studentUid === childUid);
         const attendance = (allAttendance as AttendanceDoc[]).filter((a) => a.studentUid === childUid);
+        const submissions = (allSubmissions as any[]).filter((s) => s.studentUid === childUid);
 
         childrenData.push({
           info: childInfo,
           childUid,
-          childClass: serializeDoc(classMap.get(childInfo.classId) || null),
+          childClass: serializeDoc(classMap.get(classId) || null),
           grades: serializeDocs(grades),
           behaviorPoints: serializeDocs(behavior),
           behaviorScore: computeBehaviorScore(behavior),
           attendance: serializeDocs(attendance),
+          homework: serializeDocs(homework),
+          submissions: serializeDocs(submissions),
         });
       } else {
         childrenData.push({
           info: childInfo,
           childUid: "",
-          childClass: serializeDoc(classMap.get(childInfo.classId) || null),
+          childClass: serializeDoc(classMap.get(classId) || null),
           grades: [],
           behaviorPoints: [],
           behaviorScore: 0,
           attendance: [],
+          homework: serializeDocs(homework),
+          submissions: [],
         });
       }
     }

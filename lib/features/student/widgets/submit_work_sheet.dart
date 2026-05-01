@@ -14,6 +14,7 @@ class SubmitWorkSheet {
     required Color color,
     required ApiService api,
     required void Function(Map<String, dynamic>? submission) onSubmitted,
+    String? studentUid,
   }) {
     final noteCtrl = TextEditingController();
     final pickedFiles = <MapEntry<String, Uint8List>>[];
@@ -192,6 +193,7 @@ class SubmitWorkSheet {
                               hw.id,
                               pickedFiles,
                               note: noteCtrl.text.trim(),
+                              studentUid: studentUid,
                             );
                             if (!context.mounted) return;
                             Navigator.pop(context);
