@@ -8,6 +8,7 @@ import '../../../models/child_info.dart';
 import '../../../models/schedule_model.dart';
 import '../../../models/schedule_event.dart';
 import '../../../models/holiday.dart';
+import '../../../models/class_model.dart';
 import '../../../services/api_service.dart';
 
 class ParentScheduleTab extends StatefulWidget {
