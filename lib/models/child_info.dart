@@ -1,6 +1,7 @@
 /// Strongly-typed child information stored on a parent's user document.
 class ChildInfo {
   final String childName;
+  final String childUid;
   final String classId;
   final String className;
   final String subject;
@@ -10,6 +11,7 @@ class ChildInfo {
 
   const ChildInfo({
     required this.childName,
+    this.childUid = '',
     this.classId = '',
     this.className = '',
     this.subject = '',
@@ -21,6 +23,7 @@ class ChildInfo {
   factory ChildInfo.fromJson(Map<String, dynamic> data) {
     return ChildInfo(
       childName: data['childName'] as String? ?? '',
+      childUid: data['childUid'] as String? ?? '',
       classId: data['classId'] as String? ?? '',
       className: data['className'] as String? ?? '',
       subject: data['subject'] as String? ?? '',
@@ -32,6 +35,7 @@ class ChildInfo {
 
   ChildInfo copyWith({
     String? childName,
+    String? childUid,
     String? classId,
     String? className,
     String? subject,
@@ -41,6 +45,7 @@ class ChildInfo {
   }) {
     return ChildInfo(
       childName: childName ?? this.childName,
+      childUid: childUid ?? this.childUid,
       classId: classId ?? this.classId,
       className: className ?? this.className,
       subject: subject ?? this.subject,
@@ -53,6 +58,7 @@ class ChildInfo {
   Map<String, dynamic> toJson() {
     return {
       'childName': childName,
+      'childUid': childUid,
       'classId': classId,
       'className': className,
       'subject': subject,

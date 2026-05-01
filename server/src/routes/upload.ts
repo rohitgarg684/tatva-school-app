@@ -10,6 +10,7 @@ import { asyncHandler } from "../lib/async-handler";
 import { Collections } from "../lib/collections";
 import { env } from "../env";
 import { Config } from "../lib/config";
+import { isParentOfChild } from "./users";
 
 const IMAGE_MIME_TYPES = [
   "image/jpeg",
@@ -262,9 +263,7 @@ router.post(
         const targetUid = req.body?.studentUid as string;
         if (!targetUid) return res.status(403).json({ error: "studentUid required for parent submissions" });
         const parentDoc = await getDoc(Collections.USERS, req.uid!);
-        const childNames: string[] = ((parentDoc?.children || []) as Array<{ childName: string }>).map((c) => c.childName);
-        const studentDoc = await getDoc(Collections.USERS, targetUid);
-        if (!studentDoc || !childNames.includes(studentDoc.name))
+        if (!isParentOfChild(parentDoc?.children || [], targetUid))
           return res.status(403).json({ error: "You can only submit for your own child" });
         studentUid = targetUid;
       }
@@ -377,9 +376,7 @@ router.get(
       const targetUid = req.query.studentUid as string;
       if (!targetUid) return res.status(400).json({ error: "studentUid required" });
       const parentDoc = await getDoc(Collections.USERS, req.uid!);
-      const childNames: string[] = ((parentDoc?.children || []) as Array<{ childName: string }>).map((c) => c.childName);
-      const studentDocData = await getDoc(Collections.USERS, targetUid);
-      if (!studentDocData || !childNames.includes(studentDocData.name))
+      if (!isParentOfChild(parentDoc?.children || [], targetUid))
         return res.status(403).json({ error: "You can only view your own child's submissions" });
       studentUid = targetUid;
     }
@@ -406,9 +403,7 @@ router.delete(
       const targetUid = req.body?.studentUid as string;
       if (!targetUid) return res.status(403).json({ error: "studentUid required" });
       const parentDoc = await getDoc(Collections.USERS, req.uid!);
-      const childNames: string[] = ((parentDoc?.children || []) as Array<{ childName: string }>).map((c) => c.childName);
-      const studentDoc = await getDoc(Collections.USERS, targetUid);
-      if (!studentDoc || !childNames.includes(studentDoc.name))
+      if (!isParentOfChild(parentDoc?.children || [], targetUid))
         return res.status(403).json({ error: "You can only manage your own child's submissions" });
       studentUid = targetUid;
     }

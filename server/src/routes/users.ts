@@ -6,8 +6,8 @@ import { asyncHandler } from "../lib/async-handler";
 import { Collections } from "../lib/collections";
 import { Config } from "../lib/config";
 
-type ChildEntry = {
-  childName: string; classId: string; className: string;
+export type ChildEntry = {
+  childName: string; childUid: string; classId: string; className: string;
   subject: string; teacherName: string; teacherUid: string; teacherEmail: string;
 };
 
@@ -15,17 +15,42 @@ function childKey(c: ChildEntry): string {
   return `${c.childName}::${c.classId}`;
 }
 
-function deduplicateChildren(existing: ChildEntry[], incoming: ChildEntry[]): ChildEntry[] {
-  const seen = new Set(existing.map(childKey));
-  const merged = [...existing];
-  for (const entry of incoming) {
+export function isParentOfChild(children: ChildEntry[], targetUid: string): boolean {
+  return children.some((c) => c.childUid === targetUid);
+}
+
+export function deduplicateChildren(existing: ChildEntry[], incoming: ChildEntry[]): ChildEntry[] {
+  const incomingKeys = new Set(incoming.map(childKey));
+  const kept = existing.filter((e) => !incomingKeys.has(childKey(e)));
+  const seen = new Set<string>();
+  const result: ChildEntry[] = [];
+  for (const entry of [...incoming, ...kept]) {
     const key = childKey(entry);
     if (!seen.has(key)) {
       seen.add(key);
-      merged.push(entry);
+      result.push(entry);
     }
   }
-  return merged;
+  return result;
+}
+
+async function resolveStudentUids(
+  studentNames: string[]
+): Promise<Map<string, string>> {
+  if (studentNames.length === 0) return new Map();
+  const chunks: string[][] = [];
+  for (let i = 0; i < studentNames.length; i += Config.FIRESTORE_IN_LIMIT) {
+    chunks.push(studentNames.slice(i, i + Config.FIRESTORE_IN_LIMIT));
+  }
+  const results = await Promise.all(
+    chunks.map((names) =>
+      queryDocs(Collections.USERS, [
+        { field: "role", op: "==", value: "Student" },
+        { field: "name", op: "in", value: names },
+      ])
+    )
+  );
+  return new Map(results.flat().map((u: any) => [u.name, u.id]));
 }
 
 async function buildChildEntriesFromStudents(
@@ -34,8 +59,12 @@ async function buildChildEntriesFromStudents(
   const entries: ChildEntry[] = [];
   const classIds = new Set<string>();
 
+  const names = studentSnap.docs.map((d) => d.data().name as string).filter(Boolean);
+  const nameToUid = await resolveStudentUids([...new Set(names)]);
+
   for (const doc of studentSnap.docs) {
     const s = doc.data();
+    const resolvedUid = nameToUid.get(s.name) || "";
     const studentClassIds: string[] = s.classIds || [];
     for (const cid of studentClassIds) classIds.add(cid);
 
@@ -45,7 +74,7 @@ async function buildChildEntriesFromStudents(
     if (classDocs.length > 0) {
       for (const cls of classDocs as any[]) {
         entries.push({
-          childName: s.name, classId: cls.id,
+          childName: s.name, childUid: resolvedUid, classId: cls.id,
           className: cls.name || "", subject: cls.subject || "",
           teacherName: cls.teacherName || "", teacherUid: cls.teacherUid || "",
           teacherEmail: cls.teacherEmail || "",
@@ -53,7 +82,7 @@ async function buildChildEntriesFromStudents(
       }
     } else {
       entries.push({
-        childName: s.name, classId: "", className: "", subject: "",
+        childName: s.name, childUid: resolvedUid, classId: "", className: "", subject: "",
         teacherName: "", teacherUid: "", teacherEmail: "",
       });
     }
@@ -108,6 +137,17 @@ router.post(
     if (!uid || !name || !email || !role)
       return res.status(400).json({ error: "uid, name, email, role required" });
 
+    if (uid !== req.uid)
+      return res.status(403).json({ error: "You can only create your own profile" });
+
+    const validRoles = ["Teacher", "Parent", "Principal"];
+    if (!validRoles.includes(role))
+      return res.status(400).json({ error: "Invalid role" });
+
+    const existing = await getDoc(Collections.USERS, uid);
+    if (existing)
+      return res.status(409).json({ error: "User already exists" });
+
     await db.collection(Collections.USERS).doc(uid).set({
       uid, name, email, role,
       classIds: [],
@@ -144,6 +184,17 @@ router.get(
     const { studentUid, startDate, endDate } = req.query as Record<string, string>;
     if (!studentUid)
       return res.status(400).json({ error: "studentUid required" });
+
+    const callerRole = req.role!;
+    const callerUid = req.uid!;
+    if (callerRole === "Student" && callerUid !== studentUid)
+      return res.status(403).json({ error: "Forbidden" });
+    if (callerRole === "Parent") {
+      const callerDoc = await getDoc(Collections.USERS, callerUid);
+      const children: ChildEntry[] = callerDoc?.children || [];
+      if (!isParentOfChild(children, studentUid))
+        return res.status(403).json({ error: "Forbidden" });
+    }
 
     const start = startDate || new Date(Date.now() - Config.WEEKLY_REPORT_MS).toISOString().slice(0, 10);
     const end = endDate || new Date().toISOString().slice(0, 10);

@@ -51,17 +51,21 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
     }
   }
 
+  ClassModel? get _currentClass {
+    if (widget.childrenData.isEmpty) return null;
+    final idx = widget.selectedChildIndex.clamp(0, widget.childrenData.length - 1);
+    return widget.childrenData[idx].childClass;
+  }
+
   String _grade() {
-    if (widget.childrenData.isEmpty) return '8';
-    final cls = widget.childrenData[widget.selectedChildIndex].childClass;
+    final cls = _currentClass;
     if (cls == null) return '8';
     final match = RegExp(r'(\d+)').firstMatch(cls.name);
     return match?.group(1) ?? '8';
   }
 
   String _section() {
-    if (widget.childrenData.isEmpty) return 'A';
-    final cls = widget.childrenData[widget.selectedChildIndex].childClass;
+    final cls = _currentClass;
     if (cls == null) return 'A';
     final match =
         RegExp(r'Section\s*(\w+)', caseSensitive: false).firstMatch(cls.name);

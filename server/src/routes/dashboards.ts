@@ -26,6 +26,7 @@ import {
 import { Collections } from "../lib/collections";
 import { Config } from "../lib/config";
 import * as admin from "firebase-admin";
+import { type ChildEntry, isParentOfChild, deduplicateChildren } from "./users";
 
 const FieldValue = admin.firestore.FieldValue;
 
@@ -48,11 +49,7 @@ async function callerSharesClassWith(callerUid: string, targetUid: string): Prom
 async function callerIsParentOf(callerUid: string, childUid: string): Promise<boolean> {
   const callerDoc = await getDoc(Collections.USERS, callerUid);
   if (!callerDoc || !callerDoc.children) return false;
-  const childDoc = await getDoc(Collections.USERS, childUid);
-  if (!childDoc) return false;
-  return (callerDoc.children as Array<{ childName: string }>).some(
-    (c) => c.childName === childDoc.name
-  );
+  return isParentOfChild(callerDoc.children as ChildEntry[], childUid);
 }
 
 async function fetchShared<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
@@ -297,13 +294,30 @@ router.get(
       const studentSnap = await db.collection(Collections.STUDENTS)
         .where("parentEmail", "==", user.email).get();
       if (!studentSnap.empty) {
-        const existingChildren: Array<{ childName: string; classId: string }> = user.children || [];
+        const existingChildren: ChildEntry[] = user.children || [];
 
-        const incoming: Array<{ childName: string; classId: string; className: string; subject: string; teacherName: string; teacherUid: string; teacherEmail: string }> = [];
+        const incoming: ChildEntry[] = [];
         const newClassIds = new Set<string>();
+
+        const names = studentSnap.docs.map((d) => d.data().name as string).filter(Boolean);
+        const nameChunks: string[][] = [];
+        const uniqueNames = [...new Set(names)];
+        for (let i = 0; i < uniqueNames.length; i += Config.FIRESTORE_IN_LIMIT) {
+          nameChunks.push(uniqueNames.slice(i, i + Config.FIRESTORE_IN_LIMIT));
+        }
+        const studentUserChunks = await Promise.all(
+          nameChunks.map((n) =>
+            queryDocs(Collections.USERS, [
+              { field: "role", op: "==", value: "Student" },
+              { field: "name", op: "in", value: n },
+            ])
+          )
+        );
+        const nameToUid = new Map(studentUserChunks.flat().map((u: any) => [u.name, u.id]));
 
         for (const doc of studentSnap.docs) {
           const s = doc.data();
+          const resolvedUid = nameToUid.get(s.name) || "";
           const studentClassIds: string[] = s.classIds || [];
           const classDocs = studentClassIds.length > 0
             ? await getDocs(Collections.CLASSES, studentClassIds) : [];
@@ -312,30 +326,23 @@ router.get(
           if (classDocs.length > 0) {
             for (const cls of classDocs as any[]) {
               incoming.push({
-                childName: s.name, classId: cls.id,
+                childName: s.name, childUid: resolvedUid, classId: cls.id,
                 className: cls.name || "", subject: cls.subject || "",
                 teacherName: cls.teacherName || "", teacherUid: cls.teacherUid || "",
                 teacherEmail: cls.teacherEmail || "",
               });
             }
           } else {
-            incoming.push({ childName: s.name, classId: "", className: "", subject: "", teacherName: "", teacherUid: "", teacherEmail: "" });
+            incoming.push({ childName: s.name, childUid: resolvedUid, classId: "", className: "", subject: "", teacherName: "", teacherUid: "", teacherEmail: "" });
           }
         }
 
-        const seen = new Set<string>();
-        const deduped: typeof existingChildren = [];
-        for (const c of existingChildren) {
-          const key = `${c.childName}::${c.classId}`;
-          if (!seen.has(key)) { seen.add(key); deduped.push(c); }
-        }
-        const newEntries = incoming.filter(
-          (c) => !seen.has(`${c.childName}::${c.classId}`));
-        const hadDuplicates = deduped.length < existingChildren.length;
+        const merged = deduplicateChildren(existingChildren, incoming);
+        const changed = merged.length !== existingChildren.length ||
+          merged.some((m, i) => m.childUid !== (existingChildren[i]?.childUid || ""));
 
-        if (newEntries.length > 0 || hadDuplicates) {
+        if (changed) {
           didDedup = true;
-          const merged = [...deduped, ...newEntries];
           const allClassIds = [...new Set([
             ...(user.classIds || []) as string[],
             ...newClassIds,
@@ -359,7 +366,7 @@ router.get(
       if (cached) return res.json(cached);
     }
 
-    const children: Array<{ childName: string; classId: string }> = user!.children || [];
+    const children: ChildEntry[] = user!.children || [];
     const classIdSet = new Set<string>();
     const childrenData: { childUid: string; childPhotoUrl: string; info: unknown; childClass: unknown; grades: any[]; behaviorPoints: any[]; behaviorScore: number; attendance: any[]; homework: any[]; submissions: any[] }[] = [];
 
@@ -369,33 +376,13 @@ router.get(
       : [];
     const classMap = new Map((childClasses as ClassDoc[]).map((c) => [c.id, c]));
 
-    // Batch: collect all child names, find matching student UIDs in one pass
-    const childNames = children.map((c) => c.childName).filter(Boolean);
-    let allStudents: StudentDoc[] = [];
-    if (childNames.length > 0) {
-      const nameChunks: string[][] = [];
-      for (let i = 0; i < childNames.length; i += Config.FIRESTORE_IN_LIMIT) {
-        nameChunks.push(childNames.slice(i, i + Config.FIRESTORE_IN_LIMIT));
-      }
-      const studentChunks = await Promise.all(
-        nameChunks.map((names) =>
-          queryDocs(Collections.USERS, [
-            { field: "role", op: "==", value: "Student" },
-            { field: "name", op: "in", value: names },
-          ])
-        )
-      );
-      allStudents = studentChunks.flat();
-    }
-    const studentNameMap = new Map(allStudents.map((s) => [s.name, s.id]));
-    const studentPhotoMap = new Map(allStudents.map((s) => [s.name, (s as any).photoUrl || ""]));
+    const childUids = [...new Set(children.map((c) => c.childUid).filter(Boolean))];
 
-    // Batch: collect all child UIDs, query grades/behavior/attendance in bulk
-    const childUids: string[] = [];
-    for (const childInfo of children) {
-      const uid = studentNameMap.get(childInfo.childName) || "";
-      if (uid) childUids.push(uid);
-    }
+    // Fetch child photo URLs in bulk
+    const childUserDocs = childUids.length > 0
+      ? await getDocs(Collections.USERS, childUids.slice(0, Config.FIRESTORE_IN_LIMIT))
+      : [];
+    const uidToPhoto = new Map((childUserDocs as any[]).map((u) => [u.id, u.photoUrl || ""]));
 
     const [allGrades, allBehavior, allAttendance, allHomework, allSubmissions] = await Promise.all([
       childUids.length > 0
@@ -417,21 +404,21 @@ router.get(
 
     for (const childInfo of children) {
       if (childInfo.classId) classIdSet.add(childInfo.classId);
-      const childUid = studentNameMap.get(childInfo.childName) || "";
+      const cUid = childInfo.childUid || "";
 
       const classId = childInfo.classId;
       const homework = (allHomework as any[]).filter((h) => h.classId === classId);
 
-      if (childUid) {
-        const grades = (allGrades as GradeDoc[]).filter((g) => g.studentUid === childUid);
-        const behavior = (allBehavior as BehaviorPointDoc[]).filter((b) => b.studentUid === childUid);
-        const attendance = (allAttendance as AttendanceDoc[]).filter((a) => a.studentUid === childUid);
-        const submissions = (allSubmissions as any[]).filter((s) => s.studentUid === childUid);
+      if (cUid) {
+        const grades = (allGrades as GradeDoc[]).filter((g) => g.studentUid === cUid);
+        const behavior = (allBehavior as BehaviorPointDoc[]).filter((b) => b.studentUid === cUid);
+        const attendance = (allAttendance as AttendanceDoc[]).filter((a) => a.studentUid === cUid);
+        const submissions = (allSubmissions as any[]).filter((s) => s.studentUid === cUid);
 
         childrenData.push({
           info: childInfo,
-          childUid,
-          childPhotoUrl: studentPhotoMap.get(childInfo.childName) || "",
+          childUid: cUid,
+          childPhotoUrl: uidToPhoto.get(cUid) || "",
           childClass: serializeDoc(classMap.get(classId) || null),
           grades: serializeDocs(grades),
           behaviorPoints: serializeDocs(behavior),
@@ -444,7 +431,7 @@ router.get(
         childrenData.push({
           info: childInfo,
           childUid: "",
-          childPhotoUrl: studentPhotoMap.get(childInfo.childName) || "",
+          childPhotoUrl: "",
           childClass: serializeDoc(classMap.get(classId) || null),
           grades: [],
           behaviorPoints: [],

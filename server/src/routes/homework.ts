@@ -8,6 +8,7 @@ import { deleteDocument } from "../lib/crud-helpers";
 import { Collections } from "../lib/collections";
 import { logActivity } from "../lib/activity-logger";
 import { notify } from "../lib/notifications/notifier";
+import { type ChildEntry, isParentOfChild } from "./users";
 
 const router = Router();
 router.use(requireAuth);
@@ -19,10 +20,8 @@ async function resolveStudentUid(req: any): Promise<{ studentUid: string; error?
     const targetUid = req.body?.studentUid as string;
     if (!targetUid) return { studentUid: "", error: "studentUid required for parent submissions" };
     const parentDoc = await getDoc(Collections.USERS, req.uid!);
-    const children: Array<{ childName: string }> = parentDoc?.children || [];
-    const childNames = children.map((c) => c.childName);
-    const studentDoc = await getDoc(Collections.USERS, targetUid);
-    if (!studentDoc || !childNames.includes(studentDoc.name)) {
+    const children: ChildEntry[] = parentDoc?.children || [];
+    if (!isParentOfChild(children, targetUid)) {
       return { studentUid: "", error: "You can only submit for your own child" };
     }
     return { studentUid: targetUid };
@@ -156,9 +155,7 @@ router.post(
     let isOwner = uid === studentUid;
     if (!isOwner && role === "Parent") {
       const parentDoc = await getDoc(Collections.USERS, uid);
-      const childNames: string[] = ((parentDoc?.children || []) as Array<{ childName: string }>).map((c) => c.childName);
-      const studentDoc = await getDoc(Collections.USERS, studentUid);
-      isOwner = !!studentDoc && childNames.includes(studentDoc.name);
+      isOwner = isParentOfChild(parentDoc?.children || [], studentUid);
     }
     if (!isTeacher && !isOwner)
       return res.status(403).json({ error: "Forbidden" });
@@ -220,9 +217,7 @@ router.get(
     let isOwner = uid === studentUid;
     if (!isOwner && role === "Parent") {
       const parentDoc = await getDoc(Collections.USERS, uid);
-      const childNames: string[] = ((parentDoc?.children || []) as Array<{ childName: string }>).map((c) => c.childName);
-      const studentDoc = await getDoc(Collections.USERS, studentUid);
-      isOwner = !!studentDoc && childNames.includes(studentDoc.name);
+      isOwner = isParentOfChild(parentDoc?.children || [], studentUid);
     }
     if (!isTeacher && !isOwner)
       return res.status(403).json({ error: "Forbidden" });

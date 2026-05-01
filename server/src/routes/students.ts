@@ -6,6 +6,8 @@ import { asyncHandler } from "../lib/async-handler";
 import { Collections } from "../lib/collections";
 import { getDoc } from "../lib/firestore-helpers";
 import { logActivity } from "../lib/activity-logger";
+import { invalidateDashboards } from "../lib/cache-invalidation";
+import { type ChildEntry } from "./users";
 
 const router = Router();
 router.use(requireAuth);
@@ -61,7 +63,42 @@ router.patch(
     if (snap.empty)
       return res.status(404).json({ error: "Student record not found" });
 
-    await snap.docs[0].ref.update({ parentEmail: parentEmail || "" });
+    const studentDoc = snap.docs[0];
+    const oldEmail = (studentDoc.data().parentEmail || "") as string;
+
+    await studentDoc.ref.update({ parentEmail: parentEmail || "" });
+
+    // Revoke old parent's access if email changed
+    if (oldEmail && oldEmail !== (parentEmail || "")) {
+      const oldParentSnap = await db.collection(Collections.USERS)
+        .where("email", "==", oldEmail)
+        .where("role", "==", "Parent")
+        .limit(1).get();
+      if (!oldParentSnap.empty) {
+        const oldParent = oldParentSnap.docs[0];
+        const children: ChildEntry[] = oldParent.data().children || [];
+        const filtered = children.filter((c) => c.childName !== studentName);
+        const removedClassIds = children
+          .filter((c) => c.childName === studentName)
+          .map((c) => c.classId)
+          .filter(Boolean);
+        const remainingClassIds = [...new Set(filtered.map((c) => c.classId).filter(Boolean))];
+        await oldParent.ref.update({
+          children: filtered,
+          classIds: remainingClassIds,
+        });
+        for (const cid of removedClassIds) {
+          const hasOtherChildInClass = filtered.some((c) => c.classId === cid);
+          if (!hasOtherChildInClass) {
+            await db.collection(Collections.CLASSES).doc(cid).update({
+              parentUids: FieldValue.arrayRemove(oldParent.id),
+            });
+          }
+        }
+      }
+    }
+
+    invalidateDashboards("parent_dash_");
     res.json({ updated: true });
   })
 );
