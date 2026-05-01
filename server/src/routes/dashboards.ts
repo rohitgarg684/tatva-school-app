@@ -25,6 +25,9 @@ import {
 } from "../lib/dashboard-helpers";
 import { Collections } from "../lib/collections";
 import { Config } from "../lib/config";
+import * as admin from "firebase-admin";
+
+const FieldValue = admin.firestore.FieldValue;
 
 const router = Router();
 router.use(requireAuth);
@@ -287,10 +290,62 @@ router.get(
     const cached = cacheGet<any>(cacheKey);
     if (cached) return res.json(cached);
 
-    const user = await getDoc(Collections.USERS, uid);
+    let user = await getDoc(Collections.USERS, uid);
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    const children: Array<{ childName: string; classId: string }> = user.children || [];
+    // Lazy auto-link: pick up students whose parentEmail matches this parent
+    if (user.email) {
+      const studentSnap = await db.collection(Collections.STUDENTS)
+        .where("parentEmail", "==", user.email).get();
+      if (!studentSnap.empty) {
+        const existingNames = new Set(
+          ((user.children || []) as Array<{ childName: string }>).map((c) => c.childName)
+        );
+        const newChildren: Record<string, unknown>[] = [];
+        const newClassIds = new Set<string>();
+
+        for (const doc of studentSnap.docs) {
+          const s = doc.data();
+          if (existingNames.has(s.name)) continue;
+          const studentClassIds: string[] = s.classIds || [];
+          const classDocs = studentClassIds.length > 0
+            ? await getDocs(Collections.CLASSES, studentClassIds)
+            : [];
+          for (const cid of studentClassIds) newClassIds.add(cid);
+
+          if (classDocs.length > 0) {
+            for (const cls of classDocs as any[]) {
+              newChildren.push({
+                childName: s.name, classId: cls.id,
+                className: cls.name || "", subject: cls.subject || "",
+                teacherName: cls.teacherName || "", teacherUid: cls.teacherUid || "",
+                teacherEmail: cls.teacherEmail || "",
+              });
+            }
+          } else {
+            newChildren.push({ childName: s.name, classId: "", className: "", subject: "", teacherName: "", teacherUid: "", teacherEmail: "" });
+          }
+        }
+
+        if (newChildren.length > 0) {
+          const updates: Record<string, unknown> = {
+            children: FieldValue.arrayUnion(...newChildren),
+          };
+          if (newClassIds.size > 0) {
+            updates.classIds = FieldValue.arrayUnion(...Array.from(newClassIds));
+          }
+          await db.collection(Collections.USERS).doc(uid).update(updates);
+          for (const cid of newClassIds) {
+            await db.collection(Collections.CLASSES).doc(cid).update({
+              parentUids: FieldValue.arrayUnion(uid),
+            });
+          }
+          user = await getDoc(Collections.USERS, uid);
+        }
+      }
+    }
+
+    const children: Array<{ childName: string; classId: string }> = user!.children || [];
     const classIdSet = new Set<string>();
     const childrenData: { childUid: string; info: unknown; childClass: unknown; grades: any[]; behaviorPoints: any[]; behaviorScore: number; attendance: any[] }[] = [];
 

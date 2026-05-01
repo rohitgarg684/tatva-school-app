@@ -1,10 +1,61 @@
 import { Router } from "express";
 import * as admin from "firebase-admin";
 import { requireAuth } from "../middleware/auth";
-import { db, getDoc, queryDocs, serializeDoc, serializeDocs } from "../lib/firestore-helpers";
+import { db, getDoc, getDocs, queryDocs, serializeDoc, serializeDocs } from "../lib/firestore-helpers";
 import { asyncHandler } from "../lib/async-handler";
 import { Collections } from "../lib/collections";
 import { Config } from "../lib/config";
+
+async function autoLinkParentByEmail(uid: string, email: string): Promise<void> {
+  const studentSnap = await db.collection(Collections.STUDENTS)
+    .where("parentEmail", "==", email).get();
+  if (studentSnap.empty) return;
+
+  const classIdSet = new Set<string>();
+  const childEntries: Record<string, unknown>[] = [];
+
+  for (const doc of studentSnap.docs) {
+    const s = doc.data();
+    const studentClassIds: string[] = s.classIds || [];
+    for (const cid of studentClassIds) classIdSet.add(cid);
+
+    const classDocs = studentClassIds.length > 0
+      ? await getDocs(Collections.CLASSES, studentClassIds)
+      : [];
+
+    if (classDocs.length > 0) {
+      for (const cls of classDocs as any[]) {
+        childEntries.push({
+          childName: s.name,
+          classId: cls.id,
+          className: cls.name || "",
+          subject: cls.subject || "",
+          teacherName: cls.teacherName || "",
+          teacherUid: cls.teacherUid || "",
+          teacherEmail: cls.teacherEmail || "",
+        });
+      }
+    } else {
+      childEntries.push({ childName: s.name, classId: "", className: "", subject: "", teacherName: "", teacherUid: "", teacherEmail: "" });
+    }
+  }
+
+  if (childEntries.length === 0) return;
+
+  const updates: Record<string, unknown> = {
+    children: FieldValue.arrayUnion(...childEntries),
+  };
+  if (classIdSet.size > 0) {
+    updates.classIds = FieldValue.arrayUnion(...Array.from(classIdSet));
+  }
+  await db.collection(Collections.USERS).doc(uid).update(updates);
+
+  for (const cid of classIdSet) {
+    await db.collection(Collections.CLASSES).doc(cid).update({
+      parentUids: FieldValue.arrayUnion(uid),
+    });
+  }
+}
 
 const router = Router();
 router.use(requireAuth);
@@ -35,6 +86,11 @@ router.post(
     });
 
     await admin.auth().setCustomUserClaims(uid, { role });
+
+    if (role === "Parent") {
+      await autoLinkParentByEmail(uid, email);
+    }
+
     res.json({ uid, created: true });
   })
 );

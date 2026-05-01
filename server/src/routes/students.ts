@@ -16,7 +16,7 @@ router.post(
   "/student/enroll",
   requireRole("Teacher", "Principal"),
   asyncHandler(async (req, res) => {
-    const { name, rollNumber, grade, section, parentName, parentPhone, classIds } = req.body;
+    const { name, rollNumber, grade, section, parentName, parentPhone, parentEmail, classIds } = req.body;
     if (!name)
       return res.status(400).json({ error: "name required" });
 
@@ -27,6 +27,7 @@ router.post(
       section: section || "",
       parentName: parentName || "",
       parentPhone: parentPhone || "",
+      parentEmail: parentEmail || "",
       classIds: classIds || [],
       enrolledBy: req.uid,
       createdAt: FieldValue.serverTimestamp(),
@@ -44,6 +45,42 @@ router.post(
     });
 
     res.json({ id: ref.id, enrolled: true });
+  })
+);
+
+router.patch(
+  "/student/parent-email",
+  requireRole("Teacher", "Principal"),
+  asyncHandler(async (req, res) => {
+    const { studentName, parentEmail } = req.body;
+    if (!studentName)
+      return res.status(400).json({ error: "studentName required" });
+
+    const snap = await db.collection(Collections.STUDENTS)
+      .where("name", "==", studentName).limit(1).get();
+    if (snap.empty)
+      return res.status(404).json({ error: "Student record not found" });
+
+    await snap.docs[0].ref.update({ parentEmail: parentEmail || "" });
+    res.json({ updated: true });
+  })
+);
+
+router.get(
+  "/student/by-name",
+  requireRole("Teacher", "Principal"),
+  asyncHandler(async (req, res) => {
+    const name = req.query.name as string;
+    if (!name)
+      return res.status(400).json({ error: "name query param required" });
+
+    const snap = await db.collection(Collections.STUDENTS)
+      .where("name", "==", name).limit(1).get();
+    if (snap.empty)
+      return res.json({ student: null });
+
+    const doc = snap.docs[0];
+    res.json({ student: { id: doc.id, ...doc.data() } });
   })
 );
 

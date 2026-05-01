@@ -7,6 +7,7 @@ import '../../../shared/widgets/tatva_snackbar.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../../../shared/widgets/add_student_sheet.dart';
 import '../../../shared/widgets/pick_student_sheet.dart';
+import '../../../shared/widgets/student_detail_sheet.dart';
 import '../../../services/api_service.dart';
 import '../../../services/api_service.dart';
 import '../../../models/user_model.dart';
@@ -303,40 +304,45 @@ class TeacherClassesTab extends StatelessWidget {
                     TatvaColors.success
                   ];
                   final c = colors[i % colors.length];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 6),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
-                        color: c.withOpacity(0.04),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: c.withOpacity(0.1))),
-                    child: Row(children: [
-                      UserAvatar(
-                        name: s.name,
-                        radius: 18,
-                        bgColor: c.withOpacity(0.12),
-                        textColor: c,
-                        photoUrl: s.photoUrl,
-                        useDoubleInitials: true,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(s.name,
-                                  style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: TatvaColors.neutral900)),
-                              Text(s.email,
-                                  style: const TextStyle(
-                                      fontSize: 11,
-                                      color: TatvaColors.neutral400)),
-                            ]),
-                      ),
-                    ]),
+                  return GestureDetector(
+                    onTap: () => StudentDetailSheet.show(context, student: s),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                          color: c.withOpacity(0.04),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: c.withOpacity(0.1))),
+                      child: Row(children: [
+                        UserAvatar(
+                          name: s.name,
+                          radius: 18,
+                          bgColor: c.withOpacity(0.12),
+                          textColor: c,
+                          photoUrl: s.photoUrl,
+                          useDoubleInitials: true,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(s.name,
+                                    style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: TatvaColors.neutral900)),
+                                Text(s.email,
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        color: TatvaColors.neutral400)),
+                              ]),
+                        ),
+                        const Icon(Icons.chevron_right_rounded,
+                            size: 18, color: TatvaColors.neutral400),
+                      ]),
+                    ),
                   );
                 },
               ),

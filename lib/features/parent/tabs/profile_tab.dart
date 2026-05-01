@@ -11,6 +11,9 @@ class ParentProfileTab extends StatelessWidget {
   final VoidCallback onShowTeacherProfile;
   final VoidCallback onGenerateReport;
   final VoidCallback onLogout;
+  final List<ChildDashboardData> childrenData;
+  final int selectedChildIndex;
+  final ValueChanged<int> onChildSelected;
 
   const ParentProfileTab({
     super.key,
@@ -19,6 +22,9 @@ class ParentProfileTab extends StatelessWidget {
     required this.onShowTeacherProfile,
     required this.onGenerateReport,
     required this.onLogout,
+    this.childrenData = const [],
+    this.selectedChildIndex = 0,
+    required this.onChildSelected,
   });
 
   @override
@@ -66,6 +72,12 @@ class ParentProfileTab extends StatelessWidget {
                           fontSize: 12,
                           color: TatvaColors.purple,
                           fontWeight: FontWeight.w700)))),
+          if (childrenData.length > 1) ...[
+            const SizedBox(height: 24),
+            FadeSlideIn(
+                delayMs: 125,
+                child: _childPicker()),
+          ],
           const SizedBox(height: 28),
           FadeSlideIn(
               delayMs: 130,
@@ -229,5 +241,86 @@ class ParentProfileTab extends StatelessWidget {
                   TextStyle(fontSize: 11, color: TatvaColors.neutral400)),
           const SizedBox(height: 24),
         ]));
+  }
+
+  static const _avatarColors = [
+    Color(0xFF6A1B9A),
+    Color(0xFF1E88E5),
+    Color(0xFFE8A020),
+    Color(0xFF43A047),
+    Color(0xFFE53935),
+    Color(0xFF00897B),
+  ];
+
+  Widget _childPicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 4, bottom: 12),
+          child: Text('Viewing profile for',
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: TatvaColors.neutral400)),
+        ),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: List.generate(childrenData.length, (i) {
+            final isActive = i == selectedChildIndex;
+            final name = childrenData[i].info.childName;
+            final color = _avatarColors[i % _avatarColors.length];
+            final initials = _initials(name);
+            return BouncyTap(
+              onTap: () => onChildSelected(i),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isActive ? color.withOpacity(0.12) : TatvaColors.bgCard,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                      color: isActive ? color : Colors.grey.shade200,
+                      width: isActive ? 2 : 1),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: color.withOpacity(0.15),
+                      child: Text(initials,
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: color)),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(name,
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: isActive ? color : TatvaColors.neutral600)),
+                    if (isActive) ...[
+                      const SizedBox(width: 6),
+                      Icon(Icons.check_circle_rounded,
+                          size: 16, color: color),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    return name.isNotEmpty ? name[0].toUpperCase() : '?';
   }
 }

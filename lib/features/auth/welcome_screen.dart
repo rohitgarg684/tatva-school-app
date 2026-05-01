@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../teacher/teacher_dashboard.dart';
-import '../parent/parent_dashboard.dart';
+import '../parent/child_picker_screen.dart';
 import '../principal/principal_dashboard.dart';
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -121,7 +121,7 @@ fontSize: 14, color: textMut)),
                   'Parent',
                   'Mr. Suresh Mehta · Parent of Arjun',
                   const Color(0xFF8E24AA),
-                  const ParentDashboard()),
+                  const ChildPickerScreen()),
               const SizedBox(height: 12),
               _roleCard(
                   context,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/user_role.dart';
 import '../../features/teacher/teacher_dashboard.dart';
-import '../../features/parent/parent_dashboard.dart';
+import '../../features/parent/child_picker_screen.dart';
 import '../../features/principal/principal_dashboard.dart';
 
 class DashboardFactory {
@@ -14,7 +14,7 @@ class DashboardFactory {
       case UserRole.teacher:
         return const TeacherDashboard();
       case UserRole.parent:
-        return const ParentDashboard();
+        return const ChildPickerScreen();
       case UserRole.principal:
         return const PrincipalDashboard();
     }

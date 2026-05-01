@@ -19,9 +19,9 @@ import 'tabs/behavior_tab.dart';
 import 'tabs/learn_tab.dart';
 import 'tabs/vote_tab.dart';
 import 'tabs/profile_tab.dart';
-
 class ParentDashboard extends StatefulWidget {
-  const ParentDashboard({super.key});
+  final int initialChildIndex;
+  const ParentDashboard({super.key, this.initialChildIndex = 0});
 
   @override
   _ParentDashboardState createState() => _ParentDashboardState();
@@ -44,7 +44,7 @@ class _ParentDashboardState extends State<ParentDashboard>
   String _uid = '';
 
   ParentDashboardData? _data;
-  int _selectedChildIndex = 0;
+  late int _selectedChildIndex = widget.initialChildIndex;
   List<AnnouncementModel> _announcements = [];
   List<VoteModel> _activeVotes = [];
 
@@ -294,6 +294,9 @@ class _ParentDashboardState extends State<ParentDashboard>
               onShowTeacherProfile: _showTeacherProfile,
               onGenerateReport: _generateWeeklyReport,
               onLogout: _logout,
+              childrenData: _data?.childrenData ?? [],
+              selectedChildIndex: _selectedChildIndex,
+              onChildSelected: (i) => setState(() => _selectedChildIndex = i),
             ),
           ]),
     );

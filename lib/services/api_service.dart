@@ -424,6 +424,7 @@ class ApiService {
     String section = '',
     String parentName = '',
     String parentPhone = '',
+    String parentEmail = '',
     List<String> classIds = const [],
   }) =>
       _post('/student/enroll', {
@@ -433,7 +434,20 @@ class ApiService {
         'section': section,
         'parentName': parentName,
         'parentPhone': parentPhone,
+        'parentEmail': parentEmail,
         'classIds': classIds,
+      });
+
+  Future<Map<String, dynamic>> getStudentByName(String name) =>
+      _get('/student/by-name?name=${Uri.encodeComponent(name)}');
+
+  Future<Map<String, dynamic>> updateStudentParentEmail({
+    required String studentName,
+    required String parentEmail,
+  }) =>
+      _patch('/student/parent-email', {
+        'studentName': studentName,
+        'parentEmail': parentEmail,
       });
 
   Future<Map<String, dynamic>> createHomework({

@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatf
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../teacher/teacher_dashboard.dart';
-import '../parent/parent_dashboard.dart';
+import '../parent/child_picker_screen.dart';
 import '../principal/principal_dashboard.dart';
 import '../../shared/animations/animations.dart';
 import '../../services/auth_service.dart';
@@ -119,11 +119,11 @@ class _LoginScreenState extends State<LoginScreen>
         case UserRole.teacher:
           dashboard = TeacherDashboard();
         case UserRole.parent:
-          dashboard = ParentDashboard();
+          dashboard = ChildPickerScreen();
         case UserRole.principal:
           dashboard = PrincipalDashboard();
         default:
-          dashboard = ParentDashboard();
+          dashboard = ChildPickerScreen();
       }
       Navigator.pushReplacement(context, TatvaPageRoute.slideUp(dashboard));
     });

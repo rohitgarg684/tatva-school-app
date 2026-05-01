@@ -37,6 +37,7 @@ class _AddStudentSheetState extends State<AddStudentSheet> {
   final _rollCtrl = TextEditingController();
   final _parentNameCtrl = TextEditingController();
   final _parentPhoneCtrl = TextEditingController();
+  final _parentEmailCtrl = TextEditingController();
 
   String _selectedGrade = '';
   String _selectedSection = '';
@@ -52,6 +53,7 @@ class _AddStudentSheetState extends State<AddStudentSheet> {
     _rollCtrl.dispose();
     _parentNameCtrl.dispose();
     _parentPhoneCtrl.dispose();
+    _parentEmailCtrl.dispose();
     super.dispose();
   }
 
@@ -75,6 +77,7 @@ class _AddStudentSheetState extends State<AddStudentSheet> {
         section: _selectedSection,
         parentName: _parentNameCtrl.text.trim(),
         parentPhone: _parentPhoneCtrl.text.trim(),
+        parentEmail: _parentEmailCtrl.text.trim(),
         classIds: widget.classId != null ? [widget.classId!] : [],
       );
 
@@ -202,6 +205,16 @@ class _AddStudentSheetState extends State<AddStudentSheet> {
                 'e.g. +91 98765 43210',
                 Icons.phone_outlined,
                 keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 16),
+
+              _label('Parent Email'),
+              const SizedBox(height: 8),
+              _field(
+                _parentEmailCtrl,
+                'e.g. parent@example.com',
+                Icons.email_outlined,
+                keyboardType: TextInputType.emailAddress,
               ),
 
               if (_error.isNotEmpty) ...[

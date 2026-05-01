@@ -6,6 +6,7 @@ class StudentModel {
   final String section;
   final String parentName;
   final String parentPhone;
+  final String parentEmail;
   final List<String> classIds;
   final String enrolledBy;
   final DateTime? createdAt;
@@ -18,6 +19,7 @@ class StudentModel {
     this.section = '',
     this.parentName = '',
     this.parentPhone = '',
+    this.parentEmail = '',
     this.classIds = const [],
     this.enrolledBy = '',
     this.createdAt,
@@ -32,6 +34,7 @@ class StudentModel {
       section: data['section'] as String? ?? '',
       parentName: data['parentName'] as String? ?? '',
       parentPhone: data['parentPhone'] as String? ?? '',
+      parentEmail: data['parentEmail'] as String? ?? '',
       classIds: List<String>.from(data['classIds'] ?? []),
       enrolledBy: data['enrolledBy'] as String? ?? '',
       createdAt: data['createdAt'] != null
@@ -48,6 +51,7 @@ class StudentModel {
       'section': section,
       'parentName': parentName,
       'parentPhone': parentPhone,
+      'parentEmail': parentEmail,
       'classIds': classIds,
       'enrolledBy': enrolledBy,
       'createdAt': (createdAt ?? DateTime.now()).toIso8601String(),
@@ -61,6 +65,7 @@ class StudentModel {
     String? section,
     String? parentName,
     String? parentPhone,
+    String? parentEmail,
     List<String>? classIds,
     String? enrolledBy,
   }) {
@@ -72,6 +77,7 @@ class StudentModel {
       section: section ?? this.section,
       parentName: parentName ?? this.parentName,
       parentPhone: parentPhone ?? this.parentPhone,
+      parentEmail: parentEmail ?? this.parentEmail,
       classIds: classIds ?? this.classIds,
       enrolledBy: enrolledBy ?? this.enrolledBy,
       createdAt: createdAt,
