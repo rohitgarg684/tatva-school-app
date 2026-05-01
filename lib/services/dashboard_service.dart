@@ -115,6 +115,7 @@ class TeacherDashboardData {
 class ChildDashboardData {
   final ChildInfo info;
   final String childUid;
+  final String childPhotoUrl;
   final ClassModel? childClass;
   final List<GradeModel> grades;
   final List<BehaviorPoint> behaviorPoints;
@@ -126,6 +127,7 @@ class ChildDashboardData {
   const ChildDashboardData({
     required this.info,
     this.childUid = '',
+    this.childPhotoUrl = '',
     this.childClass,
     this.grades = const [],
     this.behaviorPoints = const [],
@@ -351,6 +353,7 @@ class DashboardService {
       return ChildDashboardData(
         info: ChildInfo.fromJson(infoMap),
         childUid: m['childUid'] as String? ?? '',
+        childPhotoUrl: m['childPhotoUrl'] as String? ?? '',
         childClass: _parseNullable(m['childClass'], ClassModel.fromJson),
         grades: _parseList(m['grades'], GradeModel.fromJson),
         behaviorPoints: _parseList(m['behaviorPoints'], BehaviorPoint.fromJson),

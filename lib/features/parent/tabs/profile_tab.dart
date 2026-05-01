@@ -4,6 +4,7 @@ import '../../../shared/theme/colors.dart';
 import '../../../shared/animations/animations.dart';
 import '../../../models/user_model.dart';
 import '../../../models/child_info.dart';
+import '../parent_helpers.dart' as helpers;
 
 class ParentProfileTab extends StatelessWidget {
   final UserModel? user;
@@ -12,6 +13,7 @@ class ParentProfileTab extends StatelessWidget {
   final VoidCallback onGenerateReport;
   final VoidCallback onLogout;
   final List<ChildDashboardData> childrenData;
+  final List<ChildDashboardData> currentChildEntries;
   final int selectedChildIndex;
   final ValueChanged<int> onChildSelected;
 
@@ -23,6 +25,7 @@ class ParentProfileTab extends StatelessWidget {
     required this.onGenerateReport,
     required this.onLogout,
     this.childrenData = const [],
+    this.currentChildEntries = const [],
     this.selectedChildIndex = 0,
     required this.onChildSelected,
   });
@@ -37,16 +40,18 @@ class ParentProfileTab extends StatelessWidget {
           FadeSlideIn(
               child: HeroAvatar(
                   heroTag: 'parent_avatar',
-                  initial: user?.initial ?? '?',
+                  initial: child?.info.childName.isNotEmpty == true
+                      ? child!.info.childName[0]
+                      : '?',
                   radius: 46,
                   bgColor: TatvaColors.purple.withOpacity(0.1),
                   textColor: TatvaColors.purple,
                   borderColor: TatvaColors.accent,
-                  photoUrl: user?.photoUrl ?? '')),
+                  photoUrl: child?.childPhotoUrl ?? '')),
           const SizedBox(height: 16),
           FadeSlideIn(
               delayMs: 80,
-              child: Text(user?.name ?? '',
+              child: Text(child?.info.childName ?? '',
                   style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -55,9 +60,15 @@ class ParentProfileTab extends StatelessWidget {
           const SizedBox(height: 4),
           FadeSlideIn(
               delayMs: 100,
-              child: Text(user?.email ?? '',
+              child: Text('Parent: ${user?.name ?? ''}',
                   style: const TextStyle(
                       fontSize: 13, color: TatvaColors.neutral400))),
+          const SizedBox(height: 2),
+          FadeSlideIn(
+              delayMs: 105,
+              child: Text(user?.email ?? '',
+                  style: const TextStyle(
+                      fontSize: 12, color: TatvaColors.neutral400))),
           const SizedBox(height: 10),
           FadeSlideIn(
               delayMs: 120,
@@ -72,76 +83,69 @@ class ParentProfileTab extends StatelessWidget {
                           fontSize: 12,
                           color: TatvaColors.purple,
                           fontWeight: FontWeight.w700)))),
-          if (childrenData.map((c) => c.info.childName).toSet().length > 1) ...[
+          if (helpers.uniqueChildEntries(childrenData).length > 1) ...[
             const SizedBox(height: 24),
             FadeSlideIn(
                 delayMs: 125,
                 child: _childPicker()),
           ],
           const SizedBox(height: 28),
-          FadeSlideIn(
+          ...currentChildEntries.map((e) => FadeSlideIn(
               delayMs: 130,
-              child: GestureDetector(
-                onTap: onShowTeacherProfile,
-                child: Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(bottom: 14),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                      color: TatvaColors.primary.withOpacity(0.04),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                          color: TatvaColors.primary.withOpacity(0.15))),
-                  child: Row(children: [
-                    CircleAvatar(
-                        radius: 22,
-                        backgroundColor:
-                            TatvaColors.primary.withOpacity(0.1),
-                        child: Text(
-                            (child?.info.teacherName ?? '').isNotEmpty
-                                ? child!.info.teacherName[0]
-                                : '?',
+              child: Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                    color: TatvaColors.primary.withOpacity(0.04),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                        color: TatvaColors.primary.withOpacity(0.15))),
+                child: Row(children: [
+                  CircleAvatar(
+                      radius: 22,
+                      backgroundColor:
+                          TatvaColors.primary.withOpacity(0.1),
+                      child: Text(
+                          e.info.teacherName.isNotEmpty
+                              ? e.info.teacherName[0]
+                              : '?',
+                          style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: TatvaColors.primary))),
+                  const SizedBox(width: 14),
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text(e.info.teacherName,
                             style: const TextStyle(
-                                fontSize: 16,
+                                fontSize: 14,
                                 fontWeight: FontWeight.bold,
-                                color: TatvaColors.primary))),
-                    const SizedBox(width: 14),
-                    Expanded(
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                          Text(child?.info.teacherName ?? '',
+                                color: TatvaColors.neutral900)),
+                        Text(
+                            '${e.info.subject} · ${e.info.className}',
+                            style: const TextStyle(
+                                fontSize: 12,
+                                color: TatvaColors.neutral400)),
+                        const SizedBox(height: 3),
+                        Row(children: [
+                          const Icon(Icons.email_outlined,
+                              size: 11, color: TatvaColors.info),
+                          const SizedBox(width: 4),
+                          Text(e.info.teacherEmail,
                               style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: TatvaColors.neutral900)),
-                          Text(
-                              "${child?.info.childName ?? ''}'s Teacher · ${child?.info.subject ?? ''}",
-                              style: const TextStyle(
-                                  fontSize: 12,
-                                  color: TatvaColors.neutral400)),
-                          const SizedBox(height: 3),
-                          Row(children: [
-                            const Icon(Icons.email_outlined,
-                                size: 11, color: TatvaColors.info),
-                            const SizedBox(width: 4),
-                            Text(child?.info.teacherEmail ?? '',
-                                style: const TextStyle(
-                                    fontSize: 10,
-                                    color: TatvaColors.info)),
-                          ]),
-                        ])),
-                    Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                            color: TatvaColors.primary.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(10)),
-                        child: const Icon(Icons.arrow_forward_ios_rounded,
-                            size: 12, color: TatvaColors.primary)),
-                  ]),
-                ),
-              )),
-          ...List.generate(4, (i) {
+                                  fontSize: 10,
+                                  color: TatvaColors.info)),
+                        ]),
+                      ])),
+                ]),
+              ))),
+          ...List.generate(3, (i) {
+            final entries = currentChildEntries.isNotEmpty
+                ? currentChildEntries : (child != null ? [child] : <ChildDashboardData>[]);
+            final classNames = entries.map((e) => e.info.className).toSet().join(', ');
             final items = [
               [
                 Icons.child_care_outlined,
@@ -149,8 +153,7 @@ class ParentProfileTab extends StatelessWidget {
                 child?.info.childName ?? ''
               ],
               [Icons.school_outlined, 'School', 'Tatva Academy'],
-              [Icons.class_outlined, 'Class', child?.info.className ?? ''],
-              [Icons.verified_outlined, 'Status', 'Verified'],
+              [Icons.class_outlined, 'Classes', classNames],
             ];
             return StaggeredItem(
                 index: i,
@@ -253,14 +256,7 @@ class ParentProfileTab extends StatelessWidget {
   ];
 
   Widget _childPicker() {
-    final seen = <String>{};
-    final uniqueChildren = <({int firstIndex, String name})>[];
-    for (var i = 0; i < childrenData.length; i++) {
-      final name = childrenData[i].info.childName;
-      if (seen.add(name)) {
-        uniqueChildren.add((firstIndex: i, name: name));
-      }
-    }
+    final uniqueChildren = helpers.uniqueChildEntries(childrenData);
     final activeChildName = childrenData[selectedChildIndex].info.childName;
 
     return Column(
@@ -282,7 +278,7 @@ class ParentProfileTab extends StatelessWidget {
             final isActive = uc.name == activeChildName;
             final name = uc.name;
             final color = _avatarColors[i % _avatarColors.length];
-            final initials = _initials(name);
+            final ini = helpers.initials(name);
             return BouncyTap(
               onTap: () => onChildSelected(uc.firstIndex),
               child: AnimatedContainer(
@@ -302,7 +298,7 @@ class ParentProfileTab extends StatelessWidget {
                     CircleAvatar(
                       radius: 16,
                       backgroundColor: color.withOpacity(0.15),
-                      child: Text(initials,
+                      child: Text(ini,
                           style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
@@ -329,9 +325,4 @@ class ParentProfileTab extends StatelessWidget {
     );
   }
 
-  String _initials(String name) {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    return name.isNotEmpty ? name[0].toUpperCase() : '?';
-  }
 }

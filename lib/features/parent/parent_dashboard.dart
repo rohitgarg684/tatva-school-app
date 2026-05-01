@@ -10,6 +10,7 @@ import '../../models/announcement_model.dart';
 import '../../models/vote_model.dart';
 import '../../models/weekly_report.dart';
 import '../../shared/utils/announcement_helpers.dart';
+import 'parent_helpers.dart' as helpers;
 import 'widgets/teacher_profile_sheet.dart';
 import 'widgets/weekly_report_sheet.dart';
 import 'tabs/home_tab.dart';
@@ -110,6 +111,15 @@ class _ParentDashboardState extends State<ParentDashboard>
     return children.isNotEmpty ? children[_selectedChildIndex] : null;
   }
 
+  List<ChildDashboardData> get _currentChildEntries {
+    final child = _currentChild;
+    if (child == null) return [];
+    final name = child.info.childName;
+    return (_data?.childrenData ?? [])
+        .where((c) => c.info.childName == name)
+        .toList();
+  }
+
   void _showTeacherProfile() {
     final child = _currentChild;
     TeacherProfileSheet.show(
@@ -129,15 +139,19 @@ class _ParentDashboardState extends State<ParentDashboard>
   }
 
   void _rebuildHomeworkState() {
-    final child = _currentChild;
-    if (child == null) return;
+    final entries = _currentChildEntries;
+    if (entries.isEmpty) return;
     _completedIds = {};
-    _mySubmissions = Map.of(child.submissions);
-    for (final hw in child.homework) {
-      if (hw.isSubmittedBy(child.childUid)) {
-        final sub = _mySubmissions[hw.id];
-        if (sub != null && sub['status'] == 'returned') continue;
-        _completedIds.add(hw.id);
+    _mySubmissions = {};
+    final childUid = entries.first.childUid;
+    for (final e in entries) {
+      _mySubmissions.addAll(e.submissions);
+      for (final hw in e.homework) {
+        if (hw.isSubmittedBy(childUid)) {
+          final sub = _mySubmissions[hw.id];
+          if (sub != null && sub['status'] == 'returned') continue;
+          _completedIds.add(hw.id);
+        }
       }
     }
   }
@@ -240,12 +254,7 @@ class _ParentDashboardState extends State<ParentDashboard>
 
   Widget _childSwitcher() {
     final childrenData = _data?.childrenData ?? [];
-    final seen = <String>{};
-    final uniqueChildren = <({int firstIndex, String name})>[];
-    for (var i = 0; i < childrenData.length; i++) {
-      final name = childrenData[i].info.childName;
-      if (seen.add(name)) uniqueChildren.add((firstIndex: i, name: name));
-    }
+    final uniqueChildren = helpers.uniqueChildEntries(childrenData);
     if (uniqueChildren.length <= 1) return const SizedBox.shrink();
     final activeName = childrenData[_selectedChildIndex].info.childName;
     return Container(
@@ -296,6 +305,7 @@ class _ParentDashboardState extends State<ParentDashboard>
             ParentHomeTab(
               user: _data?.user,
               currentChild: _currentChild,
+              currentChildEntries: _currentChildEntries,
               childrenData: _data?.childrenData ?? [],
               selectedChildIndex: _selectedChildIndex,
               announcements: _announcements,
@@ -319,7 +329,7 @@ class _ParentDashboardState extends State<ParentDashboard>
               api: _api,
             ),
             StudentHomeworkTab(
-              homework: _currentChild?.homework ?? [],
+              homework: _currentChildEntries.expand((e) => e.homework).toList(),
               completedIds: _completedIds,
               mySubmissions: _mySubmissions,
               uid: _uid,
@@ -329,8 +339,8 @@ class _ParentDashboardState extends State<ParentDashboard>
               onMarkIncomplete: _handleMarkIncomplete,
               onRefresh: _loadData,
             ),
-            ParentProgressTab(currentChild: _currentChild),
-            ParentBehaviorTab(currentChild: _currentChild),
+            ParentProgressTab(currentChild: _currentChild, currentChildEntries: _currentChildEntries),
+            ParentBehaviorTab(currentChild: _currentChild, currentChildEntries: _currentChildEntries),
             ParentLearnTab(
               currentChild: _currentChild,
               contentItems: _data?.contentItems ?? [],
@@ -344,6 +354,7 @@ class _ParentDashboardState extends State<ParentDashboard>
             ParentProfileTab(
               user: _data?.user,
               currentChild: _currentChild,
+              currentChildEntries: _currentChildEntries,
               onShowTeacherProfile: _showTeacherProfile,
               onGenerateReport: _generateWeeklyReport,
               onLogout: _logout,

@@ -90,7 +90,7 @@ router.delete(
       Collections.HOMEWORK,
       req.params.id as string,
       res,
-      ["teacher_dash_", "student_dash_"]
+      ["teacher_dash_", "student_dash_", "parent_dash_"]
     );
   })
 );

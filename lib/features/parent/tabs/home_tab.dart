@@ -20,6 +20,7 @@ import '../parent_helpers.dart';
 class ParentHomeTab extends StatelessWidget {
   final UserModel? user;
   final ChildDashboardData? currentChild;
+  final List<ChildDashboardData> currentChildEntries;
   final List<ChildDashboardData> childrenData;
   final int selectedChildIndex;
   final List<AnnouncementModel> announcements;
@@ -41,6 +42,7 @@ class ParentHomeTab extends StatelessWidget {
     super.key,
     required this.user,
     required this.currentChild,
+    this.currentChildEntries = const [],
     required this.childrenData,
     required this.selectedChildIndex,
     required this.announcements,
@@ -59,15 +61,22 @@ class ParentHomeTab extends StatelessWidget {
     required this.onToggleAnnouncementLike,
   });
 
+  List<ChildDashboardData> _resolveEntries() =>
+      currentChildEntries.isNotEmpty
+          ? currentChildEntries
+          : (currentChild != null ? [currentChild!] : []);
+
   @override
   Widget build(BuildContext context) {
     final child = currentChild;
-    final grades = child?.grades ?? [];
+    final entries = _resolveEntries();
+    final grades = entries.expand((e) => e.grades).toList();
     double total = grades.fold(
         0.0, (s, g) => s + (g.total > 0 ? g.score / g.total * 100 : 0.0));
     final avg = grades.isEmpty ? 0.0 : total / grades.length;
-    final attSummary = child != null
-        ? computeAttendanceSummary(child.attendance)
+    final allAttendance = entries.expand((e) => e.attendance).toList();
+    final attSummary = allAttendance.isNotEmpty
+        ? computeAttendanceSummary(allAttendance)
         : (present: 0, absent: 0, tardy: 0, total: 0);
     return RefreshIndicator(
         color: TatvaColors.purple,
@@ -85,80 +94,45 @@ class ParentHomeTab extends StatelessWidget {
                         child: _greetingCard(avg)))),
             childSwitcher,
             const SizedBox(height: 20),
-            Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20),
+            ...entries.map((e) => Container(
+                margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                     color: TatvaColors.bgCard,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                         color: TatvaColors.purple.withOpacity(0.15))),
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [
-                        Icon(Icons.class_outlined,
-                            color: TatvaColors.purple, size: 15),
-                        const SizedBox(width: 6),
-                        Text("${child?.info.childName ?? ''}'s Class",
+                child: Row(children: [
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text(e.info.className,
+                            style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: TatvaColors.neutral900)),
+                        const SizedBox(height: 4),
+                        Text('${e.info.subject} · ${e.info.teacherName}',
                             style: const TextStyle(
                                 fontSize: 12,
-                                color: TatvaColors.purple,
-                                fontWeight: FontWeight.w700))
-                      ]),
-                      const SizedBox(height: 12),
-                      Row(children: [
-                        Expanded(
-                            child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                              Text(child?.info.className ?? '',
-                                  style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: TatvaColors.neutral900)),
-                              const SizedBox(height: 4),
-                              GestureDetector(
-                                onTap: onShowTeacherProfile,
-                                child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text('${child?.info.subject ?? ''} · ',
-                                          style: const TextStyle(
-                                              fontSize: 12,
-                                              color: TatvaColors.neutral400)),
-                                      Text(child?.info.teacherName ?? '',
-                                          style: const TextStyle(
-                                              fontSize: 12,
-                                              color: TatvaColors.info,
-                                              fontWeight: FontWeight.w600,
-                                              decoration:
-                                                  TextDecoration.underline,
-                                              decorationColor:
-                                                  TatvaColors.info)),
-                                      const SizedBox(width: 3),
-                                      const Icon(Icons.open_in_new_rounded,
-                                          size: 11, color: TatvaColors.info),
-                                    ]),
-                              ),
-                            ])),
-                        Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                                color: TatvaColors.accent.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                    color:
-                                        TatvaColors.accent.withOpacity(0.3))),
-                            child: Text(child?.childClass?.classCode ?? '',
-                                style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: TatvaColors.accent,
-                                    letterSpacing: 2))),
-                      ]),
-                    ])),
+                                color: TatvaColors.neutral400)),
+                      ])),
+                  Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                          color: TatvaColors.accent.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: TatvaColors.accent.withOpacity(0.3))),
+                      child: Text(e.childClass?.classCode ?? '',
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: TatvaColors.accent,
+                              letterSpacing: 2))),
+                ]))),
             const SizedBox(height: 16),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -167,7 +141,7 @@ class ParentHomeTab extends StatelessWidget {
                   if (child != null) {
                     AttendanceDetailSheet.show(
                       context,
-                      records: child.attendance,
+                      records: allAttendance,
                       studentName: child.info.childName,
                     );
                   }
@@ -261,14 +235,14 @@ class ParentHomeTab extends StatelessWidget {
                             style: TextStyle(
                                 fontSize: 12, color: TatvaColors.neutral400)),
                         const SizedBox(height: 2),
-                        Text('${child?.behaviorScore ?? 0} points',
+                        Text('${entries.fold(0, (sum, e) => sum + e.behaviorScore)} points',
                             style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                                 color: TatvaColors.neutral900)),
                       ])),
                   GestureDetector(
-                    onTap: () => onSwitchTab(2),
+                    onTap: () => onSwitchTab(4),
                     child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 6),
@@ -292,10 +266,10 @@ class ParentHomeTab extends StatelessWidget {
                       color: TatvaColors.info, onTap: onShowTeacherProfile)),
                   const SizedBox(width: 8),
                   Expanded(child: QuickActionButton(label: 'Progress\nReport', icon: Icons.bar_chart_rounded,
-                      color: TatvaColors.purple, onTap: () => onSwitchTab(1))),
+                      color: TatvaColors.purple, onTap: () => onSwitchTab(3))),
                   const SizedBox(width: 8),
                   Expanded(child: QuickActionButton(label: 'Cast\nVote', icon: Icons.how_to_vote_outlined,
-                      color: TatvaColors.accent, onTap: () => onSwitchTab(5))),
+                      color: TatvaColors.accent, onTap: () => onSwitchTab(6))),
                 ])),
             const SizedBox(height: 24),
             Padding(
@@ -411,14 +385,15 @@ class ParentHomeTab extends StatelessWidget {
 
   Widget _greetingCard(double avg) {
     final child = currentChild;
-    final grades = child?.grades ?? [];
+    final allEntries = _resolveEntries();
+    final grades = allEntries.expand((e) => e.grades).toList();
     final childName = child?.info.childName ?? '';
     return GreetingCard(
       gradientColors: const [Color(0xFF6A1B9A), Color(0xFF8E24AA), Color(0xFFAB47BC)],
       heroTag: 'parent_avatar',
       userName: childName,
-      subtitle: user?.name ?? '',
-      photoUrl: '',
+      subtitle: 'Parent: ${user?.name ?? ''}',
+      photoUrl: child?.childPhotoUrl ?? '',
       bottomWidget: Row(children: [
         _miniStat('${avg.toStringAsFixed(0)}%', 'Avg Grade', TatvaColors.accent),
         const SizedBox(width: 20),

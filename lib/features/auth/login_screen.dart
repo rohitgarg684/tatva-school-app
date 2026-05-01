@@ -163,7 +163,10 @@ class _LoginScreenState extends State<LoginScreen>
         password: passwordController.text,
       );
 
-      if (await _blockStudentRole(result.role)) return;
+      if (await _blockStudentRole(result.role)) {
+        if (mounted) setState(() => _emailLoading = false);
+        return;
+      }
 
       _navigateToDashboard(result.role);
     } on UnverifiedEmailException {
@@ -199,7 +202,10 @@ class _LoginScreenState extends State<LoginScreen>
           if (mounted) setState(() => _socialLoading = false);
           return;
         }
-        if (await _blockStudentRole(pickedRole)) return;
+        if (await _blockStudentRole(pickedRole)) {
+          if (mounted) setState(() => _socialLoading = false);
+          return;
+        }
 
         final profile =
             await _authService.completeSocialProfile(role: pickedRole);
@@ -207,7 +213,10 @@ class _LoginScreenState extends State<LoginScreen>
         return;
       }
 
-      if (await _blockStudentRole(result.role!)) return;
+      if (await _blockStudentRole(result.role!)) {
+        if (mounted) setState(() => _socialLoading = false);
+        return;
+      }
 
       _navigateToDashboard(result.role!);
     } on SignInCancelledException {

@@ -6,6 +6,7 @@ import '../../shared/theme/colors.dart';
 import '../../shared/animations/page_routes.dart';
 import '../../shared/animations/animations.dart';
 import 'parent_dashboard.dart';
+import 'parent_helpers.dart' as helpers;
 
 /// Netflix-style profile picker shown when a parent has multiple children.
 /// If only one child exists, navigates directly to the dashboard.
@@ -55,10 +56,7 @@ class _ChildPickerScreenState extends State<ChildPickerScreen>
           await _dashSvc.loadParentDashboard(overrideUid: uid, forceRefresh: true);
       if (!mounted) return;
 
-      final uniqueNames = data.childrenData
-          .map((c) => c.info.childName)
-          .toSet();
-      if (uniqueNames.length <= 1) {
+      if (helpers.uniqueChildEntries(data.childrenData).length <= 1) {
         _goToDashboard(0);
         return;
       }
@@ -94,19 +92,7 @@ class _ChildPickerScreenState extends State<ChildPickerScreen>
     final children = _data!.childrenData;
     final userName = _data!.user.name;
 
-    // Group by unique child name, keeping the first index for each
-    final seen = <String>{};
-    final uniqueChildren = <({int firstIndex, String name, String className})>[];
-    for (var i = 0; i < children.length; i++) {
-      final name = children[i].info.childName;
-      if (seen.add(name)) {
-        uniqueChildren.add((
-          firstIndex: i,
-          name: name,
-          className: children[i].info.className,
-        ));
-      }
-    }
+    final uniqueChildren = helpers.uniqueChildEntries(children);
 
     return Scaffold(
       backgroundColor: TatvaColors.bgLight,
@@ -134,12 +120,12 @@ class _ChildPickerScreenState extends State<ChildPickerScreen>
                     children: List.generate(uniqueChildren.length, (i) {
                       final uc = uniqueChildren[i];
                       final color = _avatarColors[i % _avatarColors.length];
-                      final initials = _initials(uc.name);
+                      final ini = helpers.initials(uc.name);
                       return _ProfileTile(
                         name: uc.name,
-                        className: uc.className,
+                        className: children[uc.firstIndex].info.className,
                         color: color,
-                        initials: initials,
+                        initials: ini,
                         delay: i * 100,
                         onTap: () => _goToDashboard(uc.firstIndex),
                       );
@@ -155,11 +141,6 @@ class _ChildPickerScreenState extends State<ChildPickerScreen>
     );
   }
 
-  String _initials(String name) {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    return name.isNotEmpty ? name[0].toUpperCase() : '?';
-  }
 }
 
 class _ProfileTile extends StatefulWidget {

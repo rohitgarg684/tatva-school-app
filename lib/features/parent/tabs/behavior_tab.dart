@@ -8,14 +8,22 @@ import '../parent_helpers.dart';
 
 class ParentBehaviorTab extends StatelessWidget {
   final ChildDashboardData? currentChild;
+  final List<ChildDashboardData> currentChildEntries;
 
-  const ParentBehaviorTab({super.key, required this.currentChild});
+  const ParentBehaviorTab({
+    super.key,
+    required this.currentChild,
+    this.currentChildEntries = const [],
+  });
 
   @override
   Widget build(BuildContext context) {
     final child = currentChild;
-    final points = child?.behaviorPoints ?? [];
-    final score = child?.behaviorScore ?? 0;
+    final entries = currentChildEntries.isNotEmpty
+        ? currentChildEntries
+        : (child != null ? [child] : <ChildDashboardData>[]);
+    final points = entries.expand((e) => e.behaviorPoints).toList();
+    final score = entries.fold(0, (sum, e) => sum + e.behaviorScore);
 
     final catSummary = <String, int>{};
     for (final p in points) {

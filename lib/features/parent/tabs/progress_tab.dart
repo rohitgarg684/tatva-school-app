@@ -7,13 +7,21 @@ import '../../../models/grade_model.dart';
 
 class ParentProgressTab extends StatelessWidget {
   final ChildDashboardData? currentChild;
+  final List<ChildDashboardData> currentChildEntries;
 
-  const ParentProgressTab({super.key, required this.currentChild});
+  const ParentProgressTab({
+    super.key,
+    required this.currentChild,
+    this.currentChildEntries = const [],
+  });
 
   @override
   Widget build(BuildContext context) {
     final child = currentChild;
-    final grades = child?.grades ?? [];
+    final entries = currentChildEntries.isNotEmpty
+        ? currentChildEntries
+        : (child != null ? [child] : <ChildDashboardData>[]);
+    final grades = entries.expand((e) => e.grades).toList();
     final bySubject = <String, List<GradeModel>>{};
     for (final g in grades) {
       bySubject.putIfAbsent(g.subject, () => []).add(g);

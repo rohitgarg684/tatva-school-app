@@ -361,7 +361,7 @@ router.get(
 
     const children: Array<{ childName: string; classId: string }> = user!.children || [];
     const classIdSet = new Set<string>();
-    const childrenData: { childUid: string; info: unknown; childClass: unknown; grades: any[]; behaviorPoints: any[]; behaviorScore: number; attendance: any[]; homework: any[]; submissions: any[] }[] = [];
+    const childrenData: { childUid: string; childPhotoUrl: string; info: unknown; childClass: unknown; grades: any[]; behaviorPoints: any[]; behaviorScore: number; attendance: any[]; homework: any[]; submissions: any[] }[] = [];
 
     const classIdsFromChildren = children.map((c) => c.classId).filter(Boolean);
     const childClasses = classIdsFromChildren.length > 0
@@ -388,6 +388,7 @@ router.get(
       allStudents = studentChunks.flat();
     }
     const studentNameMap = new Map(allStudents.map((s) => [s.name, s.id]));
+    const studentPhotoMap = new Map(allStudents.map((s) => [s.name, (s as any).photoUrl || ""]));
 
     // Batch: collect all child UIDs, query grades/behavior/attendance in bulk
     const childUids: string[] = [];
@@ -430,6 +431,7 @@ router.get(
         childrenData.push({
           info: childInfo,
           childUid,
+          childPhotoUrl: studentPhotoMap.get(childInfo.childName) || "",
           childClass: serializeDoc(classMap.get(classId) || null),
           grades: serializeDocs(grades),
           behaviorPoints: serializeDocs(behavior),
@@ -442,6 +444,7 @@ router.get(
         childrenData.push({
           info: childInfo,
           childUid: "",
+          childPhotoUrl: studentPhotoMap.get(childInfo.childName) || "",
           childClass: serializeDoc(classMap.get(classId) || null),
           grades: [],
           behaviorPoints: [],

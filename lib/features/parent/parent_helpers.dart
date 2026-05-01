@@ -1,8 +1,40 @@
 import '../../models/attendance_record.dart';
 import '../../models/attendance_status.dart';
+import '../../models/grade_model.dart';
 import '../../models/weekly_report.dart';
+import '../../services/dashboard_service.dart';
 
 export '../../shared/utils/activity_helpers.dart' show formatTimeAgo;
+
+typedef UniqueChild = ({int firstIndex, String name});
+
+List<UniqueChild> uniqueChildEntries(List<ChildDashboardData> childrenData) {
+  final seen = <String>{};
+  final result = <UniqueChild>[];
+  for (var i = 0; i < childrenData.length; i++) {
+    final name = childrenData[i].info.childName;
+    if (seen.add(name)) result.add((firstIndex: i, name: name));
+  }
+  return result;
+}
+
+List<ChildDashboardData> childEntriesFor(
+    List<ChildDashboardData> all, String childName) {
+  return all.where((c) => c.info.childName == childName).toList();
+}
+
+String initials(String name) {
+  final parts = name.trim().split(RegExp(r'\s+'));
+  if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+  return name.isNotEmpty ? name[0].toUpperCase() : '?';
+}
+
+double computeGradeAverage(List<GradeModel> grades) {
+  if (grades.isEmpty) return 0.0;
+  final total = grades.fold(
+      0.0, (s, g) => s + (g.total > 0 ? g.score / g.total * 100 : 0.0));
+  return total / grades.length;
+}
 
 ({int present, int absent, int tardy, int total})
     computeAttendanceSummary(List<AttendanceRecord> records) {
