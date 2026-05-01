@@ -402,14 +402,17 @@ router.get(
         : Promise.resolve([]),
     ]);
 
+    const emittedStudentData = new Set<string>();
     for (const childInfo of children) {
       if (childInfo.classId) classIdSet.add(childInfo.classId);
       const cUid = childInfo.childUid || "";
 
       const classId = childInfo.classId;
       const homework = (allHomework as any[]).filter((h) => h.classId === classId);
+      const isFirstEntryForChild = cUid && !emittedStudentData.has(cUid);
+      if (cUid) emittedStudentData.add(cUid);
 
-      if (cUid) {
+      if (cUid && isFirstEntryForChild) {
         const grades = (allGrades as GradeDoc[]).filter((g) => g.studentUid === cUid);
         const behavior = (allBehavior as BehaviorPointDoc[]).filter((b) => b.studentUid === cUid);
         const attendance = (allAttendance as AttendanceDoc[]).filter((a) => a.studentUid === cUid);
@@ -430,8 +433,8 @@ router.get(
       } else {
         childrenData.push({
           info: childInfo,
-          childUid: "",
-          childPhotoUrl: "",
+          childUid: cUid,
+          childPhotoUrl: cUid ? (uidToPhoto.get(cUid) || "") : "",
           childClass: serializeDoc(classMap.get(classId) || null),
           grades: [],
           behaviorPoints: [],
