@@ -149,11 +149,23 @@ router.post(
     if (!isValidImage(req.file.buffer))
       return res.status(400).json({ error: "Invalid image content" });
 
-    const uid = req.uid!;
-    const storagePath = `profile-photos/${uid}/${generateFileName(req.file.mimetype)}`;
+    const callerUid = req.uid!;
+    const targetUid = (req.body?.targetUid as string) || callerUid;
+
+    if (targetUid !== callerUid) {
+      if (req.role !== "Parent")
+        return res.status(403).json({ error: "Only parents can upload for another user" });
+      const callerDoc = await getDoc(Collections.USERS, callerUid);
+      const children: { childUid: string }[] = callerDoc?.children || [];
+      if (!isParentOfChild(children as any, targetUid))
+        return res.status(403).json({ error: "Not your child" });
+    }
+
+    const storagePath = `profile-photos/${targetUid}/${generateFileName(req.file.mimetype)}`;
     const url = await uploadToStorage(req.file.buffer, storagePath, req.file.mimetype);
 
-    await db.collection(Collections.USERS).doc(uid).update({ photoUrl: url });
+    await db.collection(Collections.USERS).doc(targetUid).update({ photoUrl: url });
+    if (targetUid !== callerUid) invalidateDashboards("parent_dash_");
     res.json({ url });
   })
 );

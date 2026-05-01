@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../../services/dashboard_service.dart';
+import '../../../services/api_service.dart';
 import '../../../shared/theme/colors.dart';
 import '../../../shared/animations/animations.dart';
+import '../../../shared/widgets/tatva_snackbar.dart';
 import '../../../models/user_model.dart';
 import '../../../models/child_info.dart';
 import '../parent_helpers.dart' as helpers;
 
-class ParentProfileTab extends StatelessWidget {
+class ParentProfileTab extends StatefulWidget {
   final UserModel? user;
   final ChildDashboardData? currentChild;
   final VoidCallback onShowTeacherProfile;
@@ -16,6 +19,7 @@ class ParentProfileTab extends StatelessWidget {
   final List<ChildDashboardData> currentChildEntries;
   final int selectedChildIndex;
   final ValueChanged<int> onChildSelected;
+  final VoidCallback onRefresh;
 
   const ParentProfileTab({
     super.key,
@@ -28,26 +32,87 @@ class ParentProfileTab extends StatelessWidget {
     this.currentChildEntries = const [],
     this.selectedChildIndex = 0,
     required this.onChildSelected,
+    required this.onRefresh,
   });
 
   @override
+  State<ParentProfileTab> createState() => _ParentProfileTabState();
+}
+
+class _ParentProfileTabState extends State<ParentProfileTab> {
+  bool _uploading = false;
+
+  Future<void> _pickAndUploadPhoto() async {
+    final childUid = widget.currentChild?.childUid;
+    if (childUid == null || childUid.isEmpty) return;
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    if (file.bytes == null || file.name.isEmpty) return;
+
+    setState(() => _uploading = true);
+    try {
+      final url = await ApiService().uploadChildPhoto(file.bytes!, file.name, childUid);
+      if (url != null && mounted) {
+        TatvaSnackbar.show(context, 'Photo updated');
+        widget.onRefresh();
+      } else if (mounted) {
+        TatvaSnackbar.show(context, 'Upload failed', color: TatvaColors.error);
+      }
+    } catch (_) {
+      if (mounted) {
+        TatvaSnackbar.show(context, 'Upload failed', color: TatvaColors.error);
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final child = currentChild;
+    final child = widget.currentChild;
     return SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(children: [
           const SizedBox(height: 16),
           FadeSlideIn(
-              child: HeroAvatar(
-                  heroTag: 'parent_avatar',
-                  initial: child?.info.childName.isNotEmpty == true
-                      ? child!.info.childName[0]
-                      : '?',
-                  radius: 46,
-                  bgColor: TatvaColors.purple.withOpacity(0.1),
-                  textColor: TatvaColors.purple,
-                  borderColor: TatvaColors.accent,
-                  photoUrl: child?.childPhotoUrl ?? '')),
+              child: GestureDetector(
+                  onTap: _uploading ? null : _pickAndUploadPhoto,
+                  child: Stack(
+                    children: [
+                      HeroAvatar(
+                          heroTag: 'parent_avatar',
+                          initial: child?.info.childName.isNotEmpty == true
+                              ? child!.info.childName[0]
+                              : '?',
+                          radius: 46,
+                          bgColor: TatvaColors.purple.withOpacity(0.1),
+                          textColor: TatvaColors.purple,
+                          borderColor: TatvaColors.accent,
+                          photoUrl: child?.childPhotoUrl ?? ''),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                              color: TatvaColors.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2)),
+                          child: _uploading
+                              ? const SizedBox(
+                                  width: 14, height: 14,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.camera_alt, size: 14, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ))),
           const SizedBox(height: 16),
           FadeSlideIn(
               delayMs: 80,
@@ -60,13 +125,13 @@ class ParentProfileTab extends StatelessWidget {
           const SizedBox(height: 4),
           FadeSlideIn(
               delayMs: 100,
-              child: Text('Parent: ${user?.name ?? ''}',
+              child: Text('Parent: ${widget.user?.name ?? ''}',
                   style: const TextStyle(
                       fontSize: 13, color: TatvaColors.neutral400))),
           const SizedBox(height: 2),
           FadeSlideIn(
               delayMs: 105,
-              child: Text(user?.email ?? '',
+              child: Text(widget.user?.email ?? '',
                   style: const TextStyle(
                       fontSize: 12, color: TatvaColors.neutral400))),
           const SizedBox(height: 10),
@@ -83,14 +148,14 @@ class ParentProfileTab extends StatelessWidget {
                           fontSize: 12,
                           color: TatvaColors.purple,
                           fontWeight: FontWeight.w700)))),
-          if (helpers.uniqueChildEntries(childrenData).length > 1) ...[
+          if (helpers.uniqueChildEntries(widget.childrenData).length > 1) ...[
             const SizedBox(height: 24),
             FadeSlideIn(
                 delayMs: 125,
                 child: _childPicker()),
           ],
           const SizedBox(height: 28),
-          ...currentChildEntries.map((e) => FadeSlideIn(
+          ...widget.currentChildEntries.map((e) => FadeSlideIn(
               delayMs: 130,
               child: Container(
                 width: double.infinity,
@@ -143,8 +208,8 @@ class ParentProfileTab extends StatelessWidget {
                 ]),
               ))),
           ...List.generate(3, (i) {
-            final entries = currentChildEntries.isNotEmpty
-                ? currentChildEntries : (child != null ? [child] : <ChildDashboardData>[]);
+            final entries = widget.currentChildEntries.isNotEmpty
+                ? widget.currentChildEntries : (child != null ? [child] : <ChildDashboardData>[]);
             final classNames = entries.map((e) => e.info.className).toSet().join(', ');
             final items = [
               [
@@ -190,7 +255,7 @@ class ParentProfileTab extends StatelessWidget {
           FadeSlideIn(
               delayMs: 180,
               child: BouncyTap(
-                  onTap: onGenerateReport,
+                  onTap: widget.onGenerateReport,
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
@@ -216,7 +281,7 @@ class ParentProfileTab extends StatelessWidget {
           FadeSlideIn(
               delayMs: 200,
               child: BouncyTap(
-                  onTap: onLogout,
+                  onTap: widget.onLogout,
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
@@ -256,8 +321,8 @@ class ParentProfileTab extends StatelessWidget {
   ];
 
   Widget _childPicker() {
-    final uniqueChildren = helpers.uniqueChildEntries(childrenData);
-    final activeChildName = childrenData[selectedChildIndex].info.childName;
+    final uniqueChildren = helpers.uniqueChildEntries(widget.childrenData);
+    final activeChildName = widget.childrenData[widget.selectedChildIndex].info.childName;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -280,7 +345,7 @@ class ParentProfileTab extends StatelessWidget {
             final color = _avatarColors[i % _avatarColors.length];
             final ini = helpers.initials(name);
             return BouncyTap(
-              onTap: () => onChildSelected(uc.firstIndex),
+              onTap: () => widget.onChildSelected(uc.firstIndex),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 250),
                 padding:

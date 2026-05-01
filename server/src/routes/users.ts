@@ -122,6 +122,16 @@ router.use(requireAuth);
 const FieldValue = admin.firestore.FieldValue;
 
 router.get(
+  "/users/by-role",
+  asyncHandler(async (req, res) => {
+    const role = req.query.role as string;
+    if (!role) return res.status(400).json({ error: "role query param required" });
+    const docs = await queryDocs(Collections.USERS, [{ field: "role", op: "==", value: role }]);
+    res.json({ users: serializeDocs(docs) });
+  })
+);
+
+router.get(
   "/user/:uid",
   asyncHandler(async (req, res) => {
     const doc = await getDoc(Collections.USERS, req.params.uid as string);

@@ -282,6 +282,31 @@ class ApiService {
     }
   }
 
+  Future<String?> uploadChildPhoto(Uint8List bytes, String fileName, String childUid) async {
+    try {
+      final token = await _getToken();
+      final uri = Uri.parse('$_baseUrl/profile-photo');
+      final mime = _mimeFromFilename(fileName);
+      final request = http.MultipartRequest('POST', uri)
+        ..headers['Authorization'] = 'Bearer $token'
+        ..fields['targetUid'] = childUid
+        ..files.add(http.MultipartFile.fromBytes('file', bytes,
+            filename: fileName, contentType: MediaType.parse(mime)));
+      final response = await request.send().timeout(const Duration(seconds: 60));
+      if (response.statusCode != 200) return null;
+      final body = await response.stream.bytesToString();
+      final data = json.decode(body) as Map<String, dynamic>;
+      return data['url'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getUsersByRole(String role) async {
+    final data = await _get('/users/by-role?role=$role');
+    return (data['users'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+  }
+
   Future<String?> uploadDocument(
           Uint8List bytes, String classId, String fileName) =>
       _uploadMultipart('/document/upload', bytes, classId, fileName);

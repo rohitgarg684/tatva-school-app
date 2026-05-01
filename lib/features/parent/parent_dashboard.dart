@@ -19,6 +19,7 @@ import 'tabs/progress_tab.dart';
 import 'tabs/behavior_tab.dart';
 import 'tabs/learn_tab.dart';
 import 'tabs/vote_tab.dart';
+import 'tabs/messages_tab.dart';
 import 'tabs/profile_tab.dart';
 import '../student/tabs/homework_tab.dart';
 class ParentDashboard extends StatefulWidget {
@@ -39,6 +40,7 @@ class _ParentDashboardState extends State<ParentDashboard>
     TabItem(icon: Icons.emoji_events_outlined, activeIcon: Icons.emoji_events_rounded, label: 'Behavior'),
     TabItem(icon: Icons.lightbulb_outline, activeIcon: Icons.lightbulb_rounded, label: 'Learn'),
     TabItem(icon: Icons.how_to_vote_outlined, activeIcon: Icons.how_to_vote_rounded, label: 'Vote'),
+    TabItem(icon: Icons.chat_outlined, activeIcon: Icons.chat_rounded, label: 'Messages'),
     TabItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Profile'),
   ];
 
@@ -121,15 +123,109 @@ class _ParentDashboardState extends State<ParentDashboard>
   }
 
   void _showTeacherProfile() {
-    final child = _currentChild;
-    TeacherProfileSheet.show(
-      context,
-      teacherName: child?.info.teacherName ?? '',
-      teacherEmail: child?.info.teacherEmail ?? '',
-      teacherUid: child?.info.teacherUid ?? '',
-      subject: child?.info.subject ?? '',
-      className: child?.info.className ?? '',
-      classCode: child?.childClass?.classCode ?? '',
+    final entries = _currentChildEntries;
+    final seen = <String>{};
+    final unique = entries.where((e) {
+      final uid = e.info.teacherUid;
+      if (uid.isEmpty || seen.contains(uid)) return false;
+      seen.add(uid);
+      return true;
+    }).toList();
+
+    if (unique.length <= 1) {
+      final child = unique.isNotEmpty ? unique.first : _currentChild;
+      TeacherProfileSheet.show(
+        context,
+        teacherName: child?.info.teacherName ?? '',
+        teacherEmail: child?.info.teacherEmail ?? '',
+        teacherUid: child?.info.teacherUid ?? '',
+        subject: child?.info.subject ?? '',
+        className: child?.info.className ?? '',
+        classCode: child?.childClass?.classCode ?? '',
+      );
+      return;
+    }
+
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+            color: TatvaColors.bgCard,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Center(
+              child: Container(
+                  width: 36,
+                  height: 3,
+                  decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(2)))),
+          const SizedBox(height: 20),
+          const Text('Select a Teacher',
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: TatvaColors.neutral900)),
+          const SizedBox(height: 16),
+          ...unique.map((e) {
+            final initials = e.info.teacherName.isNotEmpty
+                ? e.info.teacherName.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join()
+                : '?';
+            return GestureDetector(
+              onTap: () {
+                Navigator.pop(context);
+                TeacherProfileSheet.show(
+                  context,
+                  teacherName: e.info.teacherName,
+                  teacherEmail: e.info.teacherEmail,
+                  teacherUid: e.info.teacherUid,
+                  subject: e.info.subject,
+                  className: e.info.className,
+                  classCode: e.childClass?.classCode ?? '',
+                );
+              },
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                    color: TatvaColors.bgLight,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.grey.shade200)),
+                child: Row(children: [
+                  CircleAvatar(
+                      radius: 22,
+                      backgroundColor: TatvaColors.primary.withOpacity(0.1),
+                      child: Text(initials,
+                          style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: TatvaColors.primary))),
+                  const SizedBox(width: 14),
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text(e.info.teacherName,
+                            style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: TatvaColors.neutral900)),
+                        Text('${e.info.subject} · ${e.info.className}',
+                            style: const TextStyle(
+                                fontSize: 12, color: TatvaColors.neutral400)),
+                      ])),
+                  const Icon(Icons.chevron_right,
+                      color: TatvaColors.neutral400, size: 20),
+                ]),
+              ),
+            );
+          }),
+        ]),
+      ),
     );
   }
 
@@ -351,6 +447,10 @@ class _ParentDashboardState extends State<ParentDashboard>
               uid: _uid,
               onCastVote: _castVote,
             ),
+            ParentMessagesTab(
+              currentChildEntries: _currentChildEntries,
+              api: _api,
+            ),
             ParentProfileTab(
               user: _data?.user,
               currentChild: _currentChild,
@@ -358,6 +458,7 @@ class _ParentDashboardState extends State<ParentDashboard>
               onShowTeacherProfile: _showTeacherProfile,
               onGenerateReport: _generateWeeklyReport,
               onLogout: _logout,
+              onRefresh: _loadData,
               childrenData: _data?.childrenData ?? [],
               selectedChildIndex: _selectedChildIndex,
               onChildSelected: (i) => setState(() {

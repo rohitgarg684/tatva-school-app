@@ -251,6 +251,10 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
             _buildWeekGrid(_weekData)
           else
             _buildDayDetail(_weekData, _selectedDay),
+          if (_weekHolidays.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            ..._weekHolidays.map(_buildHolidayCard),
+          ],
           if (_weekEvents.isNotEmpty) ...[
             const SizedBox(height: 16),
             ..._weekEvents.map(_buildEventCard),
@@ -587,6 +591,19 @@ class _StudentScheduleTabState extends State<StudentScheduleTab> {
         );
       }).toList(),
     );
+  }
+
+  String _fmtDateUtil(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  List<Holiday> get _weekHolidays {
+    final ws = _getWeekStart(_weekStart);
+    final we = ws.add(const Duration(days: 4));
+    final wsStr = _fmtDateUtil(ws);
+    final weStr = _fmtDateUtil(we);
+    return _holidays
+        .where((h) => h.endDate.compareTo(wsStr) >= 0 && h.startDate.compareTo(weStr) <= 0)
+        .toList();
   }
 
   List<ScheduleEvent> get _weekEvents {

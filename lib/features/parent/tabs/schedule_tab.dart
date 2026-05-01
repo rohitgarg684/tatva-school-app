@@ -108,6 +108,17 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
     }
   }
 
+  List<Holiday> get _weekHolidays {
+    final now = DateTime.now();
+    final ws = DateTime(now.year, now.month, now.day - (now.weekday - 1));
+    final we = ws.add(const Duration(days: 4));
+    final wsStr = _fmtDate(ws);
+    final weStr = _fmtDate(we);
+    return _holidays
+        .where((h) => h.endDate.compareTo(wsStr) >= 0 && h.startDate.compareTo(weStr) <= 0)
+        .toList();
+  }
+
   String _dateStr(int dayOfWeek) {
     final now = DateTime.now();
     final monday = DateTime(now.year, now.month, now.day - (now.weekday - 1));
@@ -243,6 +254,10 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
             _weekGrid(_weekData)
           else
             _dayDetail(_weekData, _selectedDay),
+          if (_weekHolidays.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            ..._weekHolidays.map(_buildHolidayCard),
+          ],
           if (_visibleEvents.isNotEmpty) ...[
             const SizedBox(height: 16),
             ..._visibleEvents.map(_buildEventCard),
