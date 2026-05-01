@@ -412,16 +412,13 @@ class ParentHomeTab extends StatelessWidget {
   Widget _greetingCard(double avg) {
     final child = currentChild;
     final grades = child?.grades ?? [];
-    final childNames = childrenData.map((c) => c.info.childName).toList();
-    final parentOfLabel = childNames.length <= 1
-        ? 'Parent of ${childNames.isNotEmpty ? childNames.first : ''}'
-        : 'Parent of ${childNames.join(' & ')}';
+    final childName = child?.info.childName ?? '';
     return GreetingCard(
       gradientColors: const [Color(0xFF6A1B9A), Color(0xFF8E24AA), Color(0xFFAB47BC)],
       heroTag: 'parent_avatar',
-      userName: user?.name ?? '',
-      subtitle: parentOfLabel,
-      photoUrl: user?.photoUrl ?? '',
+      userName: childName,
+      subtitle: user?.name ?? '',
+      photoUrl: '',
       bottomWidget: Row(children: [
         _miniStat('${avg.toStringAsFixed(0)}%', 'Avg Grade', TatvaColors.accent),
         const SizedBox(width: 20),

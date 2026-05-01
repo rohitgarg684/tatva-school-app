@@ -240,23 +240,30 @@ class _ParentDashboardState extends State<ParentDashboard>
 
   Widget _childSwitcher() {
     final childrenData = _data?.childrenData ?? [];
-    if (childrenData.length <= 1) return const SizedBox.shrink();
+    final seen = <String>{};
+    final uniqueChildren = <({int firstIndex, String name})>[];
+    for (var i = 0; i < childrenData.length; i++) {
+      final name = childrenData[i].info.childName;
+      if (seen.add(name)) uniqueChildren.add((firstIndex: i, name: name));
+    }
+    if (uniqueChildren.length <= 1) return const SizedBox.shrink();
+    final activeName = childrenData[_selectedChildIndex].info.childName;
     return Container(
       height: 48,
       margin: const EdgeInsets.fromLTRB(20, 8, 20, 0),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: childrenData.length,
+        itemCount: uniqueChildren.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (_, i) {
-          final isActive = i == _selectedChildIndex;
-          final name = childrenData[i].info.childName;
+          final uc = uniqueChildren[i];
+          final isActive = uc.name == activeName;
           return GestureDetector(
             onTap: () {
-              if (i == _selectedChildIndex) return;
+              if (uc.firstIndex == _selectedChildIndex) return;
               HapticFeedback.selectionClick();
               setState(() {
-                _selectedChildIndex = i;
+                _selectedChildIndex = uc.firstIndex;
                 _rebuildHomeworkState();
               });
             },
@@ -269,7 +276,7 @@ class _ParentDashboardState extends State<ParentDashboard>
                 border: Border.all(
                     color: isActive ? TatvaColors.purple : Colors.grey.shade200),
               ),
-              child: Text(name,
+              child: Text(uc.name,
                   style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
