@@ -371,7 +371,19 @@ router.get(
   requireRole("Student", "Parent"),
   asyncHandler(async (req, res) => {
     const homeworkId = req.params.id as string;
-    const studentUid = (req.query.studentUid as string) || req.uid!;
+    let studentUid = req.uid!;
+
+    if (req.role === "Parent") {
+      const targetUid = req.query.studentUid as string;
+      if (!targetUid) return res.status(400).json({ error: "studentUid required" });
+      const parentDoc = await getDoc(Collections.USERS, req.uid!);
+      const childNames: string[] = ((parentDoc?.children || []) as Array<{ childName: string }>).map((c) => c.childName);
+      const studentDocData = await getDoc(Collections.USERS, targetUid);
+      if (!studentDocData || !childNames.includes(studentDocData.name))
+        return res.status(403).json({ error: "You can only view your own child's submissions" });
+      studentUid = targetUid;
+    }
+
     const docRef = db.collection(Collections.HOMEWORK_SUBMISSIONS).doc(`${homeworkId}_${studentUid}`);
     const snap = await docRef.get();
     if (!snap.exists) return res.json({ submission: null });

@@ -359,7 +359,7 @@ class StudentHomeworkTab extends StatelessWidget {
             onTap: () => HomeworkCommentsSheet.show(
               context,
               homeworkId: hw.id,
-              studentUid: uid,
+              studentUid: studentUid ?? uid,
               studentName: 'My Submission',
               onCommentAdded: onRefresh,
             ),
@@ -541,7 +541,7 @@ class StudentHomeworkTab extends StatelessWidget {
                   onTap: () => HomeworkCommentsSheet.show(
                     context,
                     homeworkId: hw.id,
-                    studentUid: uid,
+                    studentUid: studentUid ?? uid,
                     studentName: 'My Questions',
                     onCommentAdded: onRefresh,
                   ),

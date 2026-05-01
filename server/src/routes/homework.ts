@@ -153,7 +153,14 @@ router.post(
       return res.status(400).json({ error: "text required" });
 
     const isTeacher = role === "Teacher" || role === "Principal";
-    if (!isTeacher && uid !== studentUid)
+    let isOwner = uid === studentUid;
+    if (!isOwner && role === "Parent") {
+      const parentDoc = await getDoc(Collections.USERS, uid);
+      const childNames: string[] = ((parentDoc?.children || []) as Array<{ childName: string }>).map((c) => c.childName);
+      const studentDoc = await getDoc(Collections.USERS, studentUid);
+      isOwner = !!studentDoc && childNames.includes(studentDoc.name);
+    }
+    if (!isTeacher && !isOwner)
       return res.status(403).json({ error: "Forbidden" });
 
     const subId = `${homeworkId}_${studentUid}`;
@@ -204,12 +211,20 @@ router.post(
 router.get(
   "/homework/:homeworkId/submissions/:studentUid/comments",
   asyncHandler(async (req, res) => {
-    const { homeworkId, studentUid } = req.params;
+    const homeworkId = req.params.homeworkId as string;
+    const studentUid = req.params.studentUid as string;
     const uid = req.uid!;
     const role = req.role!;
 
     const isTeacher = role === "Teacher" || role === "Principal";
-    if (!isTeacher && uid !== studentUid)
+    let isOwner = uid === studentUid;
+    if (!isOwner && role === "Parent") {
+      const parentDoc = await getDoc(Collections.USERS, uid);
+      const childNames: string[] = ((parentDoc?.children || []) as Array<{ childName: string }>).map((c) => c.childName);
+      const studentDoc = await getDoc(Collections.USERS, studentUid);
+      isOwner = !!studentDoc && childNames.includes(studentDoc.name);
+    }
+    if (!isTeacher && !isOwner)
       return res.status(403).json({ error: "Forbidden" });
 
     const subId = `${homeworkId}_${studentUid}`;
