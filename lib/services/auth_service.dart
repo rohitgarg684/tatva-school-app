@@ -4,7 +4,6 @@ import '../models/social_sign_in_result.dart';
 import '../models/user_role.dart';
 import '../repositories/auth_repository.dart';
 import 'api_service.dart';
-import 'notification_service.dart';
 
 export '../models/social_sign_in_result.dart';
 
@@ -35,7 +34,6 @@ class AuthService {
     final role = await _syncAndResolveRole(cred.user!);
     if (role == null) throw UserNotFoundException();
 
-    NotificationService.instance.requestPermissionAndRegister();
     return (uid: cred.user!.uid, role: role);
   }
 
@@ -63,7 +61,6 @@ class AuthService {
     );
 
     await _syncAndResolveRole(user);
-    NotificationService.instance.requestPermissionAndRegister();
     return (uid: user.uid, role: role);
   }
 
@@ -117,7 +114,6 @@ class AuthService {
     final role = await _syncAndResolveRole(user);
 
     if (role != null) {
-      NotificationService.instance.requestPermissionAndRegister();
       return SocialSignInResult(
         uid: user.uid,
         role: role,

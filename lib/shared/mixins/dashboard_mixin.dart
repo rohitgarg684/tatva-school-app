@@ -6,6 +6,7 @@ import '../widgets/bottom_nav_bar.dart';
 import '../widgets/logout_sheet.dart';
 import '../../core/router/app_router.dart';
 import '../../repositories/auth_repository.dart';
+import '../../services/notification_service.dart';
 
 mixin DashboardMixin<T extends StatefulWidget> on State<T>, TickerProviderStateMixin<T> {
   late AnimationController shimmerController;
@@ -53,11 +54,20 @@ mixin DashboardMixin<T extends StatefulWidget> on State<T>, TickerProviderStateM
     tabController.dispose();
   }
 
+  bool _notifRequested = false;
+
   void onDataLoaded() {
     if (!mounted) return;
     setState(() => isLoading = false);
     greetingController.forward();
     tabController.forward();
+
+    if (!_notifRequested) {
+      _notifRequested = true;
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) NotificationService.instance.requestPermissionAndRegister();
+      });
+    }
   }
 
   void switchTab(int index) {

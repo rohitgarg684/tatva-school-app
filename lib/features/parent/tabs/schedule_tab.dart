@@ -254,13 +254,8 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
             _weekGrid(_weekData)
           else
             _dayDetail(_weekData, _selectedDay),
-          if (_weekHolidays.isNotEmpty) ...[
+          if (_visibleEvents.isNotEmpty || _weekHolidays.isNotEmpty) ...[
             const SizedBox(height: 16),
-            ..._weekHolidays.map(_buildHolidayCard),
-          ],
-          if (_visibleEvents.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            ..._visibleEvents.map(_buildEventCard),
           ],
         ] else
           _buildHolidayCalendar(),
@@ -313,17 +308,32 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
     );
   }
 
+  DateTime _weekMonday() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day - (now.weekday - 1));
+  }
+
+  bool _isDayHoliday(int dayOfWeek) {
+    final d = _weekMonday().add(Duration(days: dayOfWeek - 1));
+    final ds = _fmtDate(d);
+    return _weekHolidays.any((h) => h.coversDate(ds));
+  }
+
+  List<ScheduleEvent> _eventsForDay(int dayOfWeek) {
+    final d = _weekMonday().add(Duration(days: dayOfWeek - 1));
+    final ds = _fmtDate(d);
+    return _events.where((e) => e.date == ds).toList();
+  }
+
   Widget _weekGrid(List<ScheduleModel> schedules) {
     final allTimes = <String>{};
     for (final s in schedules) {
       for (final p in s.periods) allTimes.add(p.startTime);
     }
-    final sorted = allTimes.toList()..sort();
-    if (sorted.isEmpty) {
-      return const Center(
-          child: Text('No periods defined',
-              style: TextStyle(color: TatvaColors.neutral400)));
+    for (final ev in _events) {
+      if (ev.startTime.isNotEmpty) allTimes.add(ev.startTime);
     }
+    final sorted = allTimes.toList()..sort();
 
     final colors = [
       TatvaColors.primary,
@@ -345,6 +355,10 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
     }
 
     return Column(children: [
+      ..._weekHolidays.map(_buildHolidayCard),
+      ..._events.where((e) => e.startTime.isEmpty).map(_buildEventCard),
+      if (_weekHolidays.isNotEmpty || _events.any((e) => e.startTime.isEmpty))
+        const SizedBox(height: 12),
       Row(children: [
         SizedBox(
           width: 52,
@@ -357,112 +371,181 @@ class _ParentScheduleTabState extends State<ParentScheduleTab> {
         ...List.generate(5, (i) {
           final day = i + 1;
           final isToday = DateTime.now().weekday == day;
+          final isHoliday = _isDayHoliday(day);
+          final headerColor = isHoliday
+              ? TatvaColors.error
+              : isToday
+                  ? TatvaColors.primary
+                  : null;
+          final d = _weekMonday().add(Duration(days: i));
           return Expanded(
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 6),
+              padding: const EdgeInsets.symmetric(vertical: 4),
               margin: const EdgeInsets.symmetric(horizontal: 1),
               decoration: BoxDecoration(
-                  color: isToday
-                      ? TatvaColors.primary.withOpacity(0.1)
-                      : Colors.transparent,
+                  color: isHoliday
+                      ? TatvaColors.error.withOpacity(0.08)
+                      : isToday
+                          ? TatvaColors.primary.withOpacity(0.1)
+                          : Colors.transparent,
                   borderRadius: BorderRadius.circular(6)),
-              child: Center(
-                  child: Text(ScheduleModel.dayNames[day],
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: isToday
-                              ? TatvaColors.primary
-                              : TatvaColors.neutral900))),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Text(ScheduleModel.dayNames[day],
+                    style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: headerColor ?? TatvaColors.neutral400)),
+                Text('${d.day}',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: headerColor ?? TatvaColors.neutral900)),
+              ]),
             ),
           );
         }),
       ]),
       const SizedBox(height: 4),
-      ...sorted.map((time) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 2),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: 52,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(time,
-                      style: const TextStyle(
-                          fontSize: 10, color: TatvaColors.neutral400)),
+      if (sorted.isEmpty)
+        const Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(child: Text('No periods defined',
+              style: TextStyle(color: TatvaColors.neutral400))),
+        )
+      else
+        ...sorted.map((time) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 52,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(time,
+                        style: const TextStyle(
+                            fontSize: 10, color: TatvaColors.neutral400)),
+                  ),
                 ),
-              ),
-              ...List.generate(5, (i) {
-                final day = i + 1;
-                final ds =
-                    schedules.where((s) => s.dayOfWeek == day).toList();
-                PeriodSlot? slot;
-                if (ds.isNotEmpty) {
-                  final m =
-                      ds.first.periods.where((p) => p.startTime == time);
-                  if (m.isNotEmpty) slot = m.first;
-                }
-                final isToday = DateTime.now().weekday == day;
-                final cancelled =
-                    slot != null && _isPeriodCancelled(day, time);
-                final c = slot != null
-                    ? (subjectColors[slot.subject] ?? TatvaColors.primary)
-                    : Colors.grey.shade200;
-                return Expanded(
-                  child: slot == null
-                      ? const SizedBox(height: 52)
-                      : Opacity(
-                    opacity: cancelled ? 0.4 : 1.0,
-                    child: Container(
-                      height: 52,
-                      margin: const EdgeInsets.symmetric(horizontal: 1),
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                          color: cancelled
-                              ? Colors.grey.shade100
-                              : c.withOpacity(isToday ? 0.18 : 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                              color: cancelled
-                                  ? Colors.grey.shade200
-                                  : c.withOpacity(0.3))),
-                      child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(cancelled ? '✕' : slot.subject,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w700,
-                                        color:
-                                            cancelled ? Colors.grey : c,
-                                        decoration: cancelled
-                                            ? TextDecoration.lineThrough
-                                            : TextDecoration.none)),
-                                if (!cancelled &&
-                                    slot.teacherName.isNotEmpty)
-                                  Text(
-                                      slot.teacherName.split(' ').last,
+                ...List.generate(5, (i) {
+                  final day = i + 1;
+                  final ds =
+                      schedules.where((s) => s.dayOfWeek == day).toList();
+                  PeriodSlot? slot;
+                  if (ds.isNotEmpty) {
+                    final m =
+                        ds.first.periods.where((p) => p.startTime == time);
+                    if (m.isNotEmpty) slot = m.first;
+                  }
+                  final dayEvents = _eventsForDay(day)
+                      .where((e) => e.startTime == time)
+                      .toList();
+
+                  final isToday = DateTime.now().weekday == day;
+                  final isHoliday = _isDayHoliday(day);
+                  final cancelled =
+                      slot != null && (_isPeriodCancelled(day, time) || isHoliday);
+
+                  if (dayEvents.isNotEmpty && slot == null) {
+                    final ev = dayEvents.first;
+                    final evColor = ev.type == 'holiday'
+                        ? TatvaColors.error
+                        : ev.type == 'ptm'
+                            ? TatvaColors.purple
+                            : TatvaColors.accent;
+                    return Expanded(
+                      child: Container(
+                        height: 52,
+                        margin: const EdgeInsets.symmetric(horizontal: 1),
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                            color: evColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: evColor.withOpacity(0.3))),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(ev.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w700,
+                                    color: evColor)),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  final c = slot != null
+                      ? (subjectColors[slot.subject] ?? TatvaColors.primary)
+                      : Colors.grey.shade200;
+                  return Expanded(
+                    child: slot == null
+                        ? const SizedBox(height: 52)
+                        : Opacity(
+                      opacity: cancelled ? 0.4 : 1.0,
+                      child: Container(
+                        height: 52,
+                        margin: const EdgeInsets.symmetric(horizontal: 1),
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                            color: cancelled
+                                ? Colors.grey.shade100
+                                : c.withOpacity(isToday ? 0.18 : 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                                color: cancelled
+                                    ? Colors.grey.shade200
+                                    : c.withOpacity(0.3))),
+                        child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(cancelled ? '✕' : slot.subject,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
-                                          fontSize: 8,
-                                          color: c.withOpacity(0.7))),
-                              ],
-                            ),
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w700,
+                                          color:
+                                              cancelled ? Colors.grey : c,
+                                          decoration: cancelled
+                                              ? TextDecoration.lineThrough
+                                              : TextDecoration.none)),
+                                  if (!cancelled &&
+                                      slot.teacherName.isNotEmpty)
+                                    Text(
+                                        slot.teacherName.split(' ').last,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                            fontSize: 8,
+                                            color: c.withOpacity(0.7))),
+                                ],
+                              ),
+                      ),
                     ),
-                  ),
-                );
-              }),
-            ],
-          ),
-        );
-      }),
+                  );
+                }),
+              ],
+            ),
+          );
+        }),
+      if (sorted.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        ..._events.where((e) => e.startTime.isNotEmpty).where((e) {
+          final d = DateTime.tryParse(e.date);
+          if (d == null) return false;
+          final dow = d.weekday;
+          return _eventsForDay(dow).where((ev) => ev.startTime == e.startTime).isNotEmpty &&
+              !sorted.contains(e.startTime);
+        }).map(_buildEventCard),
+      ],
       const SizedBox(height: 16),
       Wrap(
         spacing: 12,
