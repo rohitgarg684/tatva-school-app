@@ -37,6 +37,8 @@ class DiaryAttachment {
 class DiaryEntry {
   final String id;
   final String classId;
+  final String studentUid;
+  final String studentName;
   final String teacherUid;
   final String teacherName;
   final String date;
@@ -48,7 +50,9 @@ class DiaryEntry {
 
   const DiaryEntry({
     required this.id,
-    required this.classId,
+    this.classId = '',
+    required this.studentUid,
+    this.studentName = '',
     required this.teacherUid,
     required this.teacherName,
     required this.date,
@@ -63,6 +67,8 @@ class DiaryEntry {
     return DiaryEntry(
       id: data['id'] as String? ?? '',
       classId: data['classId'] as String? ?? '',
+      studentUid: data['studentUid'] as String? ?? '',
+      studentName: data['studentName'] as String? ?? '',
       teacherUid: data['teacherUid'] as String? ?? '',
       teacherName: data['teacherName'] as String? ?? '',
       date: data['date'] as String? ?? '',
@@ -80,6 +86,8 @@ class DiaryEntry {
   Map<String, dynamic> toJson() => {
     'id': id,
     'classId': classId,
+    'studentUid': studentUid,
+    'studentName': studentName,
     'teacherUid': teacherUid,
     'teacherName': teacherName,
     'date': date,
@@ -91,6 +99,8 @@ class DiaryEntry {
   DiaryEntry copyWith({
     String? id,
     String? classId,
+    String? studentUid,
+    String? studentName,
     String? teacherUid,
     String? teacherName,
     String? date,
@@ -103,6 +113,8 @@ class DiaryEntry {
     return DiaryEntry(
       id: id ?? this.id,
       classId: classId ?? this.classId,
+      studentUid: studentUid ?? this.studentUid,
+      studentName: studentName ?? this.studentName,
       teacherUid: teacherUid ?? this.teacherUid,
       teacherName: teacherName ?? this.teacherName,
       date: date ?? this.date,

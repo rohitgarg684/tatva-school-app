@@ -276,6 +276,8 @@ export interface DiaryAttachment {
 export interface DiaryEntryDoc {
   id: string;
   classId: string;
+  studentUid: string;
+  studentName: string;
   teacherUid: string;
   teacherName: string;
   date: string;

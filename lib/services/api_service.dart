@@ -836,17 +836,24 @@ class ApiService {
   // ─── Diary ───────────────────────────────────────────────────────────────
 
   Future<List<Map<String, dynamic>>> getDiaryEntries(
-      String classId, String date) async {
-    final data = await _get('/diary/entries?classId=$classId&date=$date');
+      String studentUid, String date) async {
+    final data = await _get('/diary/entries?studentUid=$studentUid&date=$date');
     return (data['entries'] as List?)?.cast<Map<String, dynamic>>() ?? [];
   }
 
+  Future<List<String>> getDiaryDates(String studentUid, String month) async {
+    final data = await _get('/diary/dates?studentUid=$studentUid&month=$month');
+    return (data['dates'] as List?)?.cast<String>() ?? [];
+  }
+
   Future<Map<String, dynamic>> createDiaryEntry({
-    required String classId,
+    required String studentUid,
     required String title,
     required String body,
+    String classId = '',
   }) =>
       _post('/diary/entries', {
+        'studentUid': studentUid,
         'classId': classId,
         'title': title,
         'body': body,

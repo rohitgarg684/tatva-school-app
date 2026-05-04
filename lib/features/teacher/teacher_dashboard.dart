@@ -205,6 +205,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
             ),
             DiaryScreen(
               classes: _data?.classes ?? [],
+              students: _data?.allStudents ?? [],
               uid: _uid,
               role: 'Teacher',
             ),

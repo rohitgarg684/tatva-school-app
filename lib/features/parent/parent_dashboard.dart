@@ -22,7 +22,6 @@ import 'tabs/vote_tab.dart';
 import 'tabs/profile_tab.dart';
 import '../student/tabs/homework_tab.dart';
 import '../shared/diary/diary_screen.dart';
-import '../../models/class_model.dart';
 class ParentDashboard extends StatefulWidget {
   final int initialChildIndex;
   const ParentDashboard({super.key, this.initialChildIndex = 0});
@@ -486,12 +485,11 @@ class _ParentDashboardState extends State<ParentDashboard>
               childSwitcher: _childSwitcher(),
             ),
             DiaryScreen(
-              classes: _currentChild?.childClass != null
-                  ? [_currentChild!.childClass!]
-                  : <ClassModel>[],
+              classes: const [],
               uid: _uid,
               role: 'Parent',
-              fixedClassId: _currentChild?.childClass?.id,
+              fixedStudentUid: _currentChild?.childUid,
+              fixedStudentName: _currentChild?.info.childName,
             ),
             ParentVoteTab(
               activeVotes: _activeVotes,

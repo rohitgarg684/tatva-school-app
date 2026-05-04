@@ -7,13 +7,15 @@ import '../../../shared/theme/colors.dart';
 import '../../../shared/theme/typography.dart';
 
 class CreateDiaryEntrySheet extends StatefulWidget {
-  final String classId;
+  final String studentUid;
+  final String studentName;
   final ValueChanged<DiaryEntry> onCreated;
   final DiaryEntry? editEntry;
 
   const CreateDiaryEntrySheet({
     super.key,
-    required this.classId,
+    required this.studentUid,
+    this.studentName = '',
     required this.onCreated,
     this.editEntry,
   });
@@ -74,7 +76,7 @@ class _CreateDiaryEntrySheetState extends State<CreateDiaryEntrySheet> {
         await _api.updateDiaryEntry(widget.editEntry!.id, title: title, body: body);
         widget.onCreated(widget.editEntry!.copyWith(title: title, body: body));
       } else {
-        final result = await _api.createDiaryEntry(classId: widget.classId, title: title, body: body);
+        final result = await _api.createDiaryEntry(studentUid: widget.studentUid, title: title, body: body);
         final entryId = result['id'] as String;
 
         List<DiaryAttachment> attachments = [];
@@ -86,7 +88,8 @@ class _CreateDiaryEntrySheetState extends State<CreateDiaryEntrySheet> {
         final now = DateTime.now();
         widget.onCreated(DiaryEntry(
           id: entryId,
-          classId: widget.classId,
+          studentUid: widget.studentUid,
+          studentName: widget.studentName,
           teacherUid: '',
           teacherName: '',
           date: '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
@@ -128,6 +131,13 @@ class _CreateDiaryEntrySheetState extends State<CreateDiaryEntrySheet> {
             _isEditing ? 'Edit Entry' : 'New Diary Entry',
             style: TatvaText.h3.copyWith(color: TatvaColors.neutral900),
           ),
+          if (!_isEditing && widget.studentName.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              'For: ${widget.studentName}',
+              style: TatvaText.caption.copyWith(color: TatvaColors.primary, fontWeight: FontWeight.w600),
+            ),
+          ],
           const SizedBox(height: 20),
           TextField(
             controller: _titleCtrl,

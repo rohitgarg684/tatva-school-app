@@ -61,35 +61,54 @@ async function deleteFromStorage(storagePath: string): Promise<void> {
   await bucket.file(storagePath).delete().catch(() => {});
 }
 
-async function isParentOfClass(uid: string, classId: string): Promise<boolean> {
-  const classDoc = await getDoc(Collections.CLASSES, classId);
-  if (!classDoc) return false;
-  return (classDoc.parentUids || []).includes(uid);
-}
 
 const router = Router();
 router.use(requireAuth);
 
-// GET /diary/entries?classId=&date=YYYY-MM-DD
+// GET /diary/entries?studentUid=&date=YYYY-MM-DD
 router.get(
   "/diary/entries",
   asyncHandler(async (req: Request, res: Response) => {
-    const { classId, date } = req.query;
-    if (!classId || !date) return res.status(400).json({ error: "classId and date required" });
+    const { studentUid, date } = req.query;
+    if (!studentUid || !date) return res.status(400).json({ error: "studentUid and date required" });
 
     if (req.role === "Parent") {
-      const allowed = await isParentOfClass(req.uid!, classId as string);
-      if (!allowed) return res.status(403).json({ error: "Access denied to this class" });
+      const parentDoc = await getDoc(Collections.USERS, req.uid!);
+      const children: { childUid?: string }[] = parentDoc?.children || [];
+      if (!children.some((c) => c.childUid === studentUid))
+        return res.status(403).json({ error: "Access denied" });
     }
 
     const snap = await db.collection(Collections.DIARY_ENTRIES)
-      .where("classId", "==", classId)
+      .where("studentUid", "==", studentUid)
       .where("date", "==", date)
       .orderBy("createdAt", "desc")
       .get();
 
     const entries = snap.docs.map((d) => serializeDoc({ id: d.id, ...d.data() }));
     res.json({ entries });
+  })
+);
+
+// GET /diary/dates?studentUid=&month=YYYY-MM — returns dates that have entries (for calendar dots)
+router.get(
+  "/diary/dates",
+  asyncHandler(async (req: Request, res: Response) => {
+    const { studentUid, month } = req.query;
+    if (!studentUid || !month) return res.status(400).json({ error: "studentUid and month required" });
+
+    const monthStr = month as string;
+    const startDate = `${monthStr}-01`;
+    const endDate = `${monthStr}-31`;
+
+    const snap = await db.collection(Collections.DIARY_ENTRIES)
+      .where("studentUid", "==", studentUid)
+      .where("date", ">=", startDate)
+      .where("date", "<=", endDate)
+      .get();
+
+    const dates = [...new Set(snap.docs.map((d) => d.data().date as string))];
+    res.json({ dates });
   })
 );
 
@@ -102,8 +121,10 @@ router.get(
     if (!doc) return res.status(404).json({ error: "Entry not found" });
 
     if (req.role === "Parent") {
-      const allowed = await isParentOfClass(req.uid!, doc.classId);
-      if (!allowed) return res.status(403).json({ error: "Access denied" });
+      const parentDoc = await getDoc(Collections.USERS, req.uid!);
+      const children: { childUid?: string }[] = parentDoc?.children || [];
+      if (!children.some((c) => c.childUid === doc.studentUid))
+        return res.status(403).json({ error: "Access denied" });
     }
 
     res.json({ entry: serializeDoc(doc) });
@@ -115,15 +136,20 @@ router.post(
   "/diary/entries",
   requireRole("Teacher", "Principal"),
   asyncHandler(async (req: Request, res: Response) => {
-    const { classId, title, body } = req.body;
-    if (!classId || !title || !body)
-      return res.status(400).json({ error: "classId, title, and body required" });
+    const { classId, studentUid, title, body } = req.body;
+    if (!studentUid || !title || !body)
+      return res.status(400).json({ error: "studentUid, title, and body required" });
 
-    const userDoc = await getDoc(Collections.USERS, req.uid!);
+    const [userDoc, studentDoc] = await Promise.all([
+      getDoc(Collections.USERS, req.uid!),
+      getDoc(Collections.USERS, studentUid),
+    ]);
     const today = new Date().toISOString().split("T")[0];
 
     const ref = await db.collection(Collections.DIARY_ENTRIES).add({
-      classId,
+      classId: classId || "",
+      studentUid,
+      studentName: studentDoc?.name || "Unknown",
       teacherUid: req.uid!,
       teacherName: userDoc?.name || "Unknown",
       date: today,
@@ -202,8 +228,10 @@ router.get(
     if (!entry) return res.status(404).json({ error: "Entry not found" });
 
     if (req.role === "Parent") {
-      const allowed = await isParentOfClass(req.uid!, entry.classId);
-      if (!allowed) return res.status(403).json({ error: "Access denied" });
+      const parentDoc = await getDoc(Collections.USERS, req.uid!);
+      const children: { childUid?: string }[] = parentDoc?.children || [];
+      if (!children.some((c) => c.childUid === entry.studentUid))
+        return res.status(403).json({ error: "Access denied" });
     }
 
     const snap = await db.collection(Collections.DIARY_COMMENTS)
@@ -226,8 +254,10 @@ router.post(
     if (!entry) return res.status(404).json({ error: "Entry not found" });
 
     if (req.role === "Parent") {
-      const allowed = await isParentOfClass(req.uid!, entry.classId);
-      if (!allowed) return res.status(403).json({ error: "Access denied" });
+      const parentDoc = await getDoc(Collections.USERS, req.uid!);
+      const children: { childUid?: string }[] = parentDoc?.children || [];
+      if (!children.some((c) => c.childUid === entry.studentUid))
+        return res.status(403).json({ error: "Access denied" });
     }
 
     const { body } = req.body;
