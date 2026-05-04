@@ -21,6 +21,8 @@ import 'tabs/learn_tab.dart';
 import 'tabs/vote_tab.dart';
 import 'tabs/profile_tab.dart';
 import '../student/tabs/homework_tab.dart';
+import '../shared/diary/diary_screen.dart';
+import '../../models/class_model.dart';
 class ParentDashboard extends StatefulWidget {
   final int initialChildIndex;
   const ParentDashboard({super.key, this.initialChildIndex = 0});
@@ -36,6 +38,7 @@ class _ParentDashboardState extends State<ParentDashboard>
     TabItem(icon: Icons.calendar_view_week_outlined, activeIcon: Icons.calendar_view_week_rounded, label: 'Schedule'),
     TabItem(icon: Icons.assignment_outlined, activeIcon: Icons.assignment_rounded, label: 'Homework'),
     TabItem(icon: Icons.lightbulb_outline, activeIcon: Icons.lightbulb_rounded, label: 'Learn'),
+    TabItem(icon: Icons.menu_book_outlined, activeIcon: Icons.menu_book_rounded, label: 'Diary'),
     TabItem(icon: Icons.how_to_vote_outlined, activeIcon: Icons.how_to_vote_rounded, label: 'Vote'),
   ];
 
@@ -452,7 +455,7 @@ class _ParentDashboardState extends State<ParentDashboard>
               onNavigateToProfile: _navigateToProfile,
               onNavigateToBehavior: _navigateToBehavior,
               onNavigateToProgress: _navigateToProgress,
-              onNavigateToVote: () => switchTab(4),
+              onNavigateToVote: () => switchTab(5),
               onRefresh: _loadData,
               childSwitcher: _childSwitcher(),
               uid: _uid,
@@ -481,6 +484,14 @@ class _ParentDashboardState extends State<ParentDashboard>
               currentChild: _currentChild,
               contentItems: _data?.contentItems ?? [],
               childSwitcher: _childSwitcher(),
+            ),
+            DiaryScreen(
+              classes: _currentChild?.childClass != null
+                  ? [_currentChild!.childClass!]
+                  : <ClassModel>[],
+              uid: _uid,
+              role: 'Parent',
+              fixedClassId: _currentChild?.childClass?.id,
             ),
             ParentVoteTab(
               activeVotes: _activeVotes,

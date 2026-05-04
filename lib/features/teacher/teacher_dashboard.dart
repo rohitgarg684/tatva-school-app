@@ -31,6 +31,7 @@ import 'tabs/learn_tab.dart';
 import 'tabs/votes_tab.dart';
 import 'tabs/messages_tab.dart';
 import 'tabs/profile_tab.dart';
+import '../shared/diary/diary_screen.dart';
 
 class TeacherDashboard extends StatefulWidget {
   const TeacherDashboard({super.key});
@@ -51,6 +52,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
     TabItem(icon: Icons.assignment_outlined, activeIcon: Icons.assignment_rounded, label: 'Homework'),
     TabItem(icon: Icons.auto_stories_outlined, activeIcon: Icons.auto_stories_rounded, label: 'Learn'),
     TabItem(icon: Icons.how_to_vote_outlined, activeIcon: Icons.how_to_vote_rounded, label: 'Votes'),
+    TabItem(icon: Icons.menu_book_outlined, activeIcon: Icons.menu_book_rounded, label: 'Diary'),
     TabItem(icon: Icons.chat_outlined, activeIcon: Icons.chat_rounded, label: 'Messages'),
     TabItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Profile'),
   ];
@@ -200,6 +202,11 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                 final idx = _voteModels.indexWhere((v) => v.id == vote.id);
                 if (idx >= 0) _voteModels[idx] = _voteModels[idx].copyWith(active: false);
               }),
+            ),
+            DiaryScreen(
+              classes: _data?.classes ?? [],
+              uid: _uid,
+              role: 'Teacher',
             ),
             TeacherMessagesTab(parents: _data?.parentsInFirstClass ?? []),
             TeacherProfileTab(

@@ -23,6 +23,7 @@ import contentRoutes from "./routes/content";
 import dashboardRoutes from "./routes/dashboards";
 import uploadRoutes from "./routes/upload";
 import holidayRoutes from "./routes/holidays";
+import diaryRoutes from "./routes/diary";
 import publicRoutes from "./routes/public";
 
 const app = express();
@@ -58,6 +59,7 @@ app.use("/api/dashboard", dashboardLimiter, dashboardRoutes);
 app.use("/api/document/upload", uploadLimiter);
 app.use("/api", uploadRoutes);
 app.use("/api", actionLimiter, holidayRoutes);
+app.use("/api", actionLimiter, diaryRoutes);
 
 // Global error handler
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {

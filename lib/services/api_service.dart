@@ -832,4 +832,100 @@ class ApiService {
   Future<Map<String, dynamic>> setDailyDefaults(
           String grade, List<Map<String, dynamic>> slots) =>
       _put('/daily-defaults/$grade', {'slots': slots});
+
+  // ─── Diary ───────────────────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getDiaryEntries(
+      String classId, String date) async {
+    final data = await _get('/diary/entries?classId=$classId&date=$date');
+    return (data['entries'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+  }
+
+  Future<Map<String, dynamic>> createDiaryEntry({
+    required String classId,
+    required String title,
+    required String body,
+  }) =>
+      _post('/diary/entries', {
+        'classId': classId,
+        'title': title,
+        'body': body,
+      });
+
+  Future<Map<String, dynamic>> updateDiaryEntry(
+          String id, {String? title, String? body}) =>
+      _put('/diary/entries/$id', {
+        if (title != null) 'title': title,
+        if (body != null) 'body': body,
+      });
+
+  Future<Map<String, dynamic>> deleteDiaryEntry(String id) =>
+      _delete('/diary/entries/$id');
+
+  Future<List<Map<String, dynamic>>> getDiaryComments(String entryId) async {
+    final data = await _get('/diary/entries/$entryId/comments');
+    return (data['comments'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+  }
+
+  Future<Map<String, dynamic>> createDiaryComment(
+          String entryId, String body) =>
+      _post('/diary/entries/$entryId/comments', {'body': body});
+
+  Future<Map<String, dynamic>> deleteDiaryComment(String commentId) =>
+      _delete('/diary/comments/$commentId');
+
+  Future<List<Map<String, dynamic>>> uploadDiaryEntryFiles(
+      String entryId, List<MapEntry<String, Uint8List>> files) async {
+    final token = await _getToken();
+    final uri = Uri.parse('$_baseUrl/diary/entries/$entryId/upload');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $token';
+    for (final file in files) {
+      final mime = _mimeFromFilename(file.key);
+      request.files.add(http.MultipartFile.fromBytes(
+        'files',
+        file.value,
+        filename: file.key,
+        contentType: MediaType.parse(mime),
+      ));
+    }
+    final streamed = await request.send().timeout(const Duration(seconds: 120));
+    final body = await streamed.stream.bytesToString();
+    if (streamed.statusCode != 200) throw Exception('Upload failed: $body');
+    final data = json.decode(body) as Map<String, dynamic>;
+    return (data['attachments'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+  }
+
+  Future<List<Map<String, dynamic>>> uploadDiaryCommentFiles(
+      String commentId, List<MapEntry<String, Uint8List>> files) async {
+    final token = await _getToken();
+    final uri = Uri.parse('$_baseUrl/diary/comments/$commentId/upload');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $token';
+    for (final file in files) {
+      final mime = _mimeFromFilename(file.key);
+      request.files.add(http.MultipartFile.fromBytes(
+        'files',
+        file.value,
+        filename: file.key,
+        contentType: MediaType.parse(mime),
+      ));
+    }
+    final streamed = await request.send().timeout(const Duration(seconds: 120));
+    final body = await streamed.stream.bytesToString();
+    if (streamed.statusCode != 200) throw Exception('Upload failed: $body');
+    final data = json.decode(body) as Map<String, dynamic>;
+    return (data['attachments'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+  }
+
+  Future<Map<String, dynamic>> deleteDiaryAttachment({
+    String? entryId,
+    String? commentId,
+    required String storagePath,
+  }) =>
+      _delete('/diary/attachments', body: {
+        if (entryId != null) 'entryId': entryId,
+        if (commentId != null) 'commentId': commentId,
+        'storagePath': storagePath,
+      });
 }

@@ -265,3 +265,34 @@ export interface WeeklyReportDoc {
   studentUid: string;
   createdAt?: FirebaseFirestore.Timestamp | string;
 }
+
+export interface DiaryAttachment {
+  url: string;
+  fileName: string;
+  mimeType: string;
+  storagePath: string;
+}
+
+export interface DiaryEntryDoc {
+  id: string;
+  classId: string;
+  teacherUid: string;
+  teacherName: string;
+  date: string;
+  title: string;
+  body: string;
+  attachments: DiaryAttachment[];
+  createdAt?: FirebaseFirestore.Timestamp | string;
+  updatedAt?: FirebaseFirestore.Timestamp | string;
+}
+
+export interface DiaryCommentDoc {
+  id: string;
+  entryId: string;
+  authorUid: string;
+  authorName: string;
+  authorRole: "Teacher" | "Parent" | "Principal";
+  body: string;
+  attachments: DiaryAttachment[];
+  createdAt?: FirebaseFirestore.Timestamp | string;
+}

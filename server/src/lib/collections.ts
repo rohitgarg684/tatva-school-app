@@ -21,6 +21,8 @@ export const Collections = {
   HOLIDAYS: "holidays",
   HOMEWORK_COMMENTS: "homework_comments",
   SCHOOL_SETTINGS: "school_settings",
+  DIARY_ENTRIES: "diary_entries",
+  DIARY_COMMENTS: "diary_comments",
 } as const;
 
 export type CollectionName = (typeof Collections)[keyof typeof Collections];
