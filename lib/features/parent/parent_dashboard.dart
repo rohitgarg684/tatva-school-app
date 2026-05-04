@@ -19,7 +19,6 @@ import 'tabs/progress_tab.dart';
 import 'tabs/behavior_tab.dart';
 import 'tabs/learn_tab.dart';
 import 'tabs/vote_tab.dart';
-import 'tabs/messages_tab.dart';
 import 'tabs/profile_tab.dart';
 import '../student/tabs/homework_tab.dart';
 class ParentDashboard extends StatefulWidget {
@@ -36,12 +35,8 @@ class _ParentDashboardState extends State<ParentDashboard>
     TabItem(icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: 'Home'),
     TabItem(icon: Icons.calendar_view_week_outlined, activeIcon: Icons.calendar_view_week_rounded, label: 'Schedule'),
     TabItem(icon: Icons.assignment_outlined, activeIcon: Icons.assignment_rounded, label: 'Homework'),
-    TabItem(icon: Icons.bar_chart_outlined, activeIcon: Icons.bar_chart_rounded, label: 'Progress'),
-    TabItem(icon: Icons.emoji_events_outlined, activeIcon: Icons.emoji_events_rounded, label: 'Behavior'),
     TabItem(icon: Icons.lightbulb_outline, activeIcon: Icons.lightbulb_rounded, label: 'Learn'),
     TabItem(icon: Icons.how_to_vote_outlined, activeIcon: Icons.how_to_vote_rounded, label: 'Vote'),
-    TabItem(icon: Icons.chat_outlined, activeIcon: Icons.chat_rounded, label: 'Messages'),
-    TabItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Profile'),
   ];
 
   final _dashSvc = DashboardService();
@@ -267,6 +262,47 @@ class _ParentDashboardState extends State<ParentDashboard>
 
   void _logout() => logout();
 
+  void _navigateToProfile() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(
+      appBar: AppBar(title: const Text('Profile')),
+      body: ParentProfileTab(
+        user: _data?.user,
+        currentChild: _currentChild,
+        currentChildEntries: _currentChildEntries,
+        onShowTeacherProfile: _showTeacherProfile,
+        onGenerateReport: _generateWeeklyReport,
+        onLogout: _logout,
+        onRefresh: _loadData,
+        childrenData: _data?.childrenData ?? [],
+        selectedChildIndex: _selectedChildIndex,
+        onChildSelected: (i) => setState(() {
+          _selectedChildIndex = i;
+          _rebuildHomeworkState();
+        }),
+      ),
+    )));
+  }
+
+  void _navigateToBehavior() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(
+      appBar: AppBar(title: const Text('Behavior')),
+      body: ParentBehaviorTab(
+        currentChild: _currentChild,
+        currentChildEntries: _currentChildEntries,
+      ),
+    )));
+  }
+
+  void _navigateToProgress() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(
+      appBar: AppBar(title: const Text('Progress')),
+      body: ParentProgressTab(
+        currentChild: _currentChild,
+        currentChildEntries: _currentChildEntries,
+      ),
+    )));
+  }
+
   Future<void> _generateWeeklyReport() async {
     final child = _currentChild;
     if (child == null) return;
@@ -410,7 +446,10 @@ class _ParentDashboardState extends State<ParentDashboard>
               greetingSlide: greetingSlide,
               greetingScale: greetingScale,
               onShowTeacherProfile: _showTeacherProfile,
-              onSwitchTab: switchTab,
+              onNavigateToProfile: _navigateToProfile,
+              onNavigateToBehavior: _navigateToBehavior,
+              onNavigateToProgress: _navigateToProgress,
+              onNavigateToVote: () => switchTab(4),
               onRefresh: _loadData,
               childSwitcher: _childSwitcher(),
               uid: _uid,
@@ -435,8 +474,6 @@ class _ParentDashboardState extends State<ParentDashboard>
               onMarkIncomplete: _handleMarkIncomplete,
               onRefresh: _loadData,
             ),
-            ParentProgressTab(currentChild: _currentChild, currentChildEntries: _currentChildEntries),
-            ParentBehaviorTab(currentChild: _currentChild, currentChildEntries: _currentChildEntries),
             ParentLearnTab(
               currentChild: _currentChild,
               contentItems: _data?.contentItems ?? [],
@@ -446,25 +483,6 @@ class _ParentDashboardState extends State<ParentDashboard>
               activeVotes: _activeVotes,
               uid: _uid,
               onCastVote: _castVote,
-            ),
-            ParentMessagesTab(
-              currentChildEntries: _currentChildEntries,
-              api: _api,
-            ),
-            ParentProfileTab(
-              user: _data?.user,
-              currentChild: _currentChild,
-              currentChildEntries: _currentChildEntries,
-              onShowTeacherProfile: _showTeacherProfile,
-              onGenerateReport: _generateWeeklyReport,
-              onLogout: _logout,
-              onRefresh: _loadData,
-              childrenData: _data?.childrenData ?? [],
-              selectedChildIndex: _selectedChildIndex,
-              onChildSelected: (i) => setState(() {
-                _selectedChildIndex = i;
-                _rebuildHomeworkState();
-              }),
             ),
           ]),
     );

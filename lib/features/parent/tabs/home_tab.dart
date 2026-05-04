@@ -30,7 +30,10 @@ class ParentHomeTab extends StatelessWidget {
   final Animation<double> greetingScale;
   final String uid;
   final VoidCallback onShowTeacherProfile;
-  final ValueChanged<int> onSwitchTab;
+  final VoidCallback onNavigateToProfile;
+  final VoidCallback onNavigateToBehavior;
+  final VoidCallback onNavigateToProgress;
+  final VoidCallback onNavigateToVote;
   final Future<void> Function() onRefresh;
   final Widget childSwitcher;
   final ApiService api;
@@ -51,7 +54,10 @@ class ParentHomeTab extends StatelessWidget {
     required this.greetingSlide,
     required this.greetingScale,
     required this.onShowTeacherProfile,
-    required this.onSwitchTab,
+    required this.onNavigateToProfile,
+    required this.onNavigateToBehavior,
+    required this.onNavigateToProgress,
+    required this.onNavigateToVote,
     required this.onRefresh,
     required this.childSwitcher,
     required this.uid,
@@ -85,54 +91,58 @@ class ParentHomeTab extends StatelessWidget {
           physics: const AlwaysScrollableScrollPhysics(),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            FadeTransition(
-                opacity: greetingFade,
-                child: SlideTransition(
-                    position: greetingSlide,
-                    child: ScaleTransition(
-                        scale: greetingScale,
-                        child: _greetingCard(avg)))),
+            GestureDetector(
+                onTap: onNavigateToProfile,
+                child: FadeTransition(
+                    opacity: greetingFade,
+                    child: SlideTransition(
+                        position: greetingSlide,
+                        child: ScaleTransition(
+                            scale: greetingScale,
+                            child: _greetingCard(avg))))),
             childSwitcher,
             const SizedBox(height: 20),
-            ...entries.map((e) => Container(
-                margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                    color: TatvaColors.bgCard,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                        color: TatvaColors.purple.withOpacity(0.15))),
-                child: Row(children: [
-                  Expanded(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                        Text(e.info.className,
-                            style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: TatvaColors.neutral900)),
-                        const SizedBox(height: 4),
-                        Text('${e.info.subject} · ${e.info.teacherName}',
-                            style: const TextStyle(
-                                fontSize: 12,
-                                color: TatvaColors.neutral400)),
-                      ])),
-                  Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                          color: TatvaColors.accent.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                              color: TatvaColors.accent.withOpacity(0.3))),
-                      child: Text(e.childClass?.classCode ?? '',
-                          style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: TatvaColors.accent,
-                              letterSpacing: 2))),
-                ]))),
+            ...entries.map((e) => GestureDetector(
+                onTap: onNavigateToProgress,
+                child: Container(
+                    margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                        color: TatvaColors.bgCard,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                            color: TatvaColors.purple.withOpacity(0.15))),
+                    child: Row(children: [
+                      Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                            Text(e.info.className,
+                                style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: TatvaColors.neutral900)),
+                            const SizedBox(height: 4),
+                            Text('${e.info.subject} · ${e.info.teacherName}',
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    color: TatvaColors.neutral400)),
+                          ])),
+                      Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                              color: TatvaColors.accent.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                  color: TatvaColors.accent.withOpacity(0.3))),
+                          child: Text(e.childClass?.classCode ?? '',
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: TatvaColors.accent,
+                                  letterSpacing: 2))),
+                    ])))),
             const SizedBox(height: 16),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -242,7 +252,7 @@ class ParentHomeTab extends StatelessWidget {
                                 color: TatvaColors.neutral900)),
                       ])),
                   GestureDetector(
-                    onTap: () => onSwitchTab(4),
+                    onTap: onNavigateToBehavior,
                     child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 6),
@@ -266,10 +276,10 @@ class ParentHomeTab extends StatelessWidget {
                       color: TatvaColors.info, onTap: onShowTeacherProfile)),
                   const SizedBox(width: 8),
                   Expanded(child: QuickActionButton(label: 'Progress\nReport', icon: Icons.bar_chart_rounded,
-                      color: TatvaColors.purple, onTap: () => onSwitchTab(3))),
+                      color: TatvaColors.purple, onTap: onNavigateToProgress)),
                   const SizedBox(width: 8),
                   Expanded(child: QuickActionButton(label: 'Cast\nVote', icon: Icons.how_to_vote_outlined,
-                      color: TatvaColors.accent, onTap: () => onSwitchTab(6))),
+                      color: TatvaColors.accent, onTap: onNavigateToVote)),
                 ])),
             const SizedBox(height: 24),
             Padding(
