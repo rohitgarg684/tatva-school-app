@@ -395,6 +395,7 @@ class _DiaryEntryDetailSheetState extends State<DiaryEntryDetailSheet> {
         Expanded(
           child: TextField(
             controller: _commentCtrl,
+            style: const TextStyle(color: TatvaColors.neutral900, fontSize: 14),
             decoration: InputDecoration(
               hintText: 'Write a comment...',
               hintStyle: TextStyle(color: TatvaColors.neutral400),

@@ -10,6 +10,7 @@ class GreetingCard extends StatelessWidget {
   final String subtitle;
   final String photoUrl;
   final Widget? bottomWidget;
+  final VoidCallback? onTap;
 
   const GreetingCard({
     super.key,
@@ -19,11 +20,14 @@ class GreetingCard extends StatelessWidget {
     required this.subtitle,
     this.photoUrl = '',
     this.bottomWidget,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
       margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       child: WaveCard(
         gradientColors: gradientColors,
@@ -118,6 +122,6 @@ class GreetingCard extends StatelessWidget {
           ),
         ]),
       ),
-    );
+    ));
   }
 }

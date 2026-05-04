@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../../models/diary_model.dart';
 import '../../../services/api_service.dart';
@@ -90,8 +91,8 @@ class _CreateDiaryEntrySheetState extends State<CreateDiaryEntrySheet> {
           id: entryId,
           studentUid: widget.studentUid,
           studentName: widget.studentName,
-          teacherUid: '',
-          teacherName: '',
+          teacherUid: FirebaseAuth.instance.currentUser?.uid ?? '',
+          teacherName: FirebaseAuth.instance.currentUser?.displayName ?? '',
           date: '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
           title: title,
           body: body,
@@ -141,6 +142,7 @@ class _CreateDiaryEntrySheetState extends State<CreateDiaryEntrySheet> {
           const SizedBox(height: 20),
           TextField(
             controller: _titleCtrl,
+            style: const TextStyle(color: TatvaColors.neutral900, fontSize: 15),
             decoration: InputDecoration(
               labelText: 'Title',
               labelStyle: TextStyle(color: TatvaColors.neutral500),
@@ -153,6 +155,7 @@ class _CreateDiaryEntrySheetState extends State<CreateDiaryEntrySheet> {
           const SizedBox(height: 14),
           TextField(
             controller: _bodyCtrl,
+            style: const TextStyle(color: TatvaColors.neutral900, fontSize: 15),
             decoration: InputDecoration(
               labelText: 'What happened today?',
               labelStyle: TextStyle(color: TatvaColors.neutral500),

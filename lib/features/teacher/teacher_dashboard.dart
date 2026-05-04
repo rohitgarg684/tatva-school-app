@@ -42,20 +42,23 @@ class TeacherDashboard extends StatefulWidget {
 
 class _TeacherDashboardState extends State<TeacherDashboard>
     with TickerProviderStateMixin, DashboardMixin {
+  // Bottom nav tabs (indices 0–6)
   static const List<TabItem> _tabs = [
     TabItem(icon: Icons.dashboard_outlined, activeIcon: Icons.dashboard_rounded, label: 'Home'),
     TabItem(icon: Icons.class_outlined, activeIcon: Icons.class_rounded, label: 'Classes'),
-    TabItem(icon: Icons.emoji_events_outlined, activeIcon: Icons.emoji_events_rounded, label: 'Behavior'),
     TabItem(icon: Icons.fact_check_outlined, activeIcon: Icons.fact_check_rounded, label: 'Attend'),
     TabItem(icon: Icons.calendar_view_week_outlined, activeIcon: Icons.calendar_view_week_rounded, label: 'Schedule'),
-    TabItem(icon: Icons.grade_outlined, activeIcon: Icons.grade_rounded, label: 'Grades'),
-    TabItem(icon: Icons.assignment_outlined, activeIcon: Icons.assignment_rounded, label: 'Homework'),
     TabItem(icon: Icons.auto_stories_outlined, activeIcon: Icons.auto_stories_rounded, label: 'Learn'),
     TabItem(icon: Icons.how_to_vote_outlined, activeIcon: Icons.how_to_vote_rounded, label: 'Votes'),
     TabItem(icon: Icons.menu_book_outlined, activeIcon: Icons.menu_book_rounded, label: 'Diary'),
-    TabItem(icon: Icons.chat_outlined, activeIcon: Icons.chat_rounded, label: 'Messages'),
-    TabItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Profile'),
   ];
+
+  // Hidden tab indices (accessible via quick actions)
+  static const int _behaviorIdx = 7;
+  static const int _gradesIdx = 8;
+  static const int _homeworkIdx = 9;
+  static const int _messagesIdx = 10;
+  static const int _profileIdx = 11;
 
   final _dashSvc = DashboardService();
   final _api = ApiService();
@@ -105,6 +108,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
     return buildDashboardScaffold(
       tabs: _tabs,
       bodyBuilder: () => IndexedStack(index: currentTab, children: [
+            // 0: Home
             TeacherHomeTab(
               user: _data?.user,
               classes: _data?.classes ?? [],
@@ -126,22 +130,14 @@ class _TeacherDashboardState extends State<TeacherDashboard>
               api: _api,
               firstClassId: (_data?.classes ?? []).isNotEmpty ? _data!.classes.first.id : null,
             ),
+            // 1: Classes
             TeacherClassesTab(
               classes: _data?.classes ?? [],
               students: _data?.studentsInFirstClass ?? [],
               onRefresh: _loadUser,
               onSwitchTab: switchTab,
             ),
-            TeacherBehaviorTab(
-              classBehavior: _classBehavior,
-              students: _data?.studentsInFirstClass ?? [],
-              classes: _data?.classes ?? [],
-              uid: _uid,
-              user: _data?.user,
-              onBehaviorAdded: (bp) => setState(() => _classBehavior.add(bp)),
-              onBehaviorDeleted: (id) =>
-                  setState(() => _classBehavior.removeWhere((b) => b.id == id)),
-            ),
+            // 2: Attend
             TeacherAttendanceTab(
               allSchoolStudents: _data?.allStudents ?? [],
               students: _data?.studentsInFirstClass ?? [],
@@ -151,29 +147,13 @@ class _TeacherDashboardState extends State<TeacherDashboard>
               onAttendanceSaved: (records) =>
                   setState(() => _todayAttendance = records),
             ),
+            // 3: Schedule
             TeacherScheduleTab(
               classes: _data?.classes ?? [],
               uid: _uid,
               onRefresh: _loadUser,
             ),
-            TeacherGradesTab(
-              classes: _data?.classes ?? [],
-              allGrades: _data?.allTeacherGrades ?? [],
-              allSchoolStudents: _data?.allStudents ?? [],
-              testTitles: _data?.testTitles ?? [],
-              onRefresh: _loadUser,
-            ),
-            TeacherHomeworkTab(
-              homework: _homework,
-              students: _data?.studentsInFirstClass ?? [],
-              classes: _data?.classes ?? [],
-              uid: _uid,
-              user: _data?.user,
-              onHomeworkAdded: (hw) =>
-                  setState(() => _homework.insert(0, hw)),
-              onHomeworkDeleted: (id) =>
-                  setState(() => _homework.removeWhere((h) => h.id == id)),
-            ),
+            // 4: Learn
             TeacherLearnTab(
               contentItems: _contentItems,
               classes: _data?.classes ?? [],
@@ -188,6 +168,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                 if (idx >= 0) _contentItems[idx] = ci;
               }),
             ),
+            // 5: Votes
             TeacherVotesTab(
               votes: _voteModels,
               uid: _uid,
@@ -203,13 +184,47 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                 if (idx >= 0) _voteModels[idx] = _voteModels[idx].copyWith(active: false);
               }),
             ),
+            // 6: Diary
             DiaryScreen(
               classes: _data?.classes ?? [],
               students: _data?.allStudents ?? [],
               uid: _uid,
               role: 'Teacher',
             ),
+            // 7: Behavior (hidden)
+            TeacherBehaviorTab(
+              classBehavior: _classBehavior,
+              students: _data?.studentsInFirstClass ?? [],
+              classes: _data?.classes ?? [],
+              uid: _uid,
+              user: _data?.user,
+              onBehaviorAdded: (bp) => setState(() => _classBehavior.add(bp)),
+              onBehaviorDeleted: (id) =>
+                  setState(() => _classBehavior.removeWhere((b) => b.id == id)),
+            ),
+            // 8: Grades (hidden)
+            TeacherGradesTab(
+              classes: _data?.classes ?? [],
+              allGrades: _data?.allTeacherGrades ?? [],
+              allSchoolStudents: _data?.allStudents ?? [],
+              testTitles: _data?.testTitles ?? [],
+              onRefresh: _loadUser,
+            ),
+            // 9: Homework (hidden)
+            TeacherHomeworkTab(
+              homework: _homework,
+              students: _data?.studentsInFirstClass ?? [],
+              classes: _data?.classes ?? [],
+              uid: _uid,
+              user: _data?.user,
+              onHomeworkAdded: (hw) =>
+                  setState(() => _homework.insert(0, hw)),
+              onHomeworkDeleted: (id) =>
+                  setState(() => _homework.removeWhere((h) => h.id == id)),
+            ),
+            // 10: Messages (hidden)
             TeacherMessagesTab(parents: _data?.parentsInFirstClass ?? []),
+            // 11: Profile (hidden)
             TeacherProfileTab(
               user: _data?.user,
               classCount: _data?.classes.length ?? 0,

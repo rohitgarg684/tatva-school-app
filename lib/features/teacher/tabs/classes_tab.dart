@@ -166,7 +166,7 @@ class TeacherClassesTab extends StatelessWidget {
                           ]))),
                   const SizedBox(width: 8),
                   GestureDetector(
-                      onTap: () => onSwitchTab(5),
+                      onTap: () => onSwitchTab(8),
                       child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 6),

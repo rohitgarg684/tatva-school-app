@@ -9,6 +9,7 @@ import { asyncHandler } from "../lib/async-handler";
 import { Collections } from "../lib/collections";
 import { env } from "../env";
 import { DiaryAttachment } from "../models";
+import { isParentOfChild } from "./users";
 
 const DOC_MIME_TYPES = [
   "image/jpeg",
@@ -74,8 +75,7 @@ router.get(
 
     if (req.role === "Parent") {
       const parentDoc = await getDoc(Collections.USERS, req.uid!);
-      const children: { childUid?: string }[] = parentDoc?.children || [];
-      if (!children.some((c) => c.childUid === studentUid))
+      if (!isParentOfChild(parentDoc?.children || [], studentUid as string))
         return res.status(403).json({ error: "Access denied" });
     }
 
@@ -122,8 +122,7 @@ router.get(
 
     if (req.role === "Parent") {
       const parentDoc = await getDoc(Collections.USERS, req.uid!);
-      const children: { childUid?: string }[] = parentDoc?.children || [];
-      if (!children.some((c) => c.childUid === doc.studentUid))
+      if (!isParentOfChild(parentDoc?.children || [], doc.studentUid))
         return res.status(403).json({ error: "Access denied" });
     }
 
@@ -229,8 +228,7 @@ router.get(
 
     if (req.role === "Parent") {
       const parentDoc = await getDoc(Collections.USERS, req.uid!);
-      const children: { childUid?: string }[] = parentDoc?.children || [];
-      if (!children.some((c) => c.childUid === entry.studentUid))
+      if (!isParentOfChild(parentDoc?.children || [], entry.studentUid))
         return res.status(403).json({ error: "Access denied" });
     }
 
@@ -255,8 +253,7 @@ router.post(
 
     if (req.role === "Parent") {
       const parentDoc = await getDoc(Collections.USERS, req.uid!);
-      const children: { childUid?: string }[] = parentDoc?.children || [];
-      if (!children.some((c) => c.childUid === entry.studentUid))
+      if (!isParentOfChild(parentDoc?.children || [], entry.studentUid))
         return res.status(403).json({ error: "Access denied" });
     }
 

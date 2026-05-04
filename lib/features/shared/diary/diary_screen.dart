@@ -133,9 +133,9 @@ class _DiaryScreenState extends State<DiaryScreen> {
       builder: (_) => CreateDiaryEntrySheet(
         studentUid: _selectedStudentUid,
         studentName: _selectedStudentName,
-        onCreated: (entry) {
-          setState(() => _entries.insert(0, entry));
+        onCreated: (_) {
           _datesWithEntries.add(_dateStr);
+          _loadEntries();
         },
       ),
     );
@@ -488,6 +488,7 @@ class _StudentPickerSheetState extends State<_StudentPickerSheet> {
             const SizedBox(height: 12),
             TextField(
               onChanged: (v) => setState(() => _search = v),
+              style: const TextStyle(color: TatvaColors.neutral900, fontSize: 14),
               decoration: InputDecoration(
                 hintText: 'Search by name...',
                 hintStyle: TextStyle(color: TatvaColors.neutral400),

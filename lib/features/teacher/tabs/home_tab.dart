@@ -102,18 +102,20 @@ class TeacherHomeTab extends StatelessWidget {
           const SizedBox(height: 12),
           Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(children: [
-                Expanded(child: QuickActionButton(label: 'Enter\nGrades', icon: Icons.edit_note_outlined,
-                    color: TatvaColors.accent, onTap: () => onSwitchTab(5))),
-                const SizedBox(width: 8),
-                Expanded(child: QuickActionButton(label: 'Post\nHomework', icon: Icons.assignment_outlined,
-                    color: TatvaColors.primary, onTap: () => onSwitchTab(6))),
-                const SizedBox(width: 8),
-                Expanded(child: QuickActionButton(label: 'Behavior', icon: Icons.emoji_events_outlined,
-                    color: TatvaColors.info, onTap: () => onSwitchTab(2))),
-                const SizedBox(width: 8),
-                Expanded(child: QuickActionButton(label: 'Messages', icon: Icons.chat_outlined, color: TatvaColors.purple,
-                    onTap: () => onSwitchTab(8))),
+              child: Column(children: [
+                Row(children: [
+                  Expanded(child: QuickActionButton(label: 'Enter\nGrades', icon: Icons.edit_note_outlined,
+                      color: TatvaColors.accent, onTap: () => onSwitchTab(8))),
+                  const SizedBox(width: 8),
+                  Expanded(child: QuickActionButton(label: 'Post\nHomework', icon: Icons.assignment_outlined,
+                      color: TatvaColors.primary, onTap: () => onSwitchTab(9))),
+                  const SizedBox(width: 8),
+                  Expanded(child: QuickActionButton(label: 'Behavior', icon: Icons.emoji_events_outlined,
+                      color: TatvaColors.info, onTap: () => onSwitchTab(7))),
+                  const SizedBox(width: 8),
+                  Expanded(child: QuickActionButton(label: 'Messages', icon: Icons.chat_outlined, color: TatvaColors.purple,
+                      onTap: () => onSwitchTab(10))),
+                ]),
               ])),
           const SizedBox(height: 24),
           Padding(
@@ -260,6 +262,7 @@ class TeacherHomeTab extends StatelessWidget {
       userName: user?.name ?? '',
       subtitle: 'Tatva Academy · Teacher',
       photoUrl: user?.photoUrl ?? '',
+      onTap: () => onSwitchTab(11),
       bottomWidget: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
@@ -360,7 +363,7 @@ class TeacherHomeTab extends StatelessWidget {
                           ]))),
                   const SizedBox(width: 8),
                   GestureDetector(
-                      onTap: () => onSwitchTab(5),
+                      onTap: () => onSwitchTab(8),
                       child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 6),
