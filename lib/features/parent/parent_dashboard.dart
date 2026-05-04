@@ -263,9 +263,9 @@ class _ParentDashboardState extends State<ParentDashboard>
   void _logout() => logout();
 
   void _navigateToProfile() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
-      body: ParentProfileTab(
+    Navigator.push(context, MaterialPageRoute(builder: (_) => _DashSubScreen(
+      title: 'Profile',
+      child: ParentProfileTab(
         user: _data?.user,
         currentChild: _currentChild,
         currentChildEntries: _currentChildEntries,
@@ -275,18 +275,21 @@ class _ParentDashboardState extends State<ParentDashboard>
         onRefresh: _loadData,
         childrenData: _data?.childrenData ?? [],
         selectedChildIndex: _selectedChildIndex,
-        onChildSelected: (i) => setState(() {
-          _selectedChildIndex = i;
-          _rebuildHomeworkState();
-        }),
+        onChildSelected: (i) {
+          Navigator.pop(context);
+          setState(() {
+            _selectedChildIndex = i;
+            _rebuildHomeworkState();
+          });
+        },
       ),
     )));
   }
 
   void _navigateToBehavior() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(
-      appBar: AppBar(title: const Text('Behavior')),
-      body: ParentBehaviorTab(
+    Navigator.push(context, MaterialPageRoute(builder: (_) => _DashSubScreen(
+      title: 'Behavior',
+      child: ParentBehaviorTab(
         currentChild: _currentChild,
         currentChildEntries: _currentChildEntries,
       ),
@@ -294,9 +297,9 @@ class _ParentDashboardState extends State<ParentDashboard>
   }
 
   void _navigateToProgress() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(
-      appBar: AppBar(title: const Text('Progress')),
-      body: ParentProgressTab(
+    Navigator.push(context, MaterialPageRoute(builder: (_) => _DashSubScreen(
+      title: 'Progress',
+      child: ParentProgressTab(
         currentChild: _currentChild,
         currentChildEntries: _currentChildEntries,
       ),
@@ -485,6 +488,32 @@ class _ParentDashboardState extends State<ParentDashboard>
               onCastVote: _castVote,
             ),
           ]),
+    );
+  }
+}
+
+class _DashSubScreen extends StatelessWidget {
+  final String title;
+  final Widget child;
+  const _DashSubScreen({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: TatvaColors.bgLight,
+      appBar: AppBar(
+        backgroundColor: TatvaColors.bgLight,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        title: Text(title, style: const TextStyle(
+          fontSize: 18, fontWeight: FontWeight.bold, color: TatvaColors.neutral900)),
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_rounded, size: 18, color: TatvaColors.neutral900),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: SafeArea(child: child),
     );
   }
 }

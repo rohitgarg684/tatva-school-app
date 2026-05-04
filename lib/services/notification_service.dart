@@ -56,7 +56,11 @@ class NotificationService {
   Future<void> _registerToken({String? token}) async {
     try {
       final fcmToken = token ?? await _messaging.getToken();
-      if (fcmToken == null) return;
+      if (fcmToken == null) {
+        debugPrint('[FCM] getToken() returned null — APNs key may be missing from Firebase Console');
+        return;
+      }
+      debugPrint('[FCM] Registering token: ${fcmToken.substring(0, 12)}…');
       await _api.registerFcmToken(fcmToken);
     } catch (e) {
       debugPrint('[FCM] Token registration failed: $e');

@@ -27,7 +27,11 @@ export class PushChannel implements NotificationChannel {
       };
 
       const response = await admin.messaging().sendEachForMulticast(message);
+      console.log(`[push] Batch ${i / BATCH_SIZE + 1}: ${response.successCount} ok, ${response.failureCount} failed`);
       if (response.failureCount > 0) {
+        response.responses.forEach((r, idx) => {
+          if (r.error) console.warn(`[push] token[${i + idx}] error: ${r.error.code} — ${r.error.message}`);
+        });
         await this.cleanStaleTokens(recipients.slice(i, i + BATCH_SIZE), response.responses);
       }
     }

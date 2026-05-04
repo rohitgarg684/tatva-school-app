@@ -75,8 +75,12 @@ async function resolveAndSend(ec: EventContext): Promise<void> {
       break;
   }
 
-  if (recipients.length === 0) return;
+  if (recipients.length === 0) {
+    console.warn(`[notifier] ${ec.event}: 0 recipients found — skipping`);
+    return;
+  }
 
+  console.log(`[notifier] ${ec.event}: sending to ${recipients.length} recipient(s)`);
   await Promise.all(channels.map((ch) => ch.send(recipients, payload)));
 }
 
