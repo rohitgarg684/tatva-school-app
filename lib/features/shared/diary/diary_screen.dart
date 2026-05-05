@@ -48,10 +48,22 @@ class _DiaryScreenState extends State<DiaryScreen> {
   void initState() {
     super.initState();
     _selectedDate = DateTime.now();
+    _initStudent();
+  }
+
+  @override
+  void didUpdateWidget(covariant DiaryScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.fixedStudentUid != oldWidget.fixedStudentUid) {
+      _initStudent();
+    }
+  }
+
+  void _initStudent() {
     if (widget.fixedStudentUid != null) {
       _selectedStudentUid = widget.fixedStudentUid!;
       _selectedStudentName = widget.fixedStudentName ?? '';
-    } else if (widget.students.isNotEmpty) {
+    } else if (_selectedStudentUid.isEmpty && widget.students.isNotEmpty) {
       _selectedStudentUid = widget.students.first.uid;
       _selectedStudentName = widget.students.first.name;
     }
@@ -59,7 +71,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
       _loadEntries();
       _loadMonthDots();
     } else {
-      _loading = false;
+      setState(() => _loading = false);
     }
   }
 
@@ -256,7 +268,13 @@ class _DiaryScreenState extends State<DiaryScreen> {
         Row(children: [
           IconButton(
             icon: const Icon(Icons.chevron_left_rounded, size: 24),
-            onPressed: () => _onDateSelected(_selectedDate.subtract(const Duration(days: 7))),
+            onPressed: () {
+              if (_monthExpanded) {
+                _onDateSelected(DateTime(_selectedDate.year, _selectedDate.month - 1, 1));
+              } else {
+                _onDateSelected(_selectedDate.subtract(const Duration(days: 7)));
+              }
+            },
           ),
           Expanded(
             child: GestureDetector(
@@ -275,7 +293,13 @@ class _DiaryScreenState extends State<DiaryScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.chevron_right_rounded, size: 24),
-            onPressed: () => _onDateSelected(_selectedDate.add(const Duration(days: 7))),
+            onPressed: () {
+              if (_monthExpanded) {
+                _onDateSelected(DateTime(_selectedDate.year, _selectedDate.month + 1, 1));
+              } else {
+                _onDateSelected(_selectedDate.add(const Duration(days: 7)));
+              }
+            },
           ),
         ]),
         const SizedBox(height: 8),

@@ -108,9 +108,9 @@ router.get(
         const commSnap = await db.collection(Collections.DIARY_COMMENTS)
           .where("entryId", "==", entryId)
           .where("createdAt", ">", lastSeen)
-          .where("authorUid", "!=", req.uid!)
           .get();
-        unreadMap[entryId] = commSnap.size;
+        const count = commSnap.docs.filter((d) => d.data().authorUid !== req.uid!).length;
+        unreadMap[entryId] = count;
       }
     }
 
@@ -397,9 +397,8 @@ router.get(
         const commSnap = await db.collection(Collections.DIARY_COMMENTS)
           .where("entryId", "==", eid)
           .where("createdAt", ">", lastSeen)
-          .where("authorUid", "!=", req.uid!)
           .get();
-        total += commSnap.size;
+        total += commSnap.docs.filter((d) => d.data().authorUid !== req.uid!).length;
       }
     }
 
