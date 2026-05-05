@@ -45,15 +45,15 @@ class _TeacherDashboardState extends State<TeacherDashboard>
   // Bottom nav tabs (indices 0–6)
   static const List<TabItem> _tabs = [
     TabItem(icon: Icons.dashboard_outlined, activeIcon: Icons.dashboard_rounded, label: 'Home'),
-    TabItem(icon: Icons.class_outlined, activeIcon: Icons.class_rounded, label: 'Classes'),
-    TabItem(icon: Icons.fact_check_outlined, activeIcon: Icons.fact_check_rounded, label: 'Attend'),
     TabItem(icon: Icons.calendar_view_week_outlined, activeIcon: Icons.calendar_view_week_rounded, label: 'Schedule'),
     TabItem(icon: Icons.auto_stories_outlined, activeIcon: Icons.auto_stories_rounded, label: 'Learn'),
     TabItem(icon: Icons.how_to_vote_outlined, activeIcon: Icons.how_to_vote_rounded, label: 'Votes'),
     TabItem(icon: Icons.menu_book_outlined, activeIcon: Icons.menu_book_rounded, label: 'Diary'),
   ];
 
-  // Hidden tab indices (accessible via quick actions)
+  // Hidden tab indices (accessible via quick actions / greeting card)
+  static const int _classesIdx = 5;
+  static const int _attendIdx = 6;
   static const int _behaviorIdx = 7;
   static const int _gradesIdx = 8;
   static const int _homeworkIdx = 9;
@@ -130,30 +130,13 @@ class _TeacherDashboardState extends State<TeacherDashboard>
               api: _api,
               firstClassId: (_data?.classes ?? []).isNotEmpty ? _data!.classes.first.id : null,
             ),
-            // 1: Classes
-            TeacherClassesTab(
-              classes: _data?.classes ?? [],
-              students: _data?.studentsInFirstClass ?? [],
-              onRefresh: _loadUser,
-              onSwitchTab: switchTab,
-            ),
-            // 2: Attend
-            TeacherAttendanceTab(
-              allSchoolStudents: _data?.allStudents ?? [],
-              students: _data?.studentsInFirstClass ?? [],
-              classes: _data?.classes ?? [],
-              todayAttendance: _todayAttendance,
-              uid: _uid,
-              onAttendanceSaved: (records) =>
-                  setState(() => _todayAttendance = records),
-            ),
-            // 3: Schedule
+            // 1: Schedule
             TeacherScheduleTab(
               classes: _data?.classes ?? [],
               uid: _uid,
               onRefresh: _loadUser,
             ),
-            // 4: Learn
+            // 2: Learn
             TeacherLearnTab(
               contentItems: _contentItems,
               classes: _data?.classes ?? [],
@@ -168,7 +151,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                 if (idx >= 0) _contentItems[idx] = ci;
               }),
             ),
-            // 5: Votes
+            // 3: Votes
             TeacherVotesTab(
               votes: _voteModels,
               uid: _uid,
@@ -184,12 +167,29 @@ class _TeacherDashboardState extends State<TeacherDashboard>
                 if (idx >= 0) _voteModels[idx] = _voteModels[idx].copyWith(active: false);
               }),
             ),
-            // 6: Diary
+            // 4: Diary
             DiaryScreen(
               classes: _data?.classes ?? [],
               students: _data?.allStudents ?? [],
               uid: _uid,
               role: 'Teacher',
+            ),
+            // 5: Classes (hidden)
+            TeacherClassesTab(
+              classes: _data?.classes ?? [],
+              students: _data?.studentsInFirstClass ?? [],
+              onRefresh: _loadUser,
+              onSwitchTab: switchTab,
+            ),
+            // 6: Attend (hidden)
+            TeacherAttendanceTab(
+              allSchoolStudents: _data?.allStudents ?? [],
+              students: _data?.studentsInFirstClass ?? [],
+              classes: _data?.classes ?? [],
+              todayAttendance: _todayAttendance,
+              uid: _uid,
+              onAttendanceSaved: (records) =>
+                  setState(() => _todayAttendance = records),
             ),
             // 7: Behavior (hidden)
             TeacherBehaviorTab(
