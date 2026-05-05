@@ -71,6 +71,7 @@ class _TeacherDashboardState extends State<TeacherDashboard>
   List<AttendanceRecord> _todayAttendance = [];
   List<ContentItem> _contentItems = [];
   List<VoteModel> _voteModels = [];
+  int _diaryUnread = 0;
 
   @override
   void initState() {
@@ -101,12 +102,21 @@ class _TeacherDashboardState extends State<TeacherDashboard>
       debugPrint('TeacherDashboard._loadData error: $e');
     }
     onDataLoaded();
+    _loadDiaryUnread();
+  }
+
+  Future<void> _loadDiaryUnread() async {
+    try {
+      final count = await _api.getDiaryUnreadCount();
+      if (mounted) setState(() => _diaryUnread = count);
+    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
     return buildDashboardScaffold(
       tabs: _tabs,
+      badges: _diaryUnread > 0 ? {4: _diaryUnread} : const {},
       bodyBuilder: () => IndexedStack(index: currentTab, children: [
             // 0: Home
             TeacherHomeTab(

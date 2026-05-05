@@ -2,7 +2,9 @@ export type NotificationEvent =
   | "announcement"
   | "homeworkAssigned"
   | "homeworkStatusChanged"
-  | "homeworkComment";
+  | "homeworkComment"
+  | "diaryEntry"
+  | "diaryComment";
 
 export interface NotificationPayload {
   title: string;
@@ -54,8 +56,28 @@ export interface HomeworkCommentContext {
   homeworkTitle: string;
 }
 
+export interface DiaryEntryContext {
+  entryId: string;
+  studentUid: string;
+  studentName: string;
+  teacherName: string;
+  teacherUid: string;
+  title: string;
+}
+
+export interface DiaryCommentContext {
+  entryId: string;
+  studentUid: string;
+  authorUid: string;
+  authorName: string;
+  teacherUid: string;
+  entryTitle: string;
+}
+
 export type EventContext =
   | { event: "announcement"; ctx: AnnouncementContext }
   | { event: "homeworkAssigned"; ctx: HomeworkAssignedContext }
   | { event: "homeworkStatusChanged"; ctx: HomeworkStatusContext }
-  | { event: "homeworkComment"; ctx: HomeworkCommentContext };
+  | { event: "homeworkComment"; ctx: HomeworkCommentContext }
+  | { event: "diaryEntry"; ctx: DiaryEntryContext }
+  | { event: "diaryComment"; ctx: DiaryCommentContext };

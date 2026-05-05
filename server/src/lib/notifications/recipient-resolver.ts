@@ -108,3 +108,30 @@ export async function resolveCommentRecipient(
   const targetUid = authorUid === studentUid ? teacherUid : studentUid;
   return fetchTokensForUids([targetUid], authorUid);
 }
+
+export async function resolveParentsOfStudent(
+  studentUid: string,
+  excludeUid?: string
+): Promise<Recipient[]> {
+  const snap = await db
+    .collection(Collections.USERS)
+    .where("role", "==", "Parent")
+    .get();
+
+  const parentUids: string[] = [];
+  for (const doc of snap.docs) {
+    const children: { childUid: string }[] = doc.data().children || [];
+    if (children.some((c) => c.childUid === studentUid)) {
+      parentUids.push(doc.id);
+    }
+  }
+
+  return fetchTokensForUids(parentUids, excludeUid);
+}
+
+export async function resolveDiaryCommentRecipient(
+  authorUid: string,
+  teacherUid: string
+): Promise<Recipient[]> {
+  return fetchTokensForUids([teacherUid], authorUid);
+}

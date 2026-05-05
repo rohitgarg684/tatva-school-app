@@ -18,6 +18,7 @@ class TatvaBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
   final Color accentColor;
+  final Map<int, int> badges;
 
   const TatvaBottomNavBar({
     super.key,
@@ -25,6 +26,7 @@ class TatvaBottomNavBar extends StatelessWidget {
     required this.currentIndex,
     required this.onTap,
     this.accentColor = const Color(0xFF2E6B4F),
+    this.badges = const {},
   });
 
   @override
@@ -66,16 +68,39 @@ class TatvaBottomNavBar extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
-                          child: Icon(
-                            isActive ? item.activeIcon : item.icon,
-                            key: ValueKey(isActive),
-                            color: isActive
-                                ? accentColor
-                                : TatvaColors.neutral400,
-                            size: 20,
-                          ),
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              child: Icon(
+                                isActive ? item.activeIcon : item.icon,
+                                key: ValueKey(isActive),
+                                color: isActive
+                                    ? accentColor
+                                    : TatvaColors.neutral400,
+                                size: 20,
+                              ),
+                            ),
+                            if ((badges[index] ?? 0) > 0)
+                              Positioned(
+                                right: -8,
+                                top: -4,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: TatvaColors.error,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  constraints: const BoxConstraints(minWidth: 16, minHeight: 14),
+                                  child: Text(
+                                    '${badges[index]!}',
+                                    style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w700),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 3),
                         AnimatedDefaultTextStyle(

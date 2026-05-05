@@ -10,6 +10,7 @@ import { Collections } from "../lib/collections";
 import { env } from "../env";
 import { DiaryAttachment } from "../models";
 import { isParentOfChild } from "./users";
+import { notify } from "../lib/notifications/notifier";
 
 const DOC_MIME_TYPES = [
   "image/jpeg",
@@ -85,8 +86,36 @@ router.get(
       .orderBy("createdAt", "desc")
       .get();
 
-    const entries = snap.docs.map((d) => serializeDoc({ id: d.id, ...d.data() }));
-    res.json({ entries });
+    const entries = snap.docs.map((d) => {
+      const data = d.data();
+      return serializeDoc({ id: d.id, ...data, commentCount: data.commentCount || 0 });
+    });
+
+    const entryIds = snap.docs.map((d) => d.id);
+    const unreadMap: Record<string, number> = {};
+    if (entryIds.length > 0) {
+      const readSnap = await db.collection(Collections.DIARY_READ_STATUS)
+        .where("userId", "==", req.uid!)
+        .where("entryId", "in", entryIds.slice(0, 30))
+        .get();
+      const lastSeenMap = new Map<string, Date>();
+      for (const rd of readSnap.docs) {
+        const d = rd.data();
+        lastSeenMap.set(d.entryId, d.lastSeenAt?.toDate?.() || new Date(0));
+      }
+      for (const entryId of entryIds) {
+        const lastSeen = lastSeenMap.get(entryId) || new Date(0);
+        const commSnap = await db.collection(Collections.DIARY_COMMENTS)
+          .where("entryId", "==", entryId)
+          .where("createdAt", ">", lastSeen)
+          .where("authorUid", "!=", req.uid!)
+          .get();
+        unreadMap[entryId] = commSnap.size;
+      }
+    }
+
+    const enriched = entries.map((e: any) => ({ ...e, unreadCount: unreadMap[e.id] || 0 }));
+    res.json({ entries: enriched });
   })
 );
 
@@ -145,18 +174,26 @@ router.post(
     ]);
     const today = new Date().toISOString().split("T")[0];
 
+    const teacherName = userDoc?.name || "Unknown";
+    const studentName = studentDoc?.name || "Unknown";
+
     const ref = await db.collection(Collections.DIARY_ENTRIES).add({
       classId: classId || "",
       studentUid,
-      studentName: studentDoc?.name || "Unknown",
+      studentName,
       teacherUid: req.uid!,
-      teacherName: userDoc?.name || "Unknown",
+      teacherName,
       date: today,
       title,
       body,
       attachments: [],
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    notify({
+      event: "diaryEntry",
+      ctx: { entryId: ref.id, studentUid, studentName, teacherName, teacherUid: req.uid!, title },
     });
 
     res.json({ id: ref.id, created: true });
@@ -263,15 +300,35 @@ router.post(
 
     const userDoc = await getDoc(Collections.USERS, req.uid!);
 
+    const authorName = userDoc?.name || "Unknown";
+
     const ref = await db.collection(Collections.DIARY_COMMENTS).add({
       entryId: id,
       authorUid: req.uid!,
-      authorName: userDoc?.name || "Unknown",
+      authorName,
       authorRole: req.role!,
       body,
       attachments: [],
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+
+    await db.collection(Collections.DIARY_ENTRIES).doc(id).update({
+      commentCount: admin.firestore.FieldValue.increment(1),
+    });
+
+    if (req.role === "Parent") {
+      notify({
+        event: "diaryComment",
+        ctx: {
+          entryId: id,
+          studentUid: entry.studentUid,
+          authorUid: req.uid!,
+          authorName,
+          teacherUid: entry.teacherUid,
+          entryTitle: entry.title,
+        },
+      });
+    }
 
     res.json({ id: ref.id, created: true });
   })
@@ -293,7 +350,77 @@ router.delete(
     }
 
     await db.collection(Collections.DIARY_COMMENTS).doc(id).delete();
+    await db.collection(Collections.DIARY_ENTRIES).doc(doc.entryId).update({
+      commentCount: admin.firestore.FieldValue.increment(-1),
+    });
     res.json({ deleted: true });
+  })
+);
+
+// GET /diary/unread-count — total unread comment count for the current user
+router.get(
+  "/diary/unread-count",
+  asyncHandler(async (req: Request, res: Response) => {
+    let entryIds: string[] = [];
+
+    if (req.role === "Parent") {
+      const parentDoc = await getDoc(Collections.USERS, req.uid!);
+      const childUids = (parentDoc?.children || []).map((c: any) => c.childUid).filter(Boolean);
+      if (childUids.length === 0) return res.json({ count: 0 });
+      const snap = await db.collection(Collections.DIARY_ENTRIES)
+        .where("studentUid", "in", childUids.slice(0, 30))
+        .get();
+      entryIds = snap.docs.map((d) => d.id);
+    } else {
+      const snap = await db.collection(Collections.DIARY_ENTRIES)
+        .where("teacherUid", "==", req.uid!)
+        .get();
+      entryIds = snap.docs.map((d) => d.id);
+    }
+
+    if (entryIds.length === 0) return res.json({ count: 0 });
+
+    const readSnap = await db.collection(Collections.DIARY_READ_STATUS)
+      .where("userId", "==", req.uid!)
+      .get();
+    const lastSeenMap = new Map<string, Date>();
+    for (const rd of readSnap.docs) {
+      const d = rd.data();
+      lastSeenMap.set(d.entryId, d.lastSeenAt?.toDate?.() || new Date(0));
+    }
+
+    let total = 0;
+    for (let i = 0; i < entryIds.length; i += 30) {
+      const chunk = entryIds.slice(i, i + 30);
+      for (const eid of chunk) {
+        const lastSeen = lastSeenMap.get(eid) || new Date(0);
+        const commSnap = await db.collection(Collections.DIARY_COMMENTS)
+          .where("entryId", "==", eid)
+          .where("createdAt", ">", lastSeen)
+          .where("authorUid", "!=", req.uid!)
+          .get();
+        total += commSnap.size;
+      }
+    }
+
+    res.json({ count: total });
+  })
+);
+
+// POST /diary/entries/:id/mark-read — mark all comments on entry as seen
+router.post(
+  "/diary/entries/:id/mark-read",
+  asyncHandler(async (req: Request, res: Response) => {
+    const entryId = req.params.id as string;
+    const docId = `${req.uid!}_${entryId}`;
+
+    await db.collection(Collections.DIARY_READ_STATUS).doc(docId).set({
+      userId: req.uid!,
+      entryId,
+      lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    res.json({ marked: true });
   })
 );
 

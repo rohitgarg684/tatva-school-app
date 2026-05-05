@@ -141,6 +141,7 @@ mixin DashboardMixin<T extends StatefulWidget> on State<T>, TickerProviderStateM
     required List<TabItem> tabs,
     required Widget Function() bodyBuilder,
     Widget Function()? shimmerBuilder,
+    Map<int, int> badges = const {},
   }) {
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -158,7 +159,7 @@ mixin DashboardMixin<T extends StatefulWidget> on State<T>, TickerProviderStateM
       bottomNavigationBar: isLoading
           ? null
           : TatvaBottomNavBar(
-              items: tabs, currentIndex: currentTab, onTap: switchTab),
+              items: tabs, currentIndex: currentTab, onTap: switchTab, badges: badges),
     );
   }
 }

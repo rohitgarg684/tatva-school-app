@@ -143,6 +143,13 @@ class _DiaryScreenState extends State<DiaryScreen> {
 
   void _openEntry(DiaryEntry entry) {
     HapticFeedback.lightImpact();
+    if (entry.unreadCount > 0) {
+      _api.markDiaryEntryRead(entry.id);
+      setState(() {
+        final idx = _entries.indexWhere((e) => e.id == entry.id);
+        if (idx >= 0) _entries[idx] = _entries[idx].copyWith(unreadCount: 0);
+      });
+    }
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => DiaryEntryDetailSheet(
         entry: entry,
@@ -603,13 +610,31 @@ class _DiaryEntryCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TatvaText.body.copyWith(color: TatvaColors.neutral600, height: 1.4),
           ),
-          if (entry.createdAt != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              _formatTime(entry.createdAt!),
-              style: TatvaText.caption.copyWith(color: TatvaColors.neutral400, fontSize: 11),
-            ),
-          ],
+          const SizedBox(height: 8),
+          Row(children: [
+            if (entry.createdAt != null)
+              Text(
+                _formatTime(entry.createdAt!),
+                style: TatvaText.caption.copyWith(color: TatvaColors.neutral400, fontSize: 11),
+              ),
+            const Spacer(),
+            if (entry.commentCount > 0) ...[
+              const Icon(Icons.chat_bubble_outline_rounded, size: 14, color: TatvaColors.neutral400),
+              const SizedBox(width: 4),
+              Text('${entry.commentCount}', style: TatvaText.caption.copyWith(color: TatvaColors.neutral500, fontSize: 11)),
+            ],
+            if (entry.unreadCount > 0) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: TatvaColors.error,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text('${entry.unreadCount} new', style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ]),
         ]),
       ),
     );

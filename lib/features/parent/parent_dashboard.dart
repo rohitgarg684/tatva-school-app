@@ -51,6 +51,7 @@ class _ParentDashboardState extends State<ParentDashboard>
   List<VoteModel> _activeVotes = [];
   Set<String> _completedIds = {};
   Map<String, Map<String, dynamic>> _mySubmissions = {};
+  int _diaryUnread = 0;
 
   @override
   void initState() {
@@ -81,6 +82,14 @@ class _ParentDashboardState extends State<ParentDashboard>
       debugPrint('ParentDashboard._loadData error: $e');
     }
     onDataLoaded();
+    _loadDiaryUnread();
+  }
+
+  Future<void> _loadDiaryUnread() async {
+    try {
+      final count = await _api.getDiaryUnreadCount();
+      if (mounted) setState(() => _diaryUnread = count);
+    } catch (_) {}
   }
 
   void _castVote(int index, String option) async {
@@ -438,6 +447,7 @@ class _ParentDashboardState extends State<ParentDashboard>
   Widget build(BuildContext context) {
     return buildDashboardScaffold(
       tabs: _tabs,
+      badges: _diaryUnread > 0 ? {4: _diaryUnread} : const {},
       bodyBuilder: () => IndexedStack(index: currentTab, children: [
             ParentHomeTab(
               user: _data?.user,

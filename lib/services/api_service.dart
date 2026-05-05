@@ -846,6 +846,15 @@ class ApiService {
     return (data['dates'] as List?)?.cast<String>() ?? [];
   }
 
+  Future<int> getDiaryUnreadCount() async {
+    final data = await _get('/diary/unread-count');
+    return (data['count'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<void> markDiaryEntryRead(String entryId) async {
+    await _post('/diary/entries/$entryId/mark-read', {});
+  }
+
   Future<Map<String, dynamic>> createDiaryEntry({
     required String studentUid,
     required String title,

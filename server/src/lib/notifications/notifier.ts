@@ -5,6 +5,8 @@ import {
   resolveClassRecipients,
   resolveStudentAndParents,
   resolveCommentRecipient,
+  resolveParentsOfStudent,
+  resolveDiaryCommentRecipient,
 } from "./recipient-resolver";
 
 const channels: NotificationChannel[] = [new PushChannel()];
@@ -45,6 +47,22 @@ function buildPayload(ec: EventContext): NotificationPayload {
         data: { type: "homework_comment", id: ctx.homeworkId, studentUid: ctx.studentUid },
       };
     }
+    case "diaryEntry": {
+      const { ctx } = ec;
+      return {
+        title: `Diary Note for ${ctx.studentName}`,
+        body: `${ctx.teacherName}: ${ctx.title}`,
+        data: { type: "diary_entry", id: ctx.entryId, studentUid: ctx.studentUid },
+      };
+    }
+    case "diaryComment": {
+      const { ctx } = ec;
+      return {
+        title: "Diary Reply",
+        body: `${ctx.authorName} replied on "${ctx.entryTitle}"`,
+        data: { type: "diary_comment", id: ctx.entryId, studentUid: ctx.studentUid },
+      };
+    }
   }
 }
 
@@ -72,6 +90,12 @@ async function resolveAndSend(ec: EventContext): Promise<void> {
         ec.ctx.studentUid,
         ec.ctx.teacherUid
       );
+      break;
+    case "diaryEntry":
+      recipients = await resolveParentsOfStudent(ec.ctx.studentUid, ec.ctx.teacherUid);
+      break;
+    case "diaryComment":
+      recipients = await resolveDiaryCommentRecipient(ec.ctx.authorUid, ec.ctx.teacherUid);
       break;
   }
 

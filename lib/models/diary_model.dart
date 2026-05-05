@@ -45,6 +45,8 @@ class DiaryEntry {
   final String title;
   final String body;
   final List<DiaryAttachment> attachments;
+  final int commentCount;
+  final int unreadCount;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -59,6 +61,8 @@ class DiaryEntry {
     required this.title,
     required this.body,
     this.attachments = const [],
+    this.commentCount = 0,
+    this.unreadCount = 0,
     this.createdAt,
     this.updatedAt,
   });
@@ -78,6 +82,8 @@ class DiaryEntry {
               ?.map((e) => DiaryAttachment.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
+      commentCount: (data['commentCount'] as num?)?.toInt() ?? 0,
+      unreadCount: (data['unreadCount'] as num?)?.toInt() ?? 0,
       createdAt: data['createdAt'] != null ? DateTime.tryParse(data['createdAt'] as String) : null,
       updatedAt: data['updatedAt'] != null ? DateTime.tryParse(data['updatedAt'] as String) : null,
     );
@@ -107,6 +113,8 @@ class DiaryEntry {
     String? title,
     String? body,
     List<DiaryAttachment>? attachments,
+    int? commentCount,
+    int? unreadCount,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -121,6 +129,8 @@ class DiaryEntry {
       title: title ?? this.title,
       body: body ?? this.body,
       attachments: attachments ?? this.attachments,
+      commentCount: commentCount ?? this.commentCount,
+      unreadCount: unreadCount ?? this.unreadCount,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

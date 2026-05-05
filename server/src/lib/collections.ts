@@ -23,6 +23,7 @@ export const Collections = {
   SCHOOL_SETTINGS: "school_settings",
   DIARY_ENTRIES: "diary_entries",
   DIARY_COMMENTS: "diary_comments",
+  DIARY_READ_STATUS: "diary_read_status",
 } as const;
 
 export type CollectionName = (typeof Collections)[keyof typeof Collections];
