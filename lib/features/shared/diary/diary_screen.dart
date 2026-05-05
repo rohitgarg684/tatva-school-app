@@ -348,59 +348,64 @@ class _DiaryScreenState extends State<DiaryScreen> {
     final startWeekday = firstOfMonth.weekday;
     final now = DateTime.now();
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
+    final totalCells = daysInMonth + startWeekday - 1;
+    final rows = (totalCells / 7).ceil();
+    final gridHeight = rows * 44.0;
+
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 7, mainAxisSpacing: 4, crossAxisSpacing: 4,
-        ),
-        itemCount: daysInMonth + startWeekday - 1,
-        itemBuilder: (_, index) {
-          if (index < startWeekday - 1) return const SizedBox();
-          final day = index - startWeekday + 2;
-          final date = DateTime(_selectedDate.year, _selectedDate.month, day);
-          final isSelected = date.day == _selectedDate.day;
-          final isToday = date.day == now.day && date.month == now.month && date.year == now.year;
-          final dayStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-          final hasEntry = _datesWithEntries.contains(dayStr);
-          return GestureDetector(
-            onTap: () {
-              _onDateSelected(date);
-              setState(() => _monthExpanded = false);
-            },
-            child: Container(
-              decoration: BoxDecoration(
-                color: isSelected ? TatvaColors.primary : Colors.transparent,
-                shape: BoxShape.circle,
-                border: isToday && !isSelected ? Border.all(color: TatvaColors.primaryLight) : null,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '$day',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      color: isSelected ? Colors.white : TatvaColors.neutral700,
-                    ),
-                  ),
-                  if (hasEntry)
-                    Container(
-                      width: 4, height: 4, margin: const EdgeInsets.only(top: 2),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isSelected ? Colors.white : TatvaColors.accent,
+      child: SizedBox(
+        height: gridHeight,
+        child: GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 7, mainAxisSpacing: 4, crossAxisSpacing: 4, childAspectRatio: 1.2,
+          ),
+          itemCount: totalCells,
+          itemBuilder: (_, index) {
+            if (index < startWeekday - 1) return const SizedBox();
+            final day = index - startWeekday + 2;
+            final date = DateTime(_selectedDate.year, _selectedDate.month, day);
+            final isSelected = date.day == _selectedDate.day;
+            final isToday = date.day == now.day && date.month == now.month && date.year == now.year;
+            final dayStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+            final hasEntry = _datesWithEntries.contains(dayStr);
+            return GestureDetector(
+              onTap: () {
+                _onDateSelected(date);
+                setState(() => _monthExpanded = false);
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isSelected ? TatvaColors.primary : Colors.transparent,
+                  shape: BoxShape.circle,
+                  border: isToday && !isSelected ? Border.all(color: TatvaColors.primaryLight) : null,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '$day',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected ? Colors.white : TatvaColors.neutral700,
                       ),
                     ),
-                ],
+                    if (hasEntry)
+                      Container(
+                        width: 4, height: 4, margin: const EdgeInsets.only(top: 2),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isSelected ? Colors.white : TatvaColors.accent,
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
